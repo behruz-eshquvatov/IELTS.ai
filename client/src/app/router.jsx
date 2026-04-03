@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import AppFrame from "../layouts/AppFrame";
 import SiteLayout from "../layouts/SiteLayout";
 import StudentLayout from "../layouts/StudentLayout";
+import TeacherLayout from "../layouts/TeacherLayout";
 
 export const router = createBrowserRouter([
   {
@@ -103,6 +104,70 @@ export const router = createBrowserRouter([
             path: "assignments/:assignmentId",
             lazy: async () => ({
               Component: (await import("../pages/student/StudentAssignmentDetailPage")).default,
+            }),
+          },
+        ],
+      },
+      {
+        path: "/teacher",
+        element: <TeacherLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate replace to="/teacher/classes" />,
+          },
+          {
+            path: "classes",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherClassesPage")).default,
+            }),
+          },
+          {
+            path: "classes/:classId",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherClassOverviewPage")).default,
+            }),
+          },
+          {
+            path: "students",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherStudentsPage")).default,
+            }),
+          },
+          {
+            path: "students/:studentId",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherStudentDetailPage")).default,
+            }),
+          },
+          {
+            path: "assignments",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherAssignmentsPage")).default,
+            }),
+          },
+          {
+            path: "assignments/create",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherCreateAssignmentPage")).default,
+            }),
+          },
+          {
+            path: "submissions",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherSubmissionsPage")).default,
+            }),
+          },
+          {
+            path: "reports",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherReportsPage")).default,
+            }),
+          },
+          {
+            path: "settings",
+            lazy: async () => ({
+              Component: (await import("../pages/teacher/TeacherSettingsPage")).default,
             }),
           },
         ],

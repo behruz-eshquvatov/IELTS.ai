@@ -10,7 +10,6 @@ const summaryCards = [
     value: "72",
     suffix: "DAYS",
     isPrimary: true,
-    bgImage: "/watermarks/goal.png",
   },
   {
     id: "streak",
@@ -20,7 +19,6 @@ const summaryCards = [
     value: "12",
     suffix: "DAYS",
     isPrimary: false,
-    bgImage: "/watermarks/streak.png",
   },
 ];
 
@@ -32,15 +30,6 @@ const StudentSummaryCards = memo(function StudentSummaryCards() {
           key={card.id}
           className="relative flex min-h-[260px] flex-col justify-between overflow-hidden bg-[white] p-2 py-4"
         >
-          {card.bgImage ? (
-            <img
-              src={card.bgImage}
-              alt=""
-              className="pointer-events-none absolute -right-6 -bottom-6 h-48 w-48 object-contain opacity-[0.06] grayscale"
-              loading="lazy"
-              aria-hidden="true"
-            />
-          ) : null}
           {/* Top section: Label with Highlight block */}
           <div className="z-10 text-xl font-medium text-slate-800">
             {card.preLabel}{" "}
@@ -62,7 +51,7 @@ const StudentSummaryCards = memo(function StudentSummaryCards() {
               {card.suffix}
             </span>
           </div>
-          {card.id === "goal" ? (
+          {card.id !== "goal" ? (
             <svg
               className="absolute -top-6 -right-6 h-80 w-80 opacity-20 fill-amber-300"
               xmlns="http://www.w3.org/2000/svg"

@@ -12,7 +12,7 @@ function AppFrame() {
   const previousPathRef = useRef(location.pathname);
   const hideTimeoutRef = useRef(null);
   const shouldSkipLoader =
-    location.pathname.startsWith("/student/") &&
+    (location.pathname.startsWith("/student/") || location.pathname.startsWith("/teacher")) &&
     !location.pathname.startsWith("/student/auth") &&
     !location.pathname.startsWith("/student/forgot-password");
   const [loaderState, setLoaderState] = useState({
