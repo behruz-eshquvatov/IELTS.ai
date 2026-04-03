@@ -24,7 +24,7 @@ function ScoreBox({ score }) {
   const [whole, fraction] = score.split(".");
 
   return (
-    <div className="flex h-[50px] w-[100px] items-center justify-center overflow-hidden rounded-2xl bg-linear-to-br from-emerald-400 to-teal-500 shadow-[0_10px_40px_-10px_rgba(52,211,153,0.7)] md:h-[80px] md:w-[150px]">
+    <div className="emerald-gradient-fill flex h-[50px] w-[100px] items-center justify-center overflow-hidden rounded-2xl shadow-[0_10px_40px_-10px_rgba(52,211,153,0.7)] md:h-[80px] md:w-[150px]">
       <div className="font-orbitron flex items-center text-4xl font-bold tracking-tighter text-white md:text-6xl">
         <div className="relative flex h-[1em] w-[0.7em] justify-center">
           <AnimatePresence mode="popLayout">
@@ -129,7 +129,7 @@ function HeroSection() {
           <h1 className="mb-6 flex flex-col items-center justify-center text-4xl font-black uppercase leading-[1.1] tracking-tight text-slate-900 sm:mb-8 sm:text-5xl md:text-7xl">
             <span>Enhance your IELTS</span>
 
-            <div className="mt-6 flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-4 md:mt-8 md:gap-x-6">
+            <div className="mt-6 flex w-full items-center justify-center gap-x-4 gap-y-4 md:mt-8 md:gap-x-6">
               from
               <ScoreBox score={fromScores[fromIndex]} />
               to
