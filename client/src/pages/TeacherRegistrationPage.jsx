@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, Eye, EyeOff } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import InteractiveGridBackground from "../components/layout/InteractiveGridBackground";
 import MagneticButton from "../components/ui/MagneticButton";
 import {
@@ -133,6 +133,7 @@ function TeacherRegistrationPage() {
     startY: 0,
     startScrollTop: 0,
   });
+  const navigate = useNavigate();
 
   const theme = teacherModes[mode];
 
@@ -200,6 +201,7 @@ function TeacherRegistrationPage() {
   const handleSubmit = (event) => {
     event.preventDefault();
     setStatusMessage(theme.successMessage);
+    navigate("/teacher/classes");
   };
 
   const handleThumbMouseMove = useCallback(
