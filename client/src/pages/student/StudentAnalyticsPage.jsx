@@ -1,49 +1,52 @@
-function StudentAnalyticsPage() {
+﻿import StudentAnalyticsOverview from "../../components/student/StudentAnalyticsOverview";
+import StudentAnalyticsAdvisor from "../../components/student/StudentAnalyticsAdvisor";
+import StudentAnalyticsBandChart from "../../components/student/StudentAnalyticsBandChart";
+import StudentAnalyticsTimeLineChart from "../../components/student/StudentAnalyticsTimeLineChart";
+import StudentAnalyticsWeakSectionsTable from "../../components/student/StudentAnalyticsWeakSectionsTable";
+import StudentActivityHeatmap from "../../components/student/StudentActivityHeatmap";
+import StudentAnalyticsRangePicker from "../../components/student/StudentAnalyticsRangePicker";
+import useLocalStorageState from "../../hooks/useLocalStorageState";
+
+const heatmapMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+
+function generateActivityData(length) {
+  return Array.from({ length }, (_, i) => {
+    const dayOfWeek = i % 7;
+    const cycle = Math.sin(i / 11);
+    if (dayOfWeek === 6) return 0;
+    if (cycle > 0.6) return 3;
+    if (cycle > 0.1) return 2;
+    if (dayOfWeek === 5) return 1;
+    return i % 3 === 0 ? 1 : 0;
+  });
+}
+
+const heatmapData = generateActivityData(365);
+
+export default function StudentAnalyticsPage() {
+  const [range, setRange] = useLocalStorageState("student:analytics:range", "week");
+
   return (
-    <div className="space-y-8">
-      <header className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-600">
+    <div className="space-y-10 -mt-1 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
           Analytics Overview
-        </p>
-        <h1 className="text-3xl font-semibold">Progress insights</h1>
-        <p className="text-slate-600">
-          Track improvement trends, forecast target timelines, and spot weaknesses.
-        </p>
-      </header>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-none border border-slate-200/80 bg-white/90 p-5">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Forecast</p>
-          <p className="mt-3 text-2xl font-semibold">6 weeks to Band 7</p>
-        </div>
-        <div className="rounded-none border border-slate-200/80 bg-white/90 p-5">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Weekly trend</p>
-          <p className="mt-3 text-2xl font-semibold">+0.3 band</p>
-        </div>
-        <div className="rounded-none border border-slate-200/80 bg-white/90 p-5">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Consistency</p>
-          <p className="mt-3 text-2xl font-semibold">82%</p>
-        </div>
+        </h2>
+        <StudentAnalyticsRangePicker value={range} onChange={setRange} />
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-none border border-slate-200/80 bg-white/90 p-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Score progression</p>
-          <div className="mt-4 h-52 rounded-none border border-dashed border-slate-200/80" />
-        </div>
-        <div className="rounded-none border border-slate-200/80 bg-white/90 p-6">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Weak skill clusters</p>
-          <ul className="mt-4 space-y-2 text-sm text-slate-600">
-            <li>Map listening accuracy</li>
-            <li>Inference reading speed</li>
-            <li>Task response structure</li>
-          </ul>
-        </div>
+      <StudentAnalyticsOverview range={range} showHeader={false} />
+      <StudentAnalyticsAdvisor range={range} />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <StudentAnalyticsBandChart range={range} />
+        <StudentAnalyticsTimeLineChart range={range} />
       </div>
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+          Practice consistency
+        </h2>
+        <StudentActivityHeatmap months={heatmapMonths} activityData={heatmapData} />
+      </section>
+      <StudentAnalyticsWeakSectionsTable range={range} />
     </div>
   );
 }
-
-export default StudentAnalyticsPage;
-
-

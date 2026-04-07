@@ -35,8 +35,10 @@
   }
 
   a,
-  button {
+  button,
+  [role="button"] {
     -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
   }
 
   ::-webkit-scrollbar {
@@ -144,8 +146,9 @@
   .auth-input:-webkit-autofill:hover,
   .auth-input:-webkit-autofill:focus,
   .auth-input:-webkit-autofill:active {
-    -webkit-text-fill-color: currentColor;
-    caret-color: currentColor;
+    -webkit-text-fill-color: rgba(var(--auth-autofill-text-rgb, 15, 23, 42), 1) !important;
+    color: rgba(var(--auth-autofill-text-rgb, 15, 23, 42), 1) !important;
+    caret-color: rgba(var(--auth-autofill-text-rgb, 15, 23, 42), 1);
     -webkit-box-shadow: 0 0 0 1000px rgba(var(--auth-autofill-bg-rgb, 255, 255, 255), 1) inset !important;
     box-shadow: 0 0 0 1000px rgba(var(--auth-autofill-bg-rgb, 255, 255, 255), 1) inset !important;
     transition:

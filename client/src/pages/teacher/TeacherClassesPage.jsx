@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { LayoutGrid, List, Plus, Search, Trash2 } from "lucide-react";
 import { teacherClasses, teacherStudents } from "../../data/teacherPanel";
 import TeacherClassCard from "../../components/teacher/TeacherClassCard";
+import useLocalStorageState from "../../hooks/useLocalStorageState";
 
 const MotionSpan = motion.span;
 
@@ -150,7 +151,7 @@ function StudentDirectoryModal(props) {
 }
 
 function TeacherClassesPage() {
-  const [viewMode, setViewMode] = useState("list");
+  const [viewMode, setViewMode] = useLocalStorageState("teacher:classes:view-mode", "list");
   const [classesState, setClassesState] = useState(() => teacherClasses.map((item) => ({ ...item })));
   const [studentsState, setStudentsState] = useState(() => {
     const seededStudents = [

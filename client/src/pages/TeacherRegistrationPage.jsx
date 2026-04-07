@@ -4,6 +4,8 @@ import { ChevronLeft, Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import InteractiveGridBackground from "../components/layout/InteractiveGridBackground";
 import MagneticButton from "../components/ui/MagneticButton";
+import { authApi } from "../lib/apiClient";
+import { saveAuthSession } from "../lib/authSession";
 import {
   TEACHER_AUTH_IMAGE_URL,
   authBackButtonInnerClass,
@@ -26,6 +28,7 @@ const teacherModes = {
     panelClass: "bg-[#0b0b0b]",
     panelShadowClass: "shadow-[0_28px_82px_-56px_rgba(255,255,255,0.14)]",
     autofillBgRgb: "11, 11, 11",
+    autofillTextRgb: "255, 255, 255",
     gridClass: "opacity-35",
     glowPrimaryClass: "bg-white/8",
     glowAccentClass: "bg-emerald-500/12",
@@ -54,6 +57,7 @@ const teacherModes = {
     panelClass: "bg-[#f7f4ef]",
     panelShadowClass: "shadow-[0_36px_110px_-52px_rgba(15,23,42,0.34)]",
     autofillBgRgb: "247, 244, 239",
+    autofillTextRgb: "15, 23, 42",
     gridClass: "opacity-60",
     glowPrimaryClass: "bg-white/75",
     glowAccentClass: "bg-emerald-500/8",
@@ -120,7 +124,8 @@ function TeacherRegistrationPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const [status, setStatus] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [scrollbar, setScrollbar] = useState({
     thumbHeight: 40,
     thumbTop: 0,
@@ -193,15 +198,98 @@ function TeacherRegistrationPage() {
     }
 
     setMode(nextMode);
-    setStatusMessage("");
+    setStatus(null);
     setShowPassword(false);
     setShowConfirmPassword(false);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setStatusMessage(theme.successMessage);
-    navigate("/teacher/classes");
+    if (isSubmitting) {
+      return;
+    }
+
+    const trimmedEmail = formData.workEmail.trim().toLowerCase();
+    if (!trimmedEmail || !formData.password) {
+      setStatus({
+        type: "error",
+        message: "Work email and password are required.",
+      });
+      return;
+    }
+
+    if (mode === "signup") {
+      if (!formData.fullName.trim()) {
+        setStatus({
+          type: "error",
+          message: "Full name is required.",
+        });
+        return;
+      }
+
+      if (!formData.organization.trim()) {
+        setStatus({
+          type: "error",
+          message: "Organization is required.",
+        });
+        return;
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        setStatus({
+          type: "error",
+          message: "Passwords do not match.",
+        });
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    setStatus(null);
+
+    try {
+      const payload =
+        mode === "signup"
+          ? {
+              fullName: formData.fullName.trim(),
+              email: trimmedEmail,
+              password: formData.password,
+              confirmPassword: formData.confirmPassword,
+              role: "teacher",
+              organization: formData.organization.trim(),
+            }
+          : {
+              email: trimmedEmail,
+              password: formData.password,
+              role: "teacher",
+            };
+
+      const response =
+        mode === "signup"
+          ? await authApi.register(payload)
+          : await authApi.login(payload);
+
+      saveAuthSession(response);
+      setStatus({
+        type: "success",
+        message:
+          mode === "signup"
+            ? "Teacher account created successfully."
+            : "Teacher login successful.",
+      });
+      navigate("/teacher/classes");
+    } catch (error) {
+      const backendErrors = Array.isArray(error.errors) && error.errors.length
+        ? error.errors.join(" ")
+        : "";
+
+      setStatus({
+        type: "error",
+        message: backendErrors || error.message || "Authentication failed.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleThumbMouseMove = useCallback(
@@ -283,7 +371,14 @@ function TeacherRegistrationPage() {
       window.removeEventListener("mousemove", handleThumbMouseMove);
       window.removeEventListener("mouseup", handleThumbMouseUp);
     };
-  }, [handleThumbMouseMove, handleThumbMouseUp, mode, statusMessage, updateScrollbar]);
+  }, [handleThumbMouseMove, handleThumbMouseUp, mode, status, updateScrollbar]);
+
+  const statusClassName =
+    status?.type === "error"
+      ? mode === "login"
+        ? "border border-rose-400/30 bg-rose-500/10 text-rose-200"
+        : "border border-rose-300/70 bg-rose-50 text-rose-700"
+      : theme.statusClass;
 
   return (
     <section
@@ -291,6 +386,7 @@ function TeacherRegistrationPage() {
       style={{
         "--page-accent-rgb": "16, 185, 129",
         "--auth-autofill-bg-rgb": theme.autofillBgRgb,
+        "--auth-autofill-text-rgb": theme.autofillTextRgb,
       }}
     >
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -487,12 +583,15 @@ function TeacherRegistrationPage() {
                           <MagneticButton
                             className="rounded-full"
                             innerClassName={authPrimaryButtonClass}
+                            disabled={isSubmitting}
                             type="submit"
                           >
                             <span className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-150%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(150%)]">
                               <span className="h-full w-8 bg-white/30 blur-sm" />
                             </span>
-                            <span className="relative">{theme.submitLabel}</span>
+                            <span className="relative">
+                              {isSubmitting ? "Processing..." : theme.submitLabel}
+                            </span>
                           </MagneticButton>
                         </div>
 
@@ -514,13 +613,13 @@ function TeacherRegistrationPage() {
                           ) : null}
                         </div>
 
-                        {statusMessage ? (
+                        {status?.message ? (
                           <MotionDiv
                             animate={{ opacity: 1, y: 0 }}
-                            className={`${theme.statusClass} px-4 py-4 text-sm leading-7`}
+                            className={`${statusClassName} px-4 py-4 text-sm leading-7`}
                             initial={{ opacity: 0, y: 10 }}
                           >
-                            {statusMessage}
+                            {status.message}
                           </MotionDiv>
                         ) : null}
                       </form>

@@ -1,61 +1,36 @@
 import { memo } from "react";
 import StudentActivityHeatmap from "./StudentActivityHeatmap";
 
-const activityMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+// 1. Static Data Generation (Runs ONCE outside the React lifecycle)
+// Generates a deterministic, realistic 365-day array (values 0-3 based on hours)
+// Ready to be swapped with an API call later.
+const generateStaticActivityData = () => {
+  return Array.from({ length: 365 }, (_, i) => {
+    const dayOfWeek = i % 7;
+    // Creates organic-looking "waves" of study activity
+    const streakFactor = Math.sin(i / 14); 
 
-const activityData = Array(365).fill(0);
-const monthStart = {
-  nov: 214,
-  dec: 244,
-  jan: 275,
-  feb: 306,
-  mar: 334,
+    if (dayOfWeek === 6) return 0; // e.g., Sundays usually off
+    if (streakFactor > 0.6) return 3; // 3+ hours (Heavy study periods)
+    if (streakFactor > 0) return 2;   // 2 hours
+    if (dayOfWeek === 5) return 1;    // 1 hour (Light Fridays)
+    return i % 4 === 0 ? 1 : 0;       // Scattered light days
+  });
 };
-const lightDays = [
-  monthStart.nov + 1,
-  monthStart.nov + 2,
-  monthStart.nov + 5,
-  monthStart.nov + 12,
-  monthStart.nov + 20,
-  monthStart.dec + 4,
-  monthStart.dec + 10,
-  monthStart.dec + 22,
-  monthStart.jan + 3,
-  monthStart.jan + 18,
-  monthStart.feb + 6,
-  monthStart.feb + 16,
-  monthStart.mar + 2,
-  monthStart.mar + 9,
-  monthStart.mar + 24,
-];
-const mediumDays = [
-  monthStart.nov + 7,
-  monthStart.nov + 18,
-  monthStart.dec + 6,
-  monthStart.dec + 15,
-  monthStart.jan + 12,
-  monthStart.jan + 27,
-  monthStart.mar + 18,
-];
-const highDays = [
-  monthStart.dec + 2,
-  monthStart.jan + 8,
-];
-lightDays.forEach((day) => {
-  activityData[day] = 1;
-});
-mediumDays.forEach((day) => {
-  activityData[day] = 2;
-});
-highDays.forEach((day) => {
-  activityData[day] = 3;
-});
+
+const activityData = generateStaticActivityData();
+const activityMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 
 const StudentStudyActivities = memo(function StudentStudyActivities() {
   return (
-    <section className="space-y-4">
-      <h2 className="text-xl font-semibold">Study activities</h2>
+    <section className="space-y-3">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+        Study activities
+      </h2>
+      
+      {/* Ensure this child component is also wrapped in memo() in its own file */}
       <StudentActivityHeatmap months={activityMonths} activityData={activityData} />
+
     </section>
   );
 });

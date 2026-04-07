@@ -7,15 +7,15 @@ import StudentTodayTasks from "../../components/student/StudentTodayTasks";
 function StudentDashboardPage() {
   return (
     <div className="space-y-8">
-      <StudentHeroBlock />
+      {/* <StudentHeroBlock /> */}
 
-      <StudentSummaryCards />
+      {/* <StudentSummaryCards /> */}
 
       <StudentStudyActivities />
 
       <StudentRecentCompleted />
 
-      <StudentTodayTasks />
+      <StudentTodayTasks maxUnits={5} />
     </div>
   );
 }

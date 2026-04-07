@@ -2,13 +2,16 @@ import {
   BarChart,
   ClipboardList,
   FileText,
+  LogOut,
   Plus,
   Settings2,
   Users,
   User,
 } from "lucide-react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { authApi } from "../lib/apiClient";
+import { clearAuthSession } from "../lib/authSession";
 
 const navGroups = [
   {
@@ -70,6 +73,7 @@ function getTeacherRouteTitle(pathname) {
 function TeacherLayout() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const routeTitle = getTeacherRouteTitle(location.pathname);
   const isClassesRoute = location.pathname === "/teacher" || location.pathname === "/teacher/classes";
 
@@ -77,6 +81,17 @@ function TeacherLayout() {
     "grid items-center rounded-none px-1.5 py-2 text-sm font-medium transition-all duration-300 ease-out";
 
   const isSidebarExpanded = isSidebarHovered;
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      // Local session clear should still happen.
+    } finally {
+      clearAuthSession();
+      navigate("/teachers/auth");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col lg:flex-row">
@@ -160,15 +175,25 @@ function TeacherLayout() {
           <div>
             <h1 className="text-lg font-semibold text-slate-900">{routeTitle}</h1>
           </div>
-          {isClassesRoute ? (
+          <div className="flex items-center gap-3">
+            {isClassesRoute ? (
+              <button
+                className="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition-transform duration-200 hover:-translate-y-0.5"
+                type="button"
+              >
+                Add class
+                <Plus className="h-4 w-4" />
+              </button>
+            ) : null}
             <button
-              className="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition-transform duration-200 hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+              onClick={handleLogout}
               type="button"
             >
-              Add class
-              <Plus className="h-4 w-4" />
+              Logout
+              <LogOut className="h-4 w-4" />
             </button>
-          ) : null}
+          </div>
         </header>
 
         <div className="relative z-0 flex-1 overflow-hidden p-4 lg:p-8">

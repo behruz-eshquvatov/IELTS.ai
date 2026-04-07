@@ -4,6 +4,8 @@ import { ChevronLeft, Eye, EyeOff, MoonStar, SunMedium } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import InteractiveGridBackground from "../components/layout/InteractiveGridBackground";
 import MagneticButton from "../components/ui/MagneticButton";
+import { authApi } from "../lib/apiClient";
+import { saveAuthSession } from "../lib/authSession";
 import {
   STUDENT_AUTH_IMAGE_URL,
   authBackButtonInnerClass,
@@ -25,6 +27,7 @@ const authModes = {
     panelClass: "bg-[#f7f4ef]",
     panelShadowClass: "shadow-[0_36px_110px_-52px_rgba(15,23,42,0.34)]",
     autofillBgRgb: "247, 244, 239",
+    autofillTextRgb: "15, 23, 42",
     lineClass: "bg-slate-950",
     mutedClass: "text-slate-500",
     bodyClass: "text-slate-600",
@@ -61,6 +64,7 @@ const authModes = {
     panelClass: "bg-[#0b0b0b]",
     panelShadowClass: "shadow-[0_28px_82px_-56px_rgba(255,255,255,0.14)]",
     autofillBgRgb: "11, 11, 11",
+    autofillTextRgb: "255, 255, 255",
     lineClass: "bg-white",
     mutedClass: "text-white/42",
     bodyClass: "text-white/68",
@@ -133,7 +137,8 @@ function AuthPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
+  const [status, setStatus] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [reveal, setReveal] = useState(null);
   const revealIdRef = useRef(0);
   const switcherRefs = useRef({ login: null, signup: null });
@@ -254,7 +259,7 @@ function AuthPage() {
     revealIdRef.current += 1;
 
     setMode(nextMode);
-    setStatusMessage("");
+    setStatus(null);
     setShowPassword(false);
     setShowConfirmPassword(false);
     setReveal({
@@ -273,10 +278,84 @@ function AuthPage() {
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setStatusMessage(theme.successMessage);
-    navigate("/student/dashboard");
+    if (isSubmitting) {
+      return;
+    }
+
+    const trimmedEmail = formData.email.trim().toLowerCase();
+    if (!trimmedEmail || !formData.password) {
+      setStatus({
+        type: "error",
+        message: "Email and password are required.",
+      });
+      return;
+    }
+
+    if (mode === "signup") {
+      if (!formData.fullName.trim()) {
+        setStatus({
+          type: "error",
+          message: "Full name is required.",
+        });
+        return;
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        setStatus({
+          type: "error",
+          message: "Passwords do not match.",
+        });
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    setStatus(null);
+
+    try {
+      const payload =
+        mode === "signup"
+          ? {
+              fullName: formData.fullName.trim(),
+              email: trimmedEmail,
+              password: formData.password,
+              confirmPassword: formData.confirmPassword,
+              role: "student",
+            }
+          : {
+              email: trimmedEmail,
+              password: formData.password,
+              role: "student",
+            };
+
+      const response =
+        mode === "signup"
+          ? await authApi.register(payload)
+          : await authApi.login(payload);
+
+      saveAuthSession(response);
+      setStatus({
+        type: "success",
+        message:
+          mode === "signup"
+            ? "Account created successfully."
+            : "Login successful.",
+      });
+      navigate("/student/dashboard");
+    } catch (error) {
+      const backendErrors = Array.isArray(error.errors) && error.errors.length
+        ? error.errors.join(" ")
+        : "";
+
+      setStatus({
+        type: "error",
+        message: backendErrors || error.message || "Authentication failed.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleThumbMouseMove = useCallback(
@@ -376,7 +455,7 @@ function AuthPage() {
       cancelAnimationFrame(rafId);
       cancelAnimationFrame(rafIdTwo);
     };
-  }, [handleThumbMouseMove, handleThumbMouseUp, mode, statusMessage, updateScrollbar]);
+  }, [handleThumbMouseMove, handleThumbMouseUp, mode, status, updateScrollbar]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -393,12 +472,20 @@ function AuthPage() {
     };
   }, [mode, updateScrollbar]);
 
+  const statusClassName =
+    status?.type === "error"
+      ? mode === "signup"
+        ? "border border-rose-400/30 bg-rose-500/10 text-rose-200"
+        : "border border-rose-300/70 bg-rose-50 text-rose-700"
+      : theme.statusClass;
+
   return (
     <section
       className={`font-manrope relative min-h-screen xl:h-screen xl:overflow-hidden ${theme.pageClass}`}
       style={{
         "--page-accent-rgb": "16, 185, 129",
         "--auth-autofill-bg-rgb": theme.autofillBgRgb,
+        "--auth-autofill-text-rgb": theme.autofillTextRgb,
       }}
     >
       <AnimatePresence>
@@ -609,12 +696,15 @@ function AuthPage() {
                             <MagneticButton
                               className="rounded-full"
                               innerClassName={theme.buttonClass}
+                              disabled={isSubmitting}
                               type="submit"
                             >
                               <span className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-150%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(150%)]">
                                 <span className="h-full w-8 bg-white/30 blur-sm" />
                               </span>
-                              <span className="relative">{theme.submitLabel}</span>
+                              <span className="relative">
+                                {isSubmitting ? "Processing..." : theme.submitLabel}
+                              </span>
                             </MagneticButton>
                           </div>
 
@@ -641,13 +731,13 @@ function AuthPage() {
                             ) : null}
                           </div>
 
-                          {statusMessage ? (
+                          {status?.message ? (
                             <MotionDiv
                               animate={{ opacity: 1, y: 0 }}
-                              className={`${theme.statusClass} px-4 py-4 text-sm leading-7`}
+                              className={`${statusClassName} px-4 py-4 text-sm leading-7`}
                               initial={{ opacity: 0, y: 10 }}
                             >
-                              {statusMessage}
+                              {status.message}
                             </MotionDiv>
                           ) : null}
                         </form>

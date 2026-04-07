@@ -1,57 +1,83 @@
-const filters = ["All", "Listening", "Reading", "Writing", "Completed", "Locked"];
+import { LayoutGroup, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import StudentTodayTasks from "../../components/student/StudentTodayTasks";
 
-const tasks = [
-  { title: "Unit 01 · Listening Basics", status: "Completed", detail: "Score 28/40" },
-  { title: "Unit 02 · Reading Skimming", status: "Completed", detail: "Score 30/40" },
-  { title: "Unit 08 · Listening & Reading", status: "In progress", detail: "2 tasks open" },
-  { title: "Unit 09 · Writing Focus", status: "Locked", detail: "Unlock after Unit 08" },
-];
+const filters = ["All", "Today", "Completed", "Locked"];
+
+function RollingLabel({ label, active }) {
+  return (
+    <span className="relative block h-[1.2rem] overflow-hidden">
+      <span
+        className={`flex flex-col transition-transform duration-300 ease-out group-hover/filter:-translate-y-1/2 ${
+          active ? "-translate-y-1/2" : "translate-y-0"
+        }`}
+      >
+        <span className="h-[1.2rem]">{label}</span>
+        <span className="h-[1.2rem] text-slate-950">{label}</span>
+      </span>
+    </span>
+  );
+}
+
 
 function StudentDailyTasksPage() {
+  const [activeFilter, setActiveFilter] = useState(filters[0]);
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    function handleScroll() {
+      setIsCompact(window.scrollY > 0);
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
+
   return (
-    <div className="space-y-8">
-      <header className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-600">
-          Tests Library
-        </p>
-        <h1 className="text-3xl font-semibold">Full task collection</h1>
-        <p className="text-slate-600">
-          Browse every unit in order, revisit completed work, or review progress
-          summaries.
-        </p>
-      </header>
-
-      <div className="flex flex-wrap gap-2">
-        {filters.map((filter) => (
-          <button
-            className="rounded-none border border-white/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700"
-            key={filter}
-            type="button"
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-4">
-        {tasks.map((task) => (
-          <div className="rounded-none border border-slate-200/80 bg-white/90 p-5" key={task.title}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-lg font-semibold">{task.title}</p>
-                <p className="text-sm text-slate-600">{task.detail}</p>
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
-                {task.status}
-              </span>
-            </div>
+    <div className="space-y-4 -my-4">
+      <LayoutGroup>
+        <div
+          className={`fixed top-16 z-20 left-20 right-0 w-screen transition-all duration-200 ease-out ${
+            isCompact
+              ? "py-3 border-b border-slate-200 bg-[#fbf8f2]"
+              : "py-5 border-b border-transparent bg-transparent"
+          }`}
+        >
+          <div className="flex mx-auto max-w-7xl flex-wrap gap-2">
+          {filters.map((filter) => {
+            const isActive = activeFilter === filter;
+            return (
+              <button
+                className={`group/filter relative rounded-none border border-transparent px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-colors ${
+                  isActive ? "text-slate-950" : "text-slate-600 hover:text-slate-950"
+                }`}
+                key={filter}
+                type="button"
+                onClick={() => setActiveFilter(filter)}
+              >
+                <RollingLabel active={isActive} label={filter} />
+                {isActive ? (
+                  <motion.span
+                    layoutId="filter-active-line"
+                    className="absolute inset-x-3 bottom-0 h-px rounded-full bg-slate-950"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                  />
+                ) : null}
+              </button>
+            );
+          })}
           </div>
-        ))}
-      </div>
+        </div>
+      </LayoutGroup>
+
+      <StudentTodayTasks showHeader={false} showAllLink={false} />
     </div>
   );
 }
 
 export default StudentDailyTasksPage;
-
-
