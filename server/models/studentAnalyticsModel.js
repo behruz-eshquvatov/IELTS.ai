@@ -93,6 +93,21 @@ const studentAnalyticsSchema = new mongoose.Schema(
       months: { type: [String], default: [] },
       activityData: { type: [Number], default: [] },
     },
+    studyActivity: {
+      entries: {
+        type: [
+          new mongoose.Schema(
+            {
+              dateKey: { type: String, required: true, trim: true },
+              visited: { type: Boolean, default: false },
+              taskActiveMinutes: { type: Number, default: 0, min: 0 },
+            },
+            { _id: false },
+          ),
+        ],
+        default: [],
+      },
+    },
   },
   { timestamps: true },
 );

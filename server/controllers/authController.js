@@ -22,12 +22,17 @@ function sanitizeUser(userDoc) {
   };
 }
 
-function setRefreshCookie(res, refreshToken) {
-  res.cookie("refreshToken", refreshToken, getRefreshCookieOptions());
+function setRefreshCookie(res, refreshToken, rememberMe) {
+  res.cookie("refreshToken", refreshToken, getRefreshCookieOptions({ rememberMe }));
 }
 
 function clearRefreshCookie(res) {
-  res.clearCookie("refreshToken", getRefreshCookieOptions());
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/api/v1/auth",
+  });
 }
 
 function buildDefaultStudentProfile(userDoc) {
@@ -59,9 +64,10 @@ function buildDefaultStudentProfile(userDoc) {
   };
 }
 
-async function issueSession(res, userDoc) {
+async function issueSession(res, userDoc, options = {}) {
+  const rememberMe = options.rememberMe !== false;
   const accessToken = signAccessToken(userDoc);
-  const refreshToken = signRefreshToken(userDoc);
+  const refreshToken = signRefreshToken(userDoc, { rememberMe });
   const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
   await User.updateOne(
@@ -69,10 +75,11 @@ async function issueSession(res, userDoc) {
     { $set: { refreshTokenHash } },
   );
 
-  setRefreshCookie(res, refreshToken);
+  setRefreshCookie(res, refreshToken, rememberMe);
 
   return {
     accessToken,
+    rememberMe,
     user: sanitizeUser(userDoc),
   };
 }
@@ -109,6 +116,7 @@ function validateRegisterInput(body) {
 
 async function register(req, res) {
   const body = req.body || {};
+  const rememberMe = body.rememberMe !== false;
   const errors = validateRegisterInput(body);
 
   if (errors.length) {
@@ -143,7 +151,7 @@ async function register(req, res) {
     );
   }
 
-  const session = await issueSession(res, user);
+  const session = await issueSession(res, user, { rememberMe });
   return res.status(201).json({
     message: "Account created successfully.",
     ...session,
@@ -152,6 +160,7 @@ async function register(req, res) {
 
 async function login(req, res) {
   const body = req.body || {};
+  const rememberMe = body.rememberMe === true;
   const email = String(body.email || "").toLowerCase().trim();
   const password = String(body.password || "");
   const role = body.role;
@@ -188,7 +197,7 @@ async function login(req, res) {
     });
   }
 
-  const session = await issueSession(res, user);
+  const session = await issueSession(res, user, { rememberMe });
   return res.json({
     message: "Logged in successfully.",
     ...session,
@@ -223,7 +232,8 @@ async function refreshSession(req, res) {
       });
     }
 
-    const session = await issueSession(res, user);
+    const rememberMe = payload?.rmb !== false;
+    const session = await issueSession(res, user, { rememberMe });
     return res.json({
       message: "Session refreshed.",
       ...session,

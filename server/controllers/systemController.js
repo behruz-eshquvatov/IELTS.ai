@@ -39,12 +39,17 @@ function getApiIndex(req, res) {
       profile: "/api/v1/students/:studentId/profile",
       dailyTasks: "/api/v1/students/:studentId/daily-tasks",
       analytics: "/api/v1/students/:studentId/analytics?range=week&part=Listening",
+      studyVisit: "POST /api/v1/students/:studentId/study-activity/visit",
+      studyTaskTime: "POST /api/v1/students/:studentId/study-activity/task-time",
+      studyHeatmap: "GET /api/v1/students/:studentId/study-activity/heatmap",
     },
     writingTask2OpinionRoutes: {
       list: "/api/v1/writing-task2-opinion",
       byEssayId: "/api/v1/writing-task2-opinion/:essayId",
       structure: "/api/v1/writing-task2-opinion/structure",
       initializeCollection: "/api/v1/writing-task2-opinion/initialize",
+      createAnalysis: "POST /api/v1/writing-task2-opinion/analyses",
+      analysisById: "GET /api/v1/writing-task2-opinion/analyses/:analysisId",
     },
     health: "/api/v1/system/health",
   });

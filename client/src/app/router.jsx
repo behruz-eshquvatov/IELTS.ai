@@ -75,6 +75,12 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: "tests/:testId/result",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentWritingTask2ResultPage")).default,
+                }),
+              },
+              {
                 path: "analytics",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentAnalyticsPage")).default,

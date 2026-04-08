@@ -8,10 +8,13 @@ const {
   updateTaskStatus,
   getStudentAnalytics,
   updateStudentAnalytics,
+  markStudyVisit,
+  addTaskStudyTime,
+  getStudyHeatmap,
   seedStudentData,
   listStudents,
 } = require("../controllers/studentController");
-const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+const { protect, authorizeRoles, authorizeSelfOrTeacher } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -33,5 +36,26 @@ router.patch(
 
 router.get("/:studentId/analytics", protect, authorizeRoles("teacher", "student"), getStudentAnalytics);
 router.put("/:studentId/analytics", protect, authorizeRoles("teacher", "student"), updateStudentAnalytics);
+router.post(
+  "/:studentId/study-activity/visit",
+  protect,
+  authorizeRoles("teacher", "student"),
+  authorizeSelfOrTeacher("studentId"),
+  markStudyVisit,
+);
+router.post(
+  "/:studentId/study-activity/task-time",
+  protect,
+  authorizeRoles("teacher", "student"),
+  authorizeSelfOrTeacher("studentId"),
+  addTaskStudyTime,
+);
+router.get(
+  "/:studentId/study-activity/heatmap",
+  protect,
+  authorizeRoles("teacher", "student"),
+  authorizeSelfOrTeacher("studentId"),
+  getStudyHeatmap,
+);
 
 module.exports = router;

@@ -14,8 +14,8 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { memo, useEffect, useRef, useState } from "react";
 import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
-import { authApi } from "../lib/apiClient";
-import { clearAuthSession } from "../lib/authSession";
+import { apiRequest, authApi } from "../lib/apiClient";
+import { clearAuthSession, getStoredUser } from "../lib/authSession";
 
 const navGroups = [
   {
@@ -170,6 +170,18 @@ const StudentMainContent = memo(function StudentMainContent() {
   const location = useLocation();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
+  const mainRef = useRef(null);
+  const topAnchorRef = useRef(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      topAnchorRef.current?.scrollIntoView({ block: "start" });
+      mainRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     function handleOutsideClick(event) {
@@ -193,7 +205,8 @@ const StudentMainContent = memo(function StudentMainContent() {
   }, []);
 
   return (
-    <main className="flex-1 flex flex-col min-w-0">
+    <main className="flex-1 flex flex-col min-w-0" ref={mainRef}>
+      <div ref={topAnchorRef} />
       <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] px-8 z-40 sticky top-0">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">
@@ -252,6 +265,19 @@ const StudentMainContent = memo(function StudentMainContent() {
 });
 
 function StudentLayout() {
+  useEffect(() => {
+    const studentId = String(getStoredUser()?.email || "").trim().toLowerCase();
+    if (!studentId) {
+      return;
+    }
+
+    apiRequest(`/students/${encodeURIComponent(studentId)}/study-activity/visit`, {
+      method: "POST",
+    }).catch(() => {
+      // Visit tracking should not block page render.
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#f7f4ef] text-slate-900 font-sans flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}

@@ -5,7 +5,12 @@ import { Link, useNavigate } from "react-router-dom";
 import InteractiveGridBackground from "../components/layout/InteractiveGridBackground";
 import MagneticButton from "../components/ui/MagneticButton";
 import { authApi } from "../lib/apiClient";
-import { saveAuthSession } from "../lib/authSession";
+import {
+  clearAuthSession,
+  getAccessToken,
+  getStoredRole,
+  saveAuthSession,
+} from "../lib/authSession";
 import {
   STUDENT_AUTH_IMAGE_URL,
   authBackButtonInnerClass,
@@ -137,8 +142,11 @@ function AuthPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
+  const [sendStudyTips, setSendStudyTips] = useState(false);
   const [status, setStatus] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [reveal, setReveal] = useState(null);
   const revealIdRef = useRef(0);
   const switcherRefs = useRef({ login: null, signup: null });
@@ -159,6 +167,42 @@ function AuthPage() {
 
   const theme = authModes[mode];
   const ThemeIcon = theme.icon;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function redirectIfAuthenticated() {
+      const role = getStoredRole();
+      if (role !== "student") {
+        if (isMounted) {
+          setIsCheckingSession(false);
+        }
+        return;
+      }
+
+      try {
+        if (!getAccessToken()) {
+          const refreshed = await authApi.refresh();
+          saveAuthSession(refreshed);
+        }
+
+        await authApi.me();
+        navigate("/student/dashboard", { replace: true });
+      } catch (error) {
+        clearAuthSession();
+      } finally {
+        if (isMounted) {
+          setIsCheckingSession(false);
+        }
+      }
+    }
+
+    redirectIfAuthenticated();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
 
   useEffect(() => {
     const syncRevealOrigin = () => {
@@ -323,11 +367,13 @@ function AuthPage() {
               password: formData.password,
               confirmPassword: formData.confirmPassword,
               role: "student",
+              rememberMe: true,
             }
           : {
               email: trimmedEmail,
               password: formData.password,
               role: "student",
+              rememberMe: keepSignedIn,
             };
 
       const response =
@@ -335,7 +381,10 @@ function AuthPage() {
           ? await authApi.register(payload)
           : await authApi.login(payload);
 
-      saveAuthSession(response);
+      saveAuthSession({
+        ...response,
+        rememberMe: mode === "login" ? keepSignedIn : true,
+      });
       setStatus({
         type: "success",
         message:
@@ -478,6 +527,14 @@ function AuthPage() {
         ? "border border-rose-400/30 bg-rose-500/10 text-rose-200"
         : "border border-rose-300/70 bg-rose-50 text-rose-700"
       : theme.statusClass;
+
+  if (isCheckingSession) {
+    return (
+      <section className="flex min-h-screen items-center justify-center bg-[#f7f4ef] text-sm font-semibold text-slate-600">
+        Checking your session...
+      </section>
+    );
+  }
 
   return (
     <section
@@ -687,6 +744,14 @@ function AuthPage() {
                               <label className="inline-flex items-center gap-3 text-sm">
                                 <input
                                   className={`h-4 w-4 ${theme.checkboxClass}`}
+                                  checked={mode === "login" ? keepSignedIn : sendStudyTips}
+                                  onChange={(event) => {
+                                    if (mode === "login") {
+                                      setKeepSignedIn(event.target.checked);
+                                      return;
+                                    }
+                                    setSendStudyTips(event.target.checked);
+                                  }}
                                   type="checkbox"
                                 />
                                 {mode === "login" ? "Keep me signed in" : "Send study tips"}

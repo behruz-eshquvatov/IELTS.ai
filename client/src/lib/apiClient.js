@@ -2,7 +2,6 @@ import {
   clearAuthSession,
   getAccessToken,
   saveAuthSession,
-  setAccessToken,
 } from "./authSession";
 
 const API_BASE_URL =
@@ -49,11 +48,7 @@ async function refreshAccessToken() {
     throw toApiError(response, body);
   }
 
-  if (body?.accessToken) {
-    setAccessToken(body.accessToken);
-  }
-
-  if (body?.user) {
+  if (body?.accessToken || body?.user) {
     saveAuthSession(body);
   }
 

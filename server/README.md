@@ -11,6 +11,14 @@ npm install
 npm run dev
 ```
 
+## AI Config (Writing Task 2 Analysis)
+Set these environment variables in `server/.env`:
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4.1-mini
+```
+
 ## API Base
 - `http://localhost:5000/api/v1`
 
@@ -38,3 +46,17 @@ This creates demo data for:
 - `PATCH /api/v1/students/:studentId/daily-tasks/units/:unitId/tasks/:taskId/status`
 - `GET /api/v1/students/:studentId/analytics?range=week&part=Listening`
 - `PUT /api/v1/students/:studentId/analytics`
+- `POST /api/v1/students/:studentId/study-activity/visit`
+- `POST /api/v1/students/:studentId/study-activity/task-time`
+- `GET /api/v1/students/:studentId/study-activity/heatmap`
+- `POST /api/v1/writing-task2-opinion/analyses`
+- `GET /api/v1/writing-task2-opinion/analyses/:analysisId`
+
+## Study Activity Rules
+- Level `1`: student visited that day (`visit` endpoint).
+- Level `2`: task-active study time reached `30+` minutes.
+- Level `3`: task-active study time reached `60+` minutes.
+
+Each study activity response includes:
+- `todaysStudyTimeMinutes` (number)
+- `"today's study time"` (string, minutes label)

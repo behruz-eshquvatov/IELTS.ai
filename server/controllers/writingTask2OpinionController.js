@@ -2,26 +2,25 @@ const WritingTask2Opinion = require("../models/writingTask2OpinionModel");
 
 async function listWritingTask2Opinions(req, res) {
   const accessStatus = req.query.accessStatus;
-  const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+  const requestedPage = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 10, 1), 50);
-  const skip = (page - 1) * limit;
   const filter = {};
 
   if (accessStatus === "locked" || accessStatus === "unlocked") {
     filter.accessStatus = accessStatus;
   }
 
-  const [total, prompts] = await Promise.all([
-    WritingTask2Opinion.countDocuments(filter),
-    WritingTask2Opinion.find(filter)
-      .sort({ unlockOrder: 1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-  ]);
+  const total = await WritingTask2Opinion.countDocuments(filter);
 
   const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
-  const safePage = Math.min(page, totalPages);
+  const safePage = Math.min(requestedPage, totalPages);
+  const safeSkip = (safePage - 1) * limit;
+
+  const prompts = await WritingTask2Opinion.find(filter)
+    .sort({ unlockOrder: 1 })
+    .skip(safeSkip)
+    .limit(limit)
+    .lean();
 
   return res.json({
     count: prompts.length,
