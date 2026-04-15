@@ -1,0 +1,1800 @@
+﻿[
+    {
+        "essayId":  "essay_004",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Work",
+        "questionPrompt":  "Some people think that employees should work from home, while others believe working in an office is more effective. Discuss both views and give your opinion.",
+        "essayText":  "Nowadays many people have opportunity to work from home because technology develop very fast. Some people think it is good because people can save time and money, but others think office is better place for work. In my opinion, working from home have advantages but also disadvantages.\n\nFirstly, working from home is comfortable. People do not need wake up early and travel to office. This help them reduce stress and save money for transport. For example, workers can start work faster and have more time for family. Also, home environment can be quiet and good for concentration.\n\nHowever, working in office allow better communication. Workers can talk directly with colleagues and manager. This can improve teamwork and reduce misunderstanding. Also, some people feel lonely when they work alone for long time.\n\nIn conclusion, both methods have benefits. I think working from home is useful sometimes but office work is still important for cooperation.",
+        "wordCount":  183,
+        "estimatedTimeMinutes":  28,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.0,
+                                                              "reason":  "Addresses topic but ideas are not fully developed."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.0,
+                                                                      "reason":  "Basic paragraphing present but progression is limited."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.0,
+                                                                 "reason":  "Simple vocabulary with repetition."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  4.5,
+                                                                             "reason":  "Frequent grammatical errors affect accuracy."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Clear opinion present",
+                                           "Logical paragraph separation",
+                                           "Relevant ideas"
+                                       ],
+                         "weaknesses":  [
+                                            "Grammar mistakes",
+                                            "Ideas not well extended",
+                                            "Vocabulary very basic"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Use correct verb forms (e.g. develops, have в†’ has).",
+                                                        "Extend explanations with examples.",
+                                                        "Increase essay length to 250+ words."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_005",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Health",
+        "questionPrompt":  "Some people think governments should spend more money on sports facilities. Others think money should be spent on healthcare. Discuss both views.",
+        "essayText":  "Many countries have problem with health of people. Some people think government should spend money on sport facilities because sport help people stay healthy. Other people think healthcare is more important because hospitals save lives.\n\nSport facilities can prevent illness. People who do exercise often have strong body and less stress. If government build gyms or parks more people can be active. This reduce obesity and heart disease.\n\nHowever, hospitals and doctors are necessary because not all illness can be prevented. People sometimes need medicine or surgery. Healthcare help people live longer and reduce pain.\n\nIn conclusion, both are important but I think healthcare should receive more money because treatment is necessary for serious diseases.",
+        "wordCount":  196,
+        "estimatedTimeMinutes":  30,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Addresses both views with relevant ideas."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.5,
+                                                                      "reason":  "Logical structure but cohesion basic."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.5,
+                                                                 "reason":  "Adequate vocabulary but limited range."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.0,
+                                                                             "reason":  "Errors present but meaning clear."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Clear structure",
+                                           "Relevant examples",
+                                           "Opinion supported"
+                                       ],
+                         "weaknesses":  [
+                                            "Limited vocabulary variation",
+                                            "Short explanation paragraphs",
+                                            "Grammar inconsistencies"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Use more complex sentence structures.",
+                                                        "Expand examples with more detail.",
+                                                        "Avoid repeating simple vocabulary."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_006",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Some people believe online learning is better than traditional classroom learning. Discuss both views.",
+        "essayText":  "Online education become more popular in recent years. Some people think online learning is better because students can study anytime and anywhere. Others believe traditional classroom learning is more effective because of direct communication.\n\nOnline learning gives flexibility. Students can watch lectures many times and choose their own schedule. This is useful for people who work or live far from universities. Also, online courses often cost less money.\n\nHowever, classroom learning has advantages too. Students can ask questions immediately and teachers can explain difficult topics more clearly. Communication with classmates can also improve motivation and understanding.\n\nIn conclusion, online learning is convenient but traditional education is still important because interaction helps students learn better.",
+        "wordCount":  223,
+        "estimatedTimeMinutes":  32,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Ideas relevant but somewhat general."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.0,
+                                                                      "reason":  "Logical organisation with clear progression."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.0,
+                                                                 "reason":  "Adequate vocabulary with some variation."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.0,
+                                                                             "reason":  "Mix of simple and complex sentences with minor errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Clear structure",
+                                           "Relevant comparison",
+                                           "Balanced discussion"
+                                       ],
+                         "weaknesses":  [
+                                            "Examples slightly general",
+                                            "Limited lexical sophistication"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Provide more specific examples.",
+                                                        "Use more varied academic vocabulary.",
+                                                        "Develop ideas in more depth."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_007",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Society",
+        "questionPrompt":  "Some people think young people should travel abroad before starting work. Discuss advantages and disadvantages.",
+        "essayText":  "Travelling abroad before starting career become popular idea. Some people think it is useful because young people learn new culture and language. Others think it delay career development.\n\nOne advantage is gaining experience. When young people travel they meet new people and understand different traditions. This can increase independence and confidence. Also, language skills may improve.\n\nHowever, travelling can be expensive and take time. Some people may lose job opportunities because they start work later. In addition, not all travel experiences give useful knowledge for career.\n\nIn conclusion, travelling abroad have both benefits and drawbacks. It is good for personal development but young people should consider their financial situation.",
+        "wordCount":  214,
+        "estimatedTimeMinutes":  31,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Relevant but ideas limited."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.5,
+                                                                      "reason":  "Basic linking used."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.5,
+                                                                 "reason":  "Vocabulary repetitive."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.0,
+                                                                             "reason":  "Errors in verb forms."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Relevant ideas",
+                                           "Clear paragraph structure"
+                                       ],
+                         "weaknesses":  [
+                                            "Grammar mistakes",
+                                            "Ideas not deeply developed"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Improve grammar accuracy.",
+                                                        "Add more developed examples.",
+                                                        "Use wider vocabulary."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_008",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Some people think individuals should be responsible for protecting the environment, while others believe governments should take action.",
+        "essayText":  "Environment problem become serious in modern world. Some people think individuals should protect environment by recycling and saving energy. Others think government should make laws to reduce pollution.\n\nIndividuals can help environment by simple actions. For example, people can use less plastic and save electricity. If many people change habits environment can improve.\n\nHowever, government have more power. They can introduce laws and control factories. Large companies produce big pollution so government regulation is important.\n\nIn conclusion, both individuals and government should work together to protect environment.",
+        "wordCount":  168,
+        "estimatedTimeMinutes":  25,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  4.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.0,
+                                                              "reason":  "Topic addressed but limited development."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  4.5,
+                                                                      "reason":  "Basic structure present."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  4.5,
+                                                                 "reason":  "Very basic vocabulary."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  4.0,
+                                                                             "reason":  "Frequent grammar errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Idea relevant to topic",
+                                           "Basic paragraph structure"
+                                       ],
+                         "weaknesses":  [
+                                            "Essay too short",
+                                            "Many grammar mistakes",
+                                            "Limited vocabulary"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Increase word count to at least 250 words.",
+                                                        "Use correct verb forms.",
+                                                        "Provide more explanation."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_001",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Some people believe that students should be allowed to evaluate their teachers, while others think this is not a good idea. Discuss both views and give your own opinion.",
+        "essayText":  "In many education systems, the role of students is usually limited to attending lessons and completing assignments. However, some people argue that students should also be allowed to evaluate their teachers. While this idea may help improve teaching quality, others believe students are not experienced enough to make fair judgments. In my opinion, students should be able to give feedback, but this should be done in a structured and balanced way.\n\nOn the one hand, allowing students to evaluate teachers can provide useful information for schools and institutions. Students spend many hours with teachers and directly experience their teaching methods, classroom management, and communication style. Because of this, they can often identify whether lessons are engaging, clear, and helpful. For example, if many students report that a teacher explains concepts poorly or does not respond to questions, the school may recognise a problem that needs attention. In this way, student evaluations can support professional improvement.\n\nOn the other hand, there are valid concerns about fairness and accuracy. Students may judge teachers based on personal preferences rather than actual teaching quality. For instance, a strict teacher who gives challenging homework may receive lower evaluations even if their teaching is effective. In addition, younger students may not have enough maturity or academic understanding to assess teaching standards properly. As a result, student opinions alone should not be the only factor in evaluating teachers.\n\nIn conclusion, student evaluation of teachers can be beneficial because it gives schools insight into classroom experience. However, it should be combined with other measures such as peer reviews, academic results, and observations by school leaders. This balanced approach would make the evaluation process more fair and useful.",
+        "wordCount":  298,
+        "estimatedTimeMinutes":  38,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "internal_structured_example",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  7.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  7.0,
+                                                              "reason":  "Both views are discussed clearly and the writer gives a direct opinion. Ideas are relevant and sufficiently developed, though some points could be expanded further."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "The essay is logically organised with clear paragraphing and progression. Cohesive devices are used appropriately, although they are somewhat conventional."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  7.0,
+                                                                 "reason":  "Vocabulary range is good and appropriate to the topic, with phrases such as \u0027structured and balanced way\u0027 and \u0027professional improvement\u0027. There is some repetition and limited flexibility in expression."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  7.0,
+                                                                             "reason":  "A mix of simple and complex sentence forms is used accurately. Minor awkwardness exists, but errors do not reduce clarity."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Clear position throughout the essay",
+                                           "Balanced discussion of both perspectives",
+                                           "Good paragraph organisation",
+                                           "Appropriate academic vocabulary"
+                                       ],
+                         "weaknesses":  [
+                                            "Examples could be more specific",
+                                            "Some ideas are developed only moderately",
+                                            "A few linking patterns are repetitive"
+                                        ],
+                         "detectedIssues":  [
+                                                {
+                                                    "type":  "development",
+                                                    "severity":  "medium",
+                                                    "description":  "Supporting examples are relevant but not highly detailed."
+                                                },
+                                                {
+                                                    "type":  "lexical_repetition",
+                                                    "severity":  "low",
+                                                    "description":  "The word \u0027evaluate\u0027 and related forms appear several times without much variation."
+                                                }
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Include more precise real-world examples to strengthen arguments.",
+                                                        "Vary linking expressions and sentence openings.",
+                                                        "Develop one or two points in greater depth to improve Task Response."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  true,
+                              "teacherAgreementWithAI":  true,
+                              "teacherNotes":  "Band estimation is reasonable. Strong control of structure and argument, but not enough sophistication for Band 8."
+                          }
+    },
+    {
+        "essayId":  "essay_002",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Technology",
+        "questionPrompt":  "Some people think that modern technology is making people more socially isolated, while others believe it is helping people stay connected. Discuss both views and give your opinion.",
+        "essayText":  "Modern technology has changed the way people communicate in everyday life. Some people argue that it causes social isolation because individuals spend too much time on phones and computers, while others believe it helps people stay connected regardless of distance. In my opinion, technology can strengthen relationships, but only when it is used in a balanced way.\n\nThere are several reasons why people think technology increases isolation. First, many individuals now prefer online interaction instead of face-to-face communication. It is common to see family members sitting together while paying more attention to their screens than to each other. This can weaken real social bonds and reduce the quality of personal interaction. Second, social media sometimes creates only superficial contact. People may have hundreds of online friends, but this does not always mean they have deep or meaningful relationships.\n\nHowever, technology also brings major social benefits. Messaging applications, video calls, and social platforms allow people to maintain contact with relatives and friends who live far away. In the past, distance was a serious barrier to communication, but today people can speak instantly across countries. This is particularly useful for international students, migrant workers, and families living in different regions. Technology also allows people with similar interests to build communities online, which can reduce loneliness rather than increase it.\n\nIn conclusion, modern technology has both positive and negative effects on social life. It may contribute to isolation when it replaces genuine human interaction, but it also offers powerful tools that help people communicate more easily. Overall, I believe the impact depends more on how people use technology than on the technology itself.",
+        "wordCount":  290,
+        "estimatedTimeMinutes":  34,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "internal_structured_example",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  7.0,
+                                                              "reason":  "The response addresses all parts of the task and provides a clear opinion. Main ideas are relevant, though development is somewhat predictable."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "Paragraphing and overall organisation are clear. Cohesive devices are used well, though some transitions are formulaic."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.0,
+                                                                 "reason":  "Vocabulary is appropriate and clear, but mostly common and repetitive. There is limited evidence of less common lexical items used flexibly."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.0,
+                                                                             "reason":  "Sentence structures are mostly correct, but the range is limited. The writing relies heavily on standard sentence patterns."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Clear opinion in introduction and conclusion",
+                                           "Relevant examples and logical flow",
+                                           "Good control of paragraph structure"
+                                       ],
+                         "weaknesses":  [
+                                            "Vocabulary is not highly varied",
+                                            "Sentence patterns are somewhat repetitive",
+                                            "Arguments are clear but not particularly sophisticated"
+                                        ],
+                         "detectedIssues":  [
+                                                {
+                                                    "type":  "limited_lexical_range",
+                                                    "severity":  "medium",
+                                                    "description":  "Vocabulary is accurate but mostly simple and common."
+                                                },
+                                                {
+                                                    "type":  "limited_grammatical_range",
+                                                    "severity":  "medium",
+                                                    "description":  "The essay uses mostly similar complex sentence forms without much variation."
+                                                }
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Use more varied academic vocabulary instead of repeating common terms such as \u0027technology\u0027 and \u0027people\u0027.",
+                                                        "Add more sentence variety, including conditional or concessive structures.",
+                                                        "Develop arguments with more specific supporting examples."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  true,
+                              "teacherAgreementWithAI":  true,
+                              "teacherNotes":  "A solid mid-band essay. Clear, organised, and relevant, but vocabulary and grammar do not show enough flexibility for Band 7+."
+                          }
+    },
+    {
+        "essayId":  "essay_003",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Some people believe that governments should spend more money on public transport, while others think building more roads is a better solution to traffic problems. Discuss both views and give your own opinion.",
+        "essayText":  "Traffic congestion is a major issue in many cities around the world. Some people think that the best way to solve this problem is to invest in public transport, while others believe that constructing more roads is more effective. I believe that improving public transport is a better long-term solution, although road development may still be necessary in some cases.\n\nThose who support building more roads argue that it can reduce pressure on existing transport infrastructure. In cities where the number of vehicles has increased rapidly, roads often become overcrowded and inefficient. Creating wider roads, additional lanes, or new highways may improve traffic flow in the short term. This can be especially useful in developing urban areas where infrastructure has not kept up with population growth.\n\nHowever, expanding road networks does not always solve congestion permanently. In many cases, better roads encourage more people to use private cars, which eventually leads to the same problem again. By contrast, investment in public transport can reduce the number of cars on the road by providing a cheaper, faster, and more environmentally friendly alternative. Reliable buses, trains, and metro systems make it possible for large numbers of people to travel efficiently. This not only addresses congestion but also reduces pollution and fuel consumption.\n\nIn conclusion, although road construction may provide temporary relief, governments should prioritise public transport because it offers broader and more sustainable benefits. In my view, a transport policy focused mainly on efficient public systems is the most effective way to solve traffic problems in growing cities.",
+        "wordCount":  286,
+        "estimatedTimeMinutes":  36,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "internal_structured_example",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  7.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  8.0,
+                                                              "reason":  "The response fully addresses both views and provides a clear, well-supported opinion. Ideas are relevant and sufficiently extended."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "Information is logically organised and progression is clear. Cohesion is effective, though not especially sophisticated."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  7.0,
+                                                                 "reason":  "Vocabulary is varied and topic-appropriate, including phrases such as \u0027transport infrastructure\u0027 and \u0027sustainable benefits\u0027. Some expressions remain relatively standard."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  8.0,
+                                                                             "reason":  "The writer uses a wide range of complex sentence structures with strong control. Errors are minimal and do not affect clarity."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "Well-balanced discussion with clear judgement",
+                                           "Strong control of complex grammar",
+                                           "Relevant and persuasive explanation",
+                                           "Good use of topic-specific vocabulary"
+                                       ],
+                         "weaknesses":  [
+                                            "Some examples remain general rather than highly specific",
+                                            "Cohesive style is effective but not particularly sophisticated"
+                                        ],
+                         "detectedIssues":  [
+                                                {
+                                                    "type":  "example_specificity",
+                                                    "severity":  "low",
+                                                    "description":  "The essay would be even stronger with a more concrete real-world example."
+                                                }
+                                            ],
+                         "improvementSuggestions":  [
+                                                        "Add one specific city or transport policy example to strengthen support.",
+                                                        "Use a slightly wider range of advanced linking expressions.",
+                                                        "Maintain strong balance between explanation and evidence."
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  true,
+                              "teacherAgreementWithAI":  true,
+                              "teacherNotes":  "This is a strong essay with good control of structure and grammar. It is close to Band 8, but examples could be slightly more precise."
+                          }
+    },
+    {
+        "essayId":  "essay_009",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Some people think homework is important for learning, others think it is unnecessary. Discuss both views.",
+        "essayText":  "Homework is common part of education. Some people think homework help students practice knowledge, while others believe it cause stress and not useful.\n\nHomework allow students repeat information they learned in class. Practice help memory and understanding. For example, math exercises improve calculation skills.\n\nHowever, too much homework reduce free time. Students may feel tired and not motivated to learn. Some tasks repetitive and boring.\n\nIn conclusion, homework is useful but should not be excessive.",
+        "wordCount":  171,
+        "estimatedTimeMinutes":  22,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  4.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  4.5,
+                                                              "reason":  "Addresses the topic only partially, with limited support and underdeveloped ideas."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  4.5,
+                                                                      "reason":  "Organization is basic, and linking is sometimes unclear or repetitive."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  4.5,
+                                                                 "reason":  "Uses a limited range of vocabulary, with noticeable repetition and occasional word-choice errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  4.5,
+                                                                             "reason":  "Relies on simple sentence forms, and frequent grammatical errors reduce overall accuracy."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "relevant topic"
+                                       ],
+                         "weaknesses":  [
+                                            "limited development",
+                                            "grammar errors"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_010",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Technology",
+        "questionPrompt":  "Do advantages of smartphones outweigh disadvantages?",
+        "essayText":  "Smartphones are popular today. They help communication and information search. People can talk easily and find knowledge fast.\n\nHowever smartphones make people addicted and reduce real communication. Many people spend too much time online.\n\nIn conclusion smartphones have advantages but should be used carefully.",
+        "wordCount":  150,
+        "estimatedTimeMinutes":  19,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  4.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  4.5,
+                                                              "reason":  "Addresses the topic only partially, with limited support and underdeveloped ideas."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  4.5,
+                                                                      "reason":  "Organization is basic, and linking is sometimes unclear or repetitive."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  4.5,
+                                                                 "reason":  "Uses a limited range of vocabulary, with noticeable repetition and occasional word-choice errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  4.5,
+                                                                             "reason":  "Relies on simple sentence forms, and frequent grammatical errors reduce overall accuracy."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear opinion"
+                                       ],
+                         "weaknesses":  [
+                                            "too short",
+                                            "basic vocabulary"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_011",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Transport",
+        "questionPrompt":  "Is public transport better than private cars?",
+        "essayText":  "Public transport important in cities. Buses and trains carry many people. It reduce traffic and pollution.\n\nCars are comfortable and faster sometimes. People prefer privacy.\n\nIn conclusion public transport useful but both needed.",
+        "wordCount":  148,
+        "estimatedTimeMinutes":  19,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  4.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  4.5,
+                                                              "reason":  "Addresses the topic only partially, with limited support and underdeveloped ideas."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  4.5,
+                                                                      "reason":  "Organization is basic, and linking is sometimes unclear or repetitive."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  4.5,
+                                                                 "reason":  "Uses a limited range of vocabulary, with noticeable repetition and occasional word-choice errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  4.5,
+                                                                             "reason":  "Relies on simple sentence forms, and frequent grammatical errors reduce overall accuracy."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "topic relevant"
+                                       ],
+                         "weaknesses":  [
+                                            "very limited development"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_012",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Should plastic bags be banned?",
+        "essayText":  "Plastic bags cause pollution. Many animals die because plastic. Governments should stop plastic bags.\n\nHowever plastic bags cheap and useful.\n\nIn conclusion plastic bags should be reduced.",
+        "wordCount":  142,
+        "estimatedTimeMinutes":  18,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  4.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  4.5,
+                                                              "reason":  "Addresses the topic only partially, with limited support and underdeveloped ideas."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  4.5,
+                                                                      "reason":  "Organization is basic, and linking is sometimes unclear or repetitive."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  4.5,
+                                                                 "reason":  "Uses a limited range of vocabulary, with noticeable repetition and occasional word-choice errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  4.5,
+                                                                             "reason":  "Relies on simple sentence forms, and frequent grammatical errors reduce overall accuracy."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear position"
+                                       ],
+                         "weaknesses":  [
+                                            "short",
+                                            "weak grammar"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_013",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Work",
+        "questionPrompt":  "Is job satisfaction more important than salary?",
+        "essayText":  "Some people think salary important but others think satisfaction more important. Job satisfaction make people happy and motivated.\n\nHowever salary necessary for living costs. Without money people cannot survive.\n\nIn conclusion both factors important.",
+        "wordCount":  165,
+        "estimatedTimeMinutes":  21,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.0,
+                                                              "reason":  "Covers the task in a general way, but key points need fuller explanation and support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.0,
+                                                                      "reason":  "Paragraphing is evident, but progression and cohesion are not consistently controlled."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.0,
+                                                                 "reason":  "Vocabulary is adequate for the topic but lacks flexibility and precision in places."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.0,
+                                                                             "reason":  "Attempts some variety in sentence structure, but grammar errors are still common."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear structure"
+                                       ],
+                         "weaknesses":  [
+                                            "limited examples"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_014",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Health",
+        "questionPrompt":  "Should governments tax sugary drinks?",
+        "essayText":  "Sugary drinks cause health problems. Tax can reduce consumption and improve public health.\n\nHowever companies may lose profit and consumers pay more.\n\nIn conclusion tax helpful but should be balanced.",
+        "wordCount":  168,
+        "estimatedTimeMinutes":  22,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.0,
+                                                              "reason":  "Covers the task in a general way, but key points need fuller explanation and support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.0,
+                                                                      "reason":  "Paragraphing is evident, but progression and cohesion are not consistently controlled."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.0,
+                                                                 "reason":  "Vocabulary is adequate for the topic but lacks flexibility and precision in places."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.0,
+                                                                             "reason":  "Attempts some variety in sentence structure, but grammar errors are still common."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "relevant arguments"
+                                       ],
+                         "weaknesses":  [
+                                            "simple vocabulary"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_015",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Should students learn coding in school?",
+        "essayText":  "Coding important skill today. Students learn problem solving and logic. Technology jobs increase.\n\nHowever not all students interested in programming.\n\nIn conclusion coding useful but should be optional.",
+        "wordCount":  176,
+        "estimatedTimeMinutes":  23,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.0,
+                                                              "reason":  "Covers the task in a general way, but key points need fuller explanation and support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.0,
+                                                                      "reason":  "Paragraphing is evident, but progression and cohesion are not consistently controlled."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.0,
+                                                                 "reason":  "Vocabulary is adequate for the topic but lacks flexibility and precision in places."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.0,
+                                                                             "reason":  "Attempts some variety in sentence structure, but grammar errors are still common."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "relevant topic"
+                                       ],
+                         "weaknesses":  [
+                                            "limited detail"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_016",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Society",
+        "questionPrompt":  "Does social media improve communication?",
+        "essayText":  "Social media connect people globally. Communication easier and faster. People share information quickly.\n\nHowever too much social media reduce real relationships.\n\nOverall social media helpful but should be used carefully.",
+        "wordCount":  172,
+        "estimatedTimeMinutes":  22,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.0,
+                                                              "reason":  "Covers the task in a general way, but key points need fuller explanation and support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.0,
+                                                                      "reason":  "Paragraphing is evident, but progression and cohesion are not consistently controlled."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.0,
+                                                                 "reason":  "Vocabulary is adequate for the topic but lacks flexibility and precision in places."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.0,
+                                                                             "reason":  "Attempts some variety in sentence structure, but grammar errors are still common."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear opinion"
+                                       ],
+                         "weaknesses":  [
+                                            "simple explanation"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_017",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Should governments invest more in renewable energy?",
+        "essayText":  "Renewable energy becoming popular. Solar and wind energy reduce pollution. Governments should invest more.\n\nHowever cost high and technology not perfect.\n\nIn conclusion renewable energy important for future.",
+        "wordCount":  181,
+        "estimatedTimeMinutes":  23,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.5,
+                                                              "reason":  "Responds to the prompt with relevant ideas, though development is uneven in places."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.5,
+                                                                      "reason":  "Information is generally organized logically, with some overuse or misuse of linking devices."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.5,
+                                                                 "reason":  "Shows some range of vocabulary, though repetition and collocation errors remain."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.5,
+                                                                             "reason":  "Uses both simple and some complex structures, though accuracy is inconsistent."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear argument"
+                                       ],
+                         "weaknesses":  [
+                                            "limited development"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_018",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Is university education necessary for success?",
+        "essayText":  "Many people think university necessary but others think skills more important. University give knowledge and qualifications.\n\nHowever successful entrepreneurs sometimes not graduate. Experience also valuable.\n\nIn conclusion university helpful but not only way to success.",
+        "wordCount":  195,
+        "estimatedTimeMinutes":  25,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.5,
+                                                              "reason":  "Responds to the prompt with relevant ideas, though development is uneven in places."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.5,
+                                                                      "reason":  "Information is generally organized logically, with some overuse or misuse of linking devices."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.5,
+                                                                 "reason":  "Shows some range of vocabulary, though repetition and collocation errors remain."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.5,
+                                                                             "reason":  "Uses both simple and some complex structures, though accuracy is inconsistent."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "balanced view"
+                                       ],
+                         "weaknesses":  [
+                                            "simple structure"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_019",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Technology",
+        "questionPrompt":  "Does technology reduce creativity?",
+        "essayText":  "Technology change way people think. Some people believe creativity reduce because people depend on internet. Others think technology give new tools.\n\nIn my opinion technology can increase creativity if used properly.",
+        "wordCount":  188,
+        "estimatedTimeMinutes":  24,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.5,
+                                                              "reason":  "Responds to the prompt with relevant ideas, though development is uneven in places."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.5,
+                                                                      "reason":  "Information is generally organized logically, with some overuse or misuse of linking devices."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.5,
+                                                                 "reason":  "Shows some range of vocabulary, though repetition and collocation errors remain."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.5,
+                                                                             "reason":  "Uses both simple and some complex structures, though accuracy is inconsistent."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "relevant ideas"
+                                       ],
+                         "weaknesses":  [
+                                            "short development"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_020",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Work",
+        "questionPrompt":  "Should companies allow flexible working hours?",
+        "essayText":  "Flexible schedule allow employees manage time better. Productivity increase because people work when most efficient.\n\nHowever coordination difficult when workers different schedules.\n\nIn conclusion flexible hours beneficial but require management.",
+        "wordCount":  200,
+        "estimatedTimeMinutes":  26,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  5.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  5.5,
+                                                              "reason":  "Responds to the prompt with relevant ideas, though development is uneven in places."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  5.5,
+                                                                      "reason":  "Information is generally organized logically, with some overuse or misuse of linking devices."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  5.5,
+                                                                 "reason":  "Shows some range of vocabulary, though repetition and collocation errors remain."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  5.5,
+                                                                             "reason":  "Uses both simple and some complex structures, though accuracy is inconsistent."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "logical structure"
+                                       ],
+                         "weaknesses":  [
+                                            "limited vocabulary"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_021",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Health",
+        "questionPrompt":  "Should governments promote healthy eating?",
+        "essayText":  "Healthy diet reduce diseases. Governments can educate citizens about nutrition. This improve public health.\n\nHowever personal choice important.\n\nIn conclusion government support helpful.",
+        "wordCount":  210,
+        "estimatedTimeMinutes":  27,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Addresses all parts of the task with generally clear position and adequate support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.0,
+                                                                      "reason":  "Ideas progress clearly overall, with effective paragraphing and mostly appropriate cohesion."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.0,
+                                                                 "reason":  "Uses an adequate range of vocabulary with some less common items and acceptable accuracy."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.0,
+                                                                             "reason":  "Uses a mix of sentence forms with generally clear meaning despite minor errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear reasoning"
+                                       ],
+                         "weaknesses":  [
+                                            "examples general"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_022",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Should cities increase green spaces?",
+        "essayText":  "Green parks improve air quality and mental health. Cities should invest in public parks.\n\nHowever urban land expensive and limited.\n\nOverall green areas beneficial for society.",
+        "wordCount":  214,
+        "estimatedTimeMinutes":  27,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Addresses all parts of the task with generally clear position and adequate support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.0,
+                                                                      "reason":  "Ideas progress clearly overall, with effective paragraphing and mostly appropriate cohesion."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.0,
+                                                                 "reason":  "Uses an adequate range of vocabulary with some less common items and acceptable accuracy."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.0,
+                                                                             "reason":  "Uses a mix of sentence forms with generally clear meaning despite minor errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear benefits"
+                                       ],
+                         "weaknesses":  [
+                                            "limited depth"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_023",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Technology",
+        "questionPrompt":  "Is artificial intelligence dangerous?",
+        "essayText":  "Artificial intelligence improve productivity and automate tasks. However ethical concerns exist such as job loss and bias.\n\nAI should be controlled responsibly.",
+        "wordCount":  208,
+        "estimatedTimeMinutes":  27,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Addresses all parts of the task with generally clear position and adequate support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.0,
+                                                                      "reason":  "Ideas progress clearly overall, with effective paragraphing and mostly appropriate cohesion."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.0,
+                                                                 "reason":  "Uses an adequate range of vocabulary with some less common items and acceptable accuracy."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.0,
+                                                                             "reason":  "Uses a mix of sentence forms with generally clear meaning despite minor errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "balanced view"
+                                       ],
+                         "weaknesses":  [
+                                            "needs examples"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_024",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Society",
+        "questionPrompt":  "Do large cities provide better opportunities?",
+        "essayText":  "Big cities offer jobs and education. People move for better life.\n\nHowever cost of living high.\n\nIn conclusion cities provide opportunity but challenges exist.",
+        "wordCount":  220,
+        "estimatedTimeMinutes":  28,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.0,
+                                                              "reason":  "Addresses all parts of the task with generally clear position and adequate support."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.0,
+                                                                      "reason":  "Ideas progress clearly overall, with effective paragraphing and mostly appropriate cohesion."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.0,
+                                                                 "reason":  "Uses an adequate range of vocabulary with some less common items and acceptable accuracy."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.0,
+                                                                             "reason":  "Uses a mix of sentence forms with generally clear meaning despite minor errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear structure"
+                                       ],
+                         "weaknesses":  [
+                                            "simple explanation"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_025",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Should exams be replaced with continuous assessment?",
+        "essayText":  "Continuous assessment allows teachers evaluate progress regularly. Students experience less stress than final exams.\n\nHowever exams measure performance under pressure.\n\nBalanced system most effective.",
+        "wordCount":  232,
+        "estimatedTimeMinutes":  30,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.5,
+                                                              "reason":  "Presents a clear response with good development, though some arguments could be extended further."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.5,
+                                                                      "reason":  "Logical flow is strong and paragraphing is clear, with only minor cohesion lapses."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.5,
+                                                                 "reason":  "Demonstrates good lexical range with generally accurate word choice and minor inaccuracies."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.5,
+                                                                             "reason":  "Shows a good range of structures with fairly high control and occasional errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear reasoning"
+                                       ],
+                         "weaknesses":  [
+                                            "examples moderate"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_026",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Technology",
+        "questionPrompt":  "Do robots improve workplace productivity?",
+        "essayText":  "Robots perform repetitive tasks efficiently. Companies reduce errors and costs.\n\nHowever automation may reduce jobs.\n\nOverall robots improve productivity but require adaptation.",
+        "wordCount":  236,
+        "estimatedTimeMinutes":  30,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.5,
+                                                              "reason":  "Presents a clear response with good development, though some arguments could be extended further."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.5,
+                                                                      "reason":  "Logical flow is strong and paragraphing is clear, with only minor cohesion lapses."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.5,
+                                                                 "reason":  "Demonstrates good lexical range with generally accurate word choice and minor inaccuracies."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.5,
+                                                                             "reason":  "Shows a good range of structures with fairly high control and occasional errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "relevant argument"
+                                       ],
+                         "weaknesses":  [
+                                            "development moderate"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_027",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Is climate change the biggest global challenge?",
+        "essayText":  "Climate change affects environment and economy. Governments must cooperate globally.\n\nHowever other problems exist such as poverty.\n\nClimate change remains major challenge.",
+        "wordCount":  228,
+        "estimatedTimeMinutes":  29,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.5,
+                                                              "reason":  "Presents a clear response with good development, though some arguments could be extended further."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.5,
+                                                                      "reason":  "Logical flow is strong and paragraphing is clear, with only minor cohesion lapses."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.5,
+                                                                 "reason":  "Demonstrates good lexical range with generally accurate word choice and minor inaccuracies."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.5,
+                                                                             "reason":  "Shows a good range of structures with fairly high control and occasional errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear structure"
+                                       ],
+                         "weaknesses":  [
+                                            "examples basic"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_028",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Work",
+        "questionPrompt":  "Should employees receive longer holidays?",
+        "essayText":  "Longer holidays improve mental health and productivity. Workers return motivated.\n\nHowever businesses lose working hours.\n\nBalanced holiday policy necessary.",
+        "wordCount":  240,
+        "estimatedTimeMinutes":  31,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  6.5,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  6.5,
+                                                              "reason":  "Presents a clear response with good development, though some arguments could be extended further."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  6.5,
+                                                                      "reason":  "Logical flow is strong and paragraphing is clear, with only minor cohesion lapses."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  6.5,
+                                                                 "reason":  "Demonstrates good lexical range with generally accurate word choice and minor inaccuracies."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  6.5,
+                                                                             "reason":  "Shows a good range of structures with fairly high control and occasional errors."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "logical argument"
+                                       ],
+                         "weaknesses":  [
+                                            "limited depth"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_029",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Education",
+        "questionPrompt":  "Should universities focus more on practical skills?",
+        "essayText":  "Practical skills help students prepare for employment. Employers prefer experience.\n\nHowever theoretical knowledge important for research.\n\nEducation should combine theory and practice.",
+        "wordCount":  258,
+        "estimatedTimeMinutes":  33,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  7.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  7.0,
+                                                              "reason":  "Fully addresses the task with clear, relevant, and well-developed arguments throughout."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "Information is sequenced logically with cohesive devices used naturally and effectively."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  7.0,
+                                                                 "reason":  "Uses a broad and precise vocabulary flexibly, with only occasional minor errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  7.0,
+                                                                             "reason":  "Uses a wide range of complex structures accurately, with only minor slips."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "balanced discussion"
+                                       ],
+                         "weaknesses":  [
+                                            "examples could expand"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_030",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Technology",
+        "questionPrompt":  "Does online shopping replace traditional stores?",
+        "essayText":  "Online shopping convenient and offers variety. Consumers save time.\n\nHowever physical stores provide direct experience with products.\n\nBoth shopping methods remain relevant.",
+        "wordCount":  255,
+        "estimatedTimeMinutes":  33,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  7.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  7.0,
+                                                              "reason":  "Fully addresses the task with clear, relevant, and well-developed arguments throughout."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "Information is sequenced logically with cohesive devices used naturally and effectively."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  7.0,
+                                                                 "reason":  "Uses a broad and precise vocabulary flexibly, with only occasional minor errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  7.0,
+                                                                             "reason":  "Uses a wide range of complex structures accurately, with only minor slips."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear structure"
+                                       ],
+                         "weaknesses":  [
+                                            "needs deeper example"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_031",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Environment",
+        "questionPrompt":  "Should individuals reduce meat consumption?",
+        "essayText":  "Reducing meat consumption helps environment and health. Farming contributes to emissions.\n\nHowever diet choice personal decision.\n\nModerate consumption reasonable solution.",
+        "wordCount":  262,
+        "estimatedTimeMinutes":  34,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  7.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  7.0,
+                                                              "reason":  "Fully addresses the task with clear, relevant, and well-developed arguments throughout."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "Information is sequenced logically with cohesive devices used naturally and effectively."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  7.0,
+                                                                 "reason":  "Uses a broad and precise vocabulary flexibly, with only occasional minor errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  7.0,
+                                                                             "reason":  "Uses a wide range of complex structures accurately, with only minor slips."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "relevant reasoning"
+                                       ],
+                         "weaknesses":  [
+                                            "arguments general"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    },
+    {
+        "essayId":  "essay_032",
+        "taskType":  "IELTS Writing Task 2",
+        "topicCategory":  "Society",
+        "questionPrompt":  "Is cultural diversity beneficial?",
+        "essayText":  "Cultural diversity promotes understanding and innovation. Different perspectives encourage creativity.\n\nHowever integration challenges exist.\n\nDiversity generally benefits society.",
+        "wordCount":  270,
+        "estimatedTimeMinutes":  35,
+        "originalSource":  {
+                               "sourceType":  "synthetic_sample",
+                               "sourceName":  "generated_dataset_v1",
+                               "sourceUrl":  null
+                           },
+        "scoring":  {
+                        "overallBand":  7.0,
+                        "criteria":  {
+                                         "taskResponse":  {
+                                                              "band":  7.0,
+                                                              "reason":  "Fully addresses the task with clear, relevant, and well-developed arguments throughout."
+                                                          },
+                                         "coherenceAndCohesion":  {
+                                                                      "band":  7.0,
+                                                                      "reason":  "Information is sequenced logically with cohesive devices used naturally and effectively."
+                                                                  },
+                                         "lexicalResource":  {
+                                                                 "band":  7.0,
+                                                                 "reason":  "Uses a broad and precise vocabulary flexibly, with only occasional minor errors."
+                                                             },
+                                         "grammaticalRangeAndAccuracy":  {
+                                                                             "band":  7.0,
+                                                                             "reason":  "Uses a wide range of complex structures accurately, with only minor slips."
+                                                                         }
+                                     }
+                    },
+        "analysis":  {
+                         "strengths":  [
+                                           "clear position"
+                                       ],
+                         "weaknesses":  [
+                                            "examples limited"
+                                        ],
+                         "detectedIssues":  [
+
+                                            ],
+                         "improvementSuggestions":  [
+
+                                                    ]
+                     },
+        "teacherReview":  {
+                              "reviewed":  false,
+                              "teacherAgreementWithAI":  null,
+                              "teacherNotes":  null
+                          }
+    }
+]

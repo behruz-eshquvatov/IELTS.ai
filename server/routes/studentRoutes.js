@@ -11,6 +11,9 @@ const {
   markStudyVisit,
   addTaskStudyTime,
   getStudyHeatmap,
+  markMyStudyVisit,
+  addMyTaskStudyTime,
+  getMyStudyHeatmap,
   seedStudentData,
   listStudents,
 } = require("../controllers/studentController");
@@ -21,6 +24,9 @@ const router = express.Router();
 router.get("/", protect, authorizeRoles("teacher"), listStudents);
 router.post("/:studentId/seed", seedStudentData);
 router.get("/me/profile", protect, authorizeRoles("student"), getMyStudentProfile);
+router.post("/me/study-activity/visit", protect, authorizeRoles("student"), markMyStudyVisit);
+router.post("/me/study-activity/task-time", protect, authorizeRoles("student"), addMyTaskStudyTime);
+router.get("/me/study-activity/heatmap", protect, authorizeRoles("student"), getMyStudyHeatmap);
 
 router.get("/:studentId/profile", protect, authorizeRoles("teacher", "student"), getStudentProfile);
 router.put("/:studentId/profile", protect, authorizeRoles("teacher", "student"), updateStudentProfile);

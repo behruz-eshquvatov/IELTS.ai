@@ -1,81 +1,40 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, LayoutGrid, List } from "lucide-react";
-import MagneticButton from "../../components/ui/MagneticButton";
 import { motion } from "framer-motion";
+import MagneticButton from "../../components/ui/MagneticButton";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
+import { apiRequest } from "../../lib/apiClient";
 
-const listeningSections = [
-  {
-    title: "Full Listening Audio",
-    description:
-      "Complete all four sections in one continuous run with mixed question types and answer transfer checks.",
-    to: "/student/tests/listening-full",
-    cta: "Open resources",
-  },
-  {
-    title: "Part-by-Part Listening",
-    description:
-      "Practice Section 1, Section 2, Section 3, and Section 4 separately with targeted timing.",
-    to: "/student/tests/listening-by-part",
-    cta: "Open resources",
-  },
-  {
-    title: "Multiple Choice",
-    description:
-      "Single and multiple answer sets with close distractors, paraphrase traps, and detail vs. inference checks.",
-    to: "/student/tests/listening-multiple-choice",
-    cta: "Open resources",
-  },
-  {
-    title: "Matching",
-    description:
-      "Match speakers, options, or categories across multiple statements with fast scanning and memory control.",
-    to: "/student/tests/listening-matching",
-    cta: "Open resources",
-  },
-  {
-    title: "Plan, Map, Diagram Labeling",
-    description:
-      "Spatial listening for layouts, routes, and locations. Focus on direction cues and precise labeling.",
-    to: "/student/tests/listening-map",
-    cta: "Open resources",
-  },
-  {
-    title: "Form, Note, Table, Summary Completion",
-    description:
-      "Capture names, numbers, dates, and key details accurately under time pressure.",
-    to: "/student/tests/listening-gap-filling",
-    cta: "Open resources",
-  },
-  {
-    title: "Sentence Completion",
-    description:
-      "Fill key words and phrases in structured sentences using one-to-three word answers.",
-    to: "/student/tests/listening-sentence-completion",
-    cta: "Open resources",
-  },
-  {
-    title: "Short Answer Questions",
-    description:
-      "Respond with concise answers drawn from the audio while keeping spelling and number accuracy.",
-    to: "/student/tests/listening-short-answer",
-    cta: "Open resources",
-  },
-  {
-    title: "Diagram Completion",
-    description:
-      "Complete labeled diagrams with precise terms and careful listening for locations and stages.",
-    to: "/student/tests/listening-diagram",
-    cta: "Open resources",
-  },
-  {
-    title: "Flowchart Completion",
-    description:
-      "Track processes and sequences with step-by-step completion under time constraints.",
-    to: "/student/tests/listening-flowchart",
-    cta: "Open resources",
-  },
-];
+function toReadableLabel(value) {
+  const safe = String(value || "").trim();
+  if (!safe) {
+    return "Unknown";
+  }
+
+  return safe
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function encodePathPart(value) {
+  return encodeURIComponent(String(value || "").trim());
+}
+
+function buildFamilyDescription(family) {
+  const count = Number(family?.count) || 0;
+  const blockTypes = Array.isArray(family?.blockTypes) ? family.blockTypes : [];
+  const readableTypes = blockTypes.map(toReadableLabel);
+
+  if (readableTypes.length === 0) {
+    return `${count} listening resources available in this question family.`;
+  }
+
+  const preview = readableTypes.slice(0, 2).join(", ");
+  const suffix = readableTypes.length > 2 ? ` +${readableTypes.length - 2} more` : "";
+  return `${count} listening resources. Block types: ${preview}${suffix}.`;
+}
 
 function ListeningCard({ section, viewMode }) {
   const cardRef = useRef(null);
@@ -165,6 +124,73 @@ function ListeningCard({ section, viewMode }) {
 
 function StudentListeningPage() {
   const [viewMode, setViewMode] = useLocalStorageState("student:listening:view-mode", "grid");
+  const [families, setFamilies] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [isLoadingFamilies, setIsLoadingFamilies] = useState(false);
+  const [familiesError, setFamiliesError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFamilies() {
+      setIsLoadingFamilies(true);
+      setFamiliesError("");
+
+      try {
+        const [familiesResponse, testsResponse] = await Promise.all([
+          apiRequest("/listening-blocks", { auth: false }),
+          apiRequest("/listening-tests?status=published&limit=50", { auth: false }),
+        ]);
+        if (!isMounted) {
+          return;
+        }
+
+        setFamilies(Array.isArray(familiesResponse?.families) ? familiesResponse.families : []);
+        setTests(Array.isArray(testsResponse?.tests) ? testsResponse.tests : []);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setFamiliesError(error.message || "Failed to load listening question families.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingFamilies(false);
+        }
+      }
+    }
+
+    loadFamilies();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const sections = useMemo(
+    () => {
+      const fullAudioSection = {
+        title: "Full Listening Tests",
+        description:
+          tests.length > 0
+            ? `${tests.length} full listening test(s) published. Latest: ${tests[0].title || tests[0]._id}.`
+            : "No published full listening tests yet. Add tests in `listening_tests`.",
+        to: "/student/tests/listening/full",
+        cta: "Open full tests",
+      };
+
+      const familySections = families.map((family) => ({
+        title: toReadableLabel(family.questionFamily),
+        description: buildFamilyDescription(family),
+        to: `/student/tests/listening/${encodePathPart(family.questionFamily)}`,
+        cta: "Open tasks",
+      }));
+
+      return [fullAudioSection, ...familySections];
+    },
+    [families, tests],
+  );
+
   const viewButtons = [
     { key: "list", icon: List },
     { key: "grid", icon: LayoutGrid },
@@ -210,12 +236,18 @@ function StudentListeningPage() {
         </motion.div>
       </header>
 
+      {isLoadingFamilies ? <p className="text-sm text-slate-600">Loading listening resources...</p> : null}
+      {familiesError ? <p className="text-sm text-rose-600">{familiesError}</p> : null}
+      {!isLoadingFamilies && !familiesError && sections.length === 0 ? (
+        <p className="text-sm text-slate-600">No listening question families found.</p>
+      ) : null}
+
       <div
         className={`grid gap-4 ${
           viewMode === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
         }`}
       >
-        {listeningSections.map((section) => (
+        {sections.map((section) => (
           <ListeningCard key={section.title} section={section} viewMode={viewMode} />
         ))}
       </div>

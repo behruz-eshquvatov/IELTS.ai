@@ -8,44 +8,20 @@ import StudentActivityHeatmap from "../../components/student/StudentActivityHeat
 import StudentAnalyticsRangePicker from "../../components/student/StudentAnalyticsRangePicker";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
 import { apiRequest } from "../../lib/apiClient";
-import { getStoredUser } from "../../lib/authSession";
-
-const heatmapMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
-
-function generateActivityData(length) {
-  return Array.from({ length }, (_, i) => {
-    const dayOfWeek = i % 7;
-    const cycle = Math.sin(i / 11);
-    if (dayOfWeek === 6) return 0;
-    if (cycle > 0.6) return 3;
-    if (cycle > 0.1) return 2;
-    if (dayOfWeek === 5) return 1;
-    return i % 3 === 0 ? 1 : 0;
-  });
-}
-
-const heatmapData = generateActivityData(365);
+import { buildBlankCalendarHeatmap } from "../../lib/heatmapCalendar";
 
 export default function StudentAnalyticsPage() {
   const [range, setRange] = useLocalStorageState("student:analytics:range", "week");
   const [dynamicHeatmap, setDynamicHeatmap] = useState(null);
   const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
-
-  const studentId = useMemo(
-    () => String(getStoredUser()?.email || "").trim().toLowerCase(),
-    [],
-  );
+  const blankHeatmap = useMemo(() => buildBlankCalendarHeatmap(), []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadStudyActivity() {
-      if (!studentId) {
-        return;
-      }
-
       try {
-        await apiRequest(`/students/${encodeURIComponent(studentId)}/study-activity/visit`, {
+        await apiRequest("/students/me/study-activity/visit", {
           method: "POST",
         });
       } catch {
@@ -53,9 +29,7 @@ export default function StudentAnalyticsPage() {
       }
 
       try {
-        const response = await apiRequest(
-          `/students/${encodeURIComponent(studentId)}/study-activity/heatmap`,
-        );
+        const response = await apiRequest("/students/me/study-activity/heatmap");
 
         if (cancelled) {
           return;
@@ -76,11 +50,13 @@ export default function StudentAnalyticsPage() {
     }
 
     loadStudyActivity();
+    const intervalId = window.setInterval(loadStudyActivity, 30000);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
-  }, [studentId]);
+  }, []);
 
   return (
     <div className="space-y-10 -mt-1 max-w-7xl mx-auto">
@@ -101,8 +77,14 @@ export default function StudentAnalyticsPage() {
           Practice consistency
         </h2>
         <StudentActivityHeatmap
-          months={dynamicHeatmap?.months?.length ? dynamicHeatmap.months : heatmapMonths}
-          activityData={dynamicHeatmap?.activityData?.length ? dynamicHeatmap.activityData : heatmapData}
+          months={dynamicHeatmap?.months?.length ? dynamicHeatmap.months : blankHeatmap.months}
+          monthTicks={dynamicHeatmap?.monthTicks?.length ? dynamicHeatmap.monthTicks : blankHeatmap.monthTicks}
+          activityData={
+            dynamicHeatmap?.activityData?.length ? dynamicHeatmap.activityData : blankHeatmap.activityData
+          }
+          visibilityData={
+            dynamicHeatmap?.visibilityData?.length ? dynamicHeatmap.visibilityData : blankHeatmap.visibilityData
+          }
         />
         <p className="text-sm text-slate-600">
           Today's study time:{" "}

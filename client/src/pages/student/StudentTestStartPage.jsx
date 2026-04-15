@@ -4,7 +4,6 @@ import { AlertTriangle, ShieldBan } from "lucide-react";
 import { motion } from "framer-motion";
 import WritingAttemptTimerCard from "../../components/student/WritingAttemptTimerCard";
 import { apiRequest } from "../../lib/apiClient";
-import { getStoredUser } from "../../lib/authSession";
 
 const DEFAULT_DURATION_SECONDS = 40 * 60;
 const MINIMUM_WORDS = 250;
@@ -276,10 +275,9 @@ function StudentTestStartPage() {
         setIsCheckingEssay(false);
       }
 
-      const studentId = String(getStoredUser()?.email || "").trim().toLowerCase();
-      if (studentId && payload.timeSpentSeconds > 0) {
+      if (payload.timeSpentSeconds > 0) {
         try {
-          await apiRequest(`/students/${encodeURIComponent(studentId)}/study-activity/task-time`, {
+          await apiRequest("/students/me/study-activity/task-time", {
             method: "POST",
             body: {
               secondsSpent: payload.timeSpentSeconds,

@@ -15,7 +15,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { memo, useEffect, useRef, useState } from "react";
 import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
 import { apiRequest, authApi } from "../lib/apiClient";
-import { clearAuthSession, getStoredUser } from "../lib/authSession";
+import { clearAuthSession } from "../lib/authSession";
 
 const navGroups = [
   {
@@ -266,12 +266,7 @@ const StudentMainContent = memo(function StudentMainContent() {
 
 function StudentLayout() {
   useEffect(() => {
-    const studentId = String(getStoredUser()?.email || "").trim().toLowerCase();
-    if (!studentId) {
-      return;
-    }
-
-    apiRequest(`/students/${encodeURIComponent(studentId)}/study-activity/visit`, {
+    apiRequest("/students/me/study-activity/visit", {
       method: "POST",
     }).catch(() => {
       // Visit tracking should not block page render.

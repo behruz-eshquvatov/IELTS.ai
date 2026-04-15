@@ -1,6 +1,9 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const User = require("../models/userModel");
 const StudentProfile = require("../models/studentProfileModel");
+const StudentAnalytics = require("../models/studentAnalyticsModel");
+const { studentAnalyticsSeed } = require("../data/studentSeedData");
 const {
   signAccessToken,
   signRefreshToken,
@@ -10,6 +13,8 @@ const {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+const PASSWORD_RESET_TOKEN_BYTES = 32;
+const PASSWORD_RESET_TTL_MINUTES = Number.parseInt(process.env.PASSWORD_RESET_TTL_MINUTES || "30", 10);
 
 function sanitizeUser(userDoc) {
   return {
@@ -62,6 +67,29 @@ function buildDefaultStudentProfile(userDoc) {
     },
     billingHistory: [],
   };
+}
+
+function cloneSeed(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+function buildResetPath(role) {
+  return role === "teacher" ? "/teachers/reset-password" : "/student/reset-password";
+}
+
+function buildResetUrl({ role, token }) {
+  const clientOrigin = (process.env.CLIENT_ORIGIN || "http://localhost:5173").replace(/\/+$/, "");
+  const search = new URLSearchParams({ token }).toString();
+  return `${clientOrigin}${buildResetPath(role)}?${search}`;
+}
+
+function clearPasswordResetFields(userDoc) {
+  userDoc.resetPasswordTokenHash = "";
+  userDoc.resetPasswordExpiresAt = null;
 }
 
 async function issueSession(res, userDoc, options = {}) {
@@ -144,9 +172,27 @@ async function register(req, res) {
 
   if (user.role === "student") {
     const starterProfile = buildDefaultStudentProfile(user);
+    const starterAnalytics = {
+      studentId: starterProfile.studentId,
+      ranges: cloneSeed(studentAnalyticsSeed.ranges),
+      heatmap: {
+        months: [],
+        activityData: [],
+      },
+      studyActivity: {
+        entries: [],
+      },
+    };
+
     await StudentProfile.updateOne(
       { studentId: starterProfile.studentId },
       { $setOnInsert: starterProfile },
+      { upsert: true },
+    );
+
+    await StudentAnalytics.updateOne(
+      { studentId: starterProfile.studentId },
+      { $setOnInsert: starterAnalytics },
       { upsert: true },
     );
   }
@@ -267,6 +313,130 @@ async function logout(req, res) {
   });
 }
 
+async function forgotPassword(req, res) {
+  const email = String(req.body?.email || "").toLowerCase().trim();
+  const role = req.body?.role;
+
+  if (!EMAIL_REGEX.test(email)) {
+    return res.status(400).json({
+      message: "Please provide a valid email address.",
+    });
+  }
+
+  if (role && !["student", "teacher"].includes(role)) {
+    return res.status(400).json({
+      message: "Role must be either student or teacher.",
+    });
+  }
+
+  const query = role ? { email, role } : { email };
+  const user = await User.findOne(query).select("+resetPasswordTokenHash +resetPasswordExpiresAt");
+  if (!user || !user.isActive) {
+    return res.json({
+      message: "If that email exists, a password reset link has been sent.",
+    });
+  }
+
+  const token = crypto.randomBytes(PASSWORD_RESET_TOKEN_BYTES).toString("hex");
+  const tokenHash = hashResetToken(token);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
+  const resetUrl = buildResetUrl({ role: user.role, token });
+
+  user.resetPasswordTokenHash = tokenHash;
+  user.resetPasswordExpiresAt = expiresAt;
+  await user.save();
+
+  // TODO: Replace console delivery with email provider integration.
+  console.info(`[auth] Password reset link for ${user.email}: ${resetUrl}`);
+
+  const isDev = process.env.NODE_ENV !== "production";
+
+  return res.json({
+    message: "If that email exists, a password reset link has been sent.",
+    ...(isDev
+      ? {
+          resetUrl,
+          expiresAt: expiresAt.toISOString(),
+        }
+      : {}),
+  });
+}
+
+async function verifyResetPasswordToken(req, res) {
+  const token = String(req.body?.token || "").trim();
+
+  if (!token) {
+    return res.status(400).json({
+      message: "Reset token is required.",
+    });
+  }
+
+  const tokenHash = hashResetToken(token);
+  const user = await User.findOne({
+    resetPasswordTokenHash: tokenHash,
+    resetPasswordExpiresAt: { $gt: new Date() },
+    isActive: true,
+  }).select("email role");
+
+  if (!user) {
+    return res.status(400).json({
+      message: "Reset link is invalid or expired.",
+    });
+  }
+
+  return res.json({
+    valid: true,
+    role: user.role,
+  });
+}
+
+async function resetPassword(req, res) {
+  const token = String(req.body?.token || "").trim();
+  const password = String(req.body?.password || "");
+  const confirmPassword = String(req.body?.confirmPassword || "");
+
+  if (!token) {
+    return res.status(400).json({
+      message: "Reset token is required.",
+    });
+  }
+
+  if (!PASSWORD_REGEX.test(password)) {
+    return res.status(400).json({
+      message: "Password must be at least 8 characters and include at least one letter and one number.",
+    });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({
+      message: "Password confirmation does not match.",
+    });
+  }
+
+  const tokenHash = hashResetToken(token);
+  const user = await User.findOne({
+    resetPasswordTokenHash: tokenHash,
+    resetPasswordExpiresAt: { $gt: new Date() },
+    isActive: true,
+  }).select("+password +refreshTokenHash +resetPasswordTokenHash +resetPasswordExpiresAt");
+
+  if (!user) {
+    return res.status(400).json({
+      message: "Reset link is invalid or expired.",
+    });
+  }
+
+  user.password = password;
+  user.refreshTokenHash = "";
+  clearPasswordResetFields(user);
+  await user.save();
+
+  clearRefreshCookie(res);
+  return res.json({
+    message: "Password has been reset successfully. Please log in again.",
+  });
+}
+
 async function getMe(req, res) {
   const user = await User.findById(req.auth.userId).lean();
 
@@ -284,6 +454,9 @@ async function getMe(req, res) {
 module.exports = {
   register,
   login,
+  forgotPassword,
+  verifyResetPasswordToken,
+  resetPassword,
   refreshSession,
   logout,
   getMe,

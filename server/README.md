@@ -35,6 +35,9 @@ This creates demo data for:
 ## Main Endpoints
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/reset-password/verify`
+- `POST /api/v1/auth/reset-password`
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
@@ -49,13 +52,21 @@ This creates demo data for:
 - `POST /api/v1/students/:studentId/study-activity/visit`
 - `POST /api/v1/students/:studentId/study-activity/task-time`
 - `GET /api/v1/students/:studentId/study-activity/heatmap`
+- `POST /api/v1/students/me/study-activity/visit`
+- `POST /api/v1/students/me/study-activity/task-time`
+- `GET /api/v1/students/me/study-activity/heatmap`
 - `POST /api/v1/writing-task2-opinion/analyses`
 - `GET /api/v1/writing-task2-opinion/analyses/:analysisId`
 
 ## Study Activity Rules
-- Level `1`: student visited that day (`visit` endpoint).
-- Level `2`: task-active study time reached `30+` minutes.
-- Level `3`: task-active study time reached `60+` minutes.
+- Level `1`: task-active study time reached `30+` minutes.
+- Level `2`: task-active study time reached `60+` minutes.
+- Level `3`: task-active study time reached `120+` minutes.
+
+Heatmap endpoints support `?year=YYYY` (e.g. `?year=2024`) and return:
+- `activityData` with intensity values
+- `visibilityData` where days outside the selected year are hidden
+- `monthTicks`, `startDateKey`, `endDateKey`, and `calendarYear`
 
 Each study activity response includes:
 - `todaysStudyTimeMinutes` (number)

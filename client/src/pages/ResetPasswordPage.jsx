@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import InteractiveGridBackground from "../components/layout/InteractiveGridBackground";
 import MagneticButton from "../components/ui/MagneticButton";
@@ -16,40 +16,117 @@ import {
 const MotionSection = motion.section;
 const MotionDiv = motion.div;
 
-function AuthField({ label, value, onChange, placeholder, type = "text", autoComplete }) {
+function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  show,
+  onToggleShow,
+  autoComplete,
+}) {
   return (
     <label className="block space-y-2.5">
       <span className="text-[0.68rem] font-semibold uppercase tracking-[0.22em]">{label}</span>
-      <input
-        autoComplete={autoComplete}
-        className={`auth-input ${authInputBaseClass} border-black/10 bg-transparent text-slate-900 placeholder:text-slate-400 focus:border-slate-950/25`}
-        onChange={onChange}
-        placeholder={placeholder}
-        type={type}
-        value={value}
-      />
+      <div className="relative">
+        <input
+          autoComplete={autoComplete}
+          className={`auth-input ${authInputBaseClass} border-black/10 bg-transparent pr-14 text-slate-900 placeholder:text-slate-400 focus:border-slate-950/25`}
+          onChange={onChange}
+          placeholder={placeholder}
+          type={show ? "text" : "password"}
+          value={value}
+        />
+        <button
+          aria-label={show ? "Hide password" : "Show password"}
+          className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-2 text-slate-500 transition hover:text-slate-800"
+          onClick={onToggleShow}
+          type="button"
+        >
+          {show ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+        </button>
+      </div>
     </label>
   );
 }
 
-function ForgotPasswordPage() {
+function ResetPasswordPage() {
   const location = useLocation();
-  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [status, setStatus] = useState(null);
+  const [isVerifyingToken, setIsVerifyingToken] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTokenValid, setIsTokenValid] = useState(false);
   const isTeacherRoute = location.pathname.startsWith("/teachers/");
   const backAuthRoute = isTeacherRoute ? "/teachers/auth" : "/student/auth";
-  const alternateAuthRoute = isTeacherRoute ? "/student/auth" : "/teachers/auth";
-  const alternateAuthLabel = isTeacherRoute ? "Student auth" : "Teacher auth";
-  const role = isTeacherRoute ? "teacher" : "student";
+
+  const token = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return String(params.get("token") || "").trim();
+  }, [location.search]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function verifyToken() {
+      if (!token) {
+        setStatus({
+          type: "error",
+          message: "Reset token is missing from the link.",
+        });
+        setIsVerifyingToken(false);
+        setIsTokenValid(false);
+        return;
+      }
+
+      setIsVerifyingToken(true);
+      setStatus(null);
+
+      try {
+        await authApi.verifyResetPasswordToken({ token });
+
+        if (cancelled) {
+          return;
+        }
+
+        setIsTokenValid(true);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setIsTokenValid(false);
+        setStatus({
+          type: "error",
+          message: error.message || "Reset link is invalid or expired.",
+        });
+      } finally {
+        if (!cancelled) {
+          setIsVerifyingToken(false);
+        }
+      }
+    }
+
+    verifyToken();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!email.trim()) {
+    if (!isTokenValid || isSubmitting) {
+      return;
+    }
+
+    if (!password || !confirmPassword) {
       setStatus({
         type: "error",
-        message: "Email is required.",
+        message: "Please fill in both password fields.",
       });
       return;
     }
@@ -58,21 +135,23 @@ function ForgotPasswordPage() {
     setStatus(null);
 
     try {
-      const response = await authApi.forgotPassword({
-        email: email.trim().toLowerCase(),
-        role,
+      const response = await authApi.resetPassword({
+        token,
+        password,
+        confirmPassword,
       });
 
       setStatus({
         type: "success",
-        message: response?.message || "If that email exists, a password reset link has been sent.",
-        resetUrl: response?.resetUrl || "",
-        expiresAt: response?.expiresAt || "",
+        message: response?.message || "Password has been reset successfully.",
       });
+      setPassword("");
+      setConfirmPassword("");
+      setIsTokenValid(false);
     } catch (error) {
       setStatus({
         type: "error",
-        message: error.message || "Could not send password reset link.",
+        message: error.message || "Could not reset password.",
       });
     } finally {
       setIsSubmitting(false);
@@ -135,7 +214,7 @@ function ForgotPasswordPage() {
                       </p>
                     </div>
                     <h1 className="max-w-xl text-4xl font-semibold leading-[0.96] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
-                      Reset your access.
+                      Choose a new password.
                     </h1>
                   </div>
                 </div>
@@ -145,59 +224,62 @@ function ForgotPasswordPage() {
             <div className="flex flex-col p-6 sm:p-8 lg:p-10">
               <div className="mt-8 border-current/10 pb-6">
                 <h2 className="mt-4 max-w-lg text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-[2.65rem]">
-                  We&apos;ll send a reset link.
+                  Secure your account.
                 </h2>
               </div>
 
               <div className="flex-1 pt-8">
                 <form className="space-y-6" onSubmit={handleSubmit}>
-                  <AuthField
-                    autoComplete="email"
-                    label="Email"
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@example.com"
-                    type="email"
-                    value={email}
+                  <PasswordField
+                    autoComplete="new-password"
+                    label="New password"
+                    onChange={(event) => setPassword(event.target.value)}
+                    onToggleShow={() => setShowPassword((current) => !current)}
+                    placeholder="At least 8 chars, include letter + number"
+                    show={showPassword}
+                    value={password}
+                  />
+
+                  <PasswordField
+                    autoComplete="new-password"
+                    label="Confirm password"
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    onToggleShow={() => setShowConfirmPassword((current) => !current)}
+                    placeholder="Repeat new password"
+                    show={showConfirmPassword}
+                    value={confirmPassword}
                   />
 
                   <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-start gap-3 text-sm leading-7 text-slate-600">
-                      <Mail className="mt-1 h-4 w-4 text-slate-500" />
-                      <p>Use the email tied to your account.</p>
+                      <KeyRound className="mt-1 h-4 w-4 text-slate-500" />
+                      <p>Your old sessions will be signed out.</p>
                     </div>
 
                     <MagneticButton
                       className="rounded-full"
+                      disabled={!isTokenValid || isVerifyingToken || isSubmitting}
                       innerClassName={authPrimaryButtonClass}
-                      disabled={isSubmitting}
                       type="submit"
                     >
                       <span className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-150%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(150%)]">
                         <span className="h-full w-8 bg-white/30 blur-sm" />
                       </span>
-                      <span className="relative">{isSubmitting ? "Sending..." : "Send reset link"}</span>
+                      <span className="relative">
+                        {isVerifyingToken
+                          ? "Checking link..."
+                          : isSubmitting
+                            ? "Saving..."
+                            : "Reset password"}
+                      </span>
                     </MagneticButton>
                   </div>
-                  <div className=" flex flex-col gap-2 pt-2">
-                    <div className="text-sm leading-7 text-slate-600">
-                      <span>{isTeacherRoute ? "Need student access instead?" : "Need teacher access instead?"}</span>{" "}
-                      <Link
-                        className={authInlineLinkClass}
-                        to={alternateAuthRoute}
-                      >
-                        {alternateAuthLabel}
-                      </Link>
-                    </div>
 
-                    <div className="text-sm leading-7 text-slate-600">
-                      <span>Remembered your password?</span>{" "}
-                      <Link
-                        className={authInlineLinkClass}
-                        to={backAuthRoute}
-                      >
-                        Back to login
-                      </Link>
-                    </div>
+                  <div className="text-sm leading-7 text-slate-600">
+                    <span>Remembered your password?</span>{" "}
+                    <Link className={authInlineLinkClass} to={backAuthRoute}>
+                      Back to login
+                    </Link>
                   </div>
 
                   {status?.message ? (
@@ -210,18 +292,7 @@ function ForgotPasswordPage() {
                       }`}
                       initial={{ opacity: 0, y: 10 }}
                     >
-                      <p>{status.message}</p>
-                      {status.resetUrl ? (
-                        <p className="mt-2 break-all">
-                          Development reset link:{" "}
-                          <a className={authInlineLinkClass} href={status.resetUrl}>
-                            {status.resetUrl}
-                          </a>
-                        </p>
-                      ) : null}
-                      {status.expiresAt ? (
-                        <p className="mt-1">Expires at: {new Date(status.expiresAt).toLocaleString()}</p>
-                      ) : null}
+                      {status.message}
                     </MotionDiv>
                   ) : null}
                 </form>
@@ -234,4 +305,5 @@ function ForgotPasswordPage() {
   );
 }
 
-export default ForgotPasswordPage;
+export default ResetPasswordPage;
+

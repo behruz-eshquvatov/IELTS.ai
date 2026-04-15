@@ -157,7 +157,7 @@ function Page() {
         </p>
         <motion.div
           layout
-          className="relative flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.25)]"
+          className="relative hidden items-center rounded-full border border-slate-200 bg-white p-1 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.25)] lg:flex"
           transition={{ type: "spring", stiffness: 420, damping: 32 }}
         >
           {viewButtons.map((item) => {
@@ -191,7 +191,7 @@ function Page() {
 
       <div
         className={`grid gap-4 ${
-          viewMode === "grid" ? "lg:grid-cols-2 2xl:grid-cols-3" : "grid-cols-1"
+          viewMode === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
         }`}
       >
         {sections.map((section) => (

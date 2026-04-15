@@ -45,6 +45,36 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: "tests/listening/full",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningFullTestsPage")).default,
+                }),
+              },
+              {
+                path: "tests/listening/full/:testId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningFullTestDetailPage")).default,
+                }),
+              },
+              {
+                path: "tests/listening/block/:blockId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningBlockPage")).default,
+                }),
+              },
+              {
+                path: "tests/listening/:questionFamily",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningFamilyPage")).default,
+                }),
+              },
+              {
+                path: "tests/listening/:questionFamily/:blockId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningBlockPage")).default,
+                }),
+              },
+              {
                 path: "tests/reading",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentReadingPage")).default,
@@ -178,6 +208,12 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: "/student/reset-password",
+        lazy: async () => ({
+          Component: (await import("../pages/ResetPasswordPage")).default,
+        }),
+      },
+      {
         path: "/teachers/auth",
         lazy: async () => ({
           Component: (await import("../pages/TeacherRegistrationPage")).default,
@@ -190,6 +226,12 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: "/teachers/reset-password",
+        lazy: async () => ({
+          Component: (await import("../pages/ResetPasswordPage")).default,
+        }),
+      },
+      {
         path: "/auth",
         element: <Navigate replace to="/student/auth" />,
       },
@@ -198,8 +240,24 @@ export const router = createBrowserRouter([
         element: <Navigate replace to="/student/forgot-password" />,
       },
       {
+        path: "/reset-password",
+        element: <Navigate replace to="/student/reset-password" />,
+      },
+      {
         path: "/teacher-registration",
         element: <Navigate replace to="/teachers/auth" />,
+      },
+      {
+        path: "/super-admin/:password",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminPage")).default,
+        }),
+      },
+      {
+        path: "/super-admin/:password/listening",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminListeningPage")).default,
+        }),
       },
       {
         path: "/",

@@ -11,7 +11,10 @@ const {
 const VALID_RANGES = ["week", "month", "lifetime"];
 const VALID_PARTS = ["Listening", "Reading", "Writing"];
 const VALID_TASK_STATUSES = ["completed", "pending", "locked"];
-const HEATMAP_DAYS = 365;
+const HEATMAP_LEVEL_ONE_MINUTES = 30;
+const HEATMAP_LEVEL_TWO_MINUTES = 60;
+const HEATMAP_LEVEL_THREE_MINUTES = 120;
+const STUDY_ENTRY_RETENTION_DAYS = 366 * 5;
 
 function normalizeStudentId(studentId) {
   return String(studentId || "").trim().toLowerCase();
@@ -52,6 +55,10 @@ function buildDefaultProfileFromUser(user) {
   };
 }
 
+function cloneSeed(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function getDateKey(dateInput = new Date()) {
   const date = new Date(dateInput);
   const year = date.getFullYear();
@@ -69,15 +76,15 @@ function getHeatmapLevel(entry) {
     return 0;
   }
 
-  if ((entry.taskActiveMinutes || 0) >= 60) {
+  if ((entry.taskActiveMinutes || 0) >= HEATMAP_LEVEL_THREE_MINUTES) {
     return 3;
   }
 
-  if ((entry.taskActiveMinutes || 0) >= 30) {
+  if ((entry.taskActiveMinutes || 0) >= HEATMAP_LEVEL_TWO_MINUTES) {
     return 2;
   }
 
-  if (entry.visited || (entry.taskActiveMinutes || 0) > 0) {
+  if ((entry.taskActiveMinutes || 0) >= HEATMAP_LEVEL_ONE_MINUTES) {
     return 1;
   }
 
@@ -112,7 +119,7 @@ function upsertStudyEntry(analyticsDoc, dateKey) {
   return entry;
 }
 
-function pruneStudyEntries(analyticsDoc, keepDays = HEATMAP_DAYS + 30) {
+function pruneStudyEntries(analyticsDoc, keepDays = STUDY_ENTRY_RETENTION_DAYS) {
   ensureStudyActivityShape(analyticsDoc);
   const entries = analyticsDoc.studyActivity.entries;
   const today = new Date();
@@ -140,43 +147,117 @@ function incrementTodayTaskMinutes(analyticsDoc, minutesSpent) {
   return todayEntry;
 }
 
-function buildHeatmapFromEntries(entries, days = HEATMAP_DAYS) {
+function startOfWeekSunday(dateInput) {
+  const date = new Date(dateInput);
+  const day = date.getDay(); // 0..6 (Sun..Sat)
+  date.setDate(date.getDate() - day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function endOfWeekSaturday(dateInput) {
+  const sunday = startOfWeekSunday(dateInput);
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
+  saturday.setHours(0, 0, 0, 0);
+  return saturday;
+}
+
+function toDateOnly(dateInput) {
+  const date = new Date(dateInput);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function diffDays(fromDate, toDate) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay);
+}
+
+function parseHeatmapYear(yearInput, fallbackYear = new Date().getFullYear()) {
+  if (yearInput === undefined || yearInput === null || yearInput === "") {
+    return fallbackYear;
+  }
+
+  const year = Number.parseInt(String(yearInput), 10);
+  if (!Number.isFinite(year) || year < 1970 || year > 9999) {
+    return null;
+  }
+
+  return year;
+}
+
+function buildHeatmapFromEntries(entries, year = new Date().getFullYear()) {
   const mapByDateKey = new Map();
   entries.forEach((entry) => {
     mapByDateKey.set(entry.dateKey, entry);
   });
 
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - (days - 1));
+  const firstDayOfYear = toDateOnly(new Date(year, 0, 1));
+  const lastDayOfYear = toDateOnly(new Date(year, 11, 31));
+  const rangeStart = startOfWeekSunday(firstDayOfYear);
+  const rangeEnd = endOfWeekSaturday(lastDayOfYear);
 
   const activityData = [];
-  const monthKeysInRange = [];
-  const seenMonthKeys = new Set();
+  const visibilityData = [];
+  const monthTicks = [];
 
-  for (let i = 0; i < days; i += 1) {
-    const day = new Date(start);
-    day.setDate(start.getDate() + i);
+  const totalDays = diffDays(rangeStart, rangeEnd) + 1;
+  for (let i = 0; i < totalDays; i += 1) {
+    const day = new Date(rangeStart);
+    day.setDate(rangeStart.getDate() + i);
 
     const dateKey = getDateKey(day);
+    const isInsideCurrentYear = day >= firstDayOfYear && day <= lastDayOfYear;
+    visibilityData.push(isInsideCurrentYear);
+
+    if (!isInsideCurrentYear) {
+      activityData.push(0);
+      continue;
+    }
+
     const entry = mapByDateKey.get(dateKey);
     activityData.push(getHeatmapLevel(entry));
-
-    const monthKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}`;
-    if (!seenMonthKeys.has(monthKey)) {
-      seenMonthKeys.add(monthKey);
-      monthKeysInRange.push(monthKey);
-    }
   }
 
-  const months = monthKeysInRange
-    .slice(-12)
-    .map((monthKey) => {
-      const [year, month] = monthKey.split("-").map((item) => Number(item));
-      return monthLabelFromDate(new Date(year, month - 1, 1));
+  for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+    const firstOfMonth = toDateOnly(new Date(year, monthIndex, 1));
+    const column = Math.floor(diffDays(rangeStart, firstOfMonth) / 7);
+    monthTicks.push({
+      label: monthLabelFromDate(firstOfMonth),
+      column,
     });
+  }
 
-  return { months, activityData };
+  const months = monthTicks.map((tick) => tick.label);
+
+  return {
+    months,
+    monthTicks,
+    activityData,
+    visibilityData,
+    calendarYear: year,
+    startDateKey: getDateKey(rangeStart),
+    endDateKey: getDateKey(rangeEnd),
+  };
+}
+
+async function getOrCreateStudentAnalyticsDoc(studentId) {
+  let analytics = await StudentAnalytics.findOne({ studentId });
+  if (analytics) {
+    return analytics;
+  }
+
+  const seededAnalytics = cloneSeed(studentAnalyticsSeed);
+  seededAnalytics.heatmap = buildHeatmapFromEntries([]);
+  seededAnalytics.studyActivity = { entries: [] };
+
+  analytics = await StudentAnalytics.create({
+    studentId,
+    ...seededAnalytics,
+  });
+
+  return analytics;
 }
 
 function todaysStudySummary(analyticsDoc, dateKey = getDateKey()) {
@@ -329,11 +410,9 @@ async function updateTaskStatus(req, res) {
   const taskActiveMinutes = Number.isFinite(activeMinutes) && activeMinutes > 0 ? activeMinutes : minutesFromSeconds;
 
   if (nextStatus === "completed" && taskActiveMinutes > 0) {
-    const analytics = await StudentAnalytics.findOne({ studentId });
-    if (analytics) {
-      incrementTodayTaskMinutes(analytics, taskActiveMinutes);
-      await analytics.save();
-    }
+    const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
+    incrementTodayTaskMinutes(analytics, taskActiveMinutes);
+    await analytics.save();
   }
 
   await doc.save();
@@ -350,6 +429,7 @@ async function getStudentAnalytics(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
   const range = req.query.range || "week";
   const part = req.query.part || "Listening";
+  const year = parseHeatmapYear(req.query.year);
 
   if (!VALID_RANGES.includes(range)) {
     return res.status(400).json({
@@ -363,13 +443,17 @@ async function getStudentAnalytics(req, res) {
     });
   }
 
-  const analytics = await StudentAnalytics.findOne({ studentId }).lean();
-  if (!analytics) {
-    return notFound(res, "Analytics", studentId);
+  if (year === null) {
+    return res.status(400).json({
+      message: "Invalid `year`. Use a year between 1970 and 9999.",
+    });
   }
 
+  const analyticsDoc = await getOrCreateStudentAnalyticsDoc(studentId);
+  const analytics = analyticsDoc.toObject();
+
   const activeRange = analytics.ranges[range];
-  const dynamicHeatmap = buildHeatmapFromEntries(analytics.studyActivity?.entries || []);
+  const dynamicHeatmap = buildHeatmapFromEntries(analytics.studyActivity?.entries || [], year);
   const todaySummary = todaysStudySummary(analytics);
 
   return res.json({
@@ -424,11 +508,7 @@ async function updateStudentAnalytics(req, res) {
 
 async function markStudyVisit(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
-  const analytics = await StudentAnalytics.findOne({ studentId });
-
-  if (!analytics) {
-    return notFound(res, "Analytics", studentId);
-  }
+  const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
 
   const todayKey = getDateKey();
   const todayEntry = upsertStudyEntry(analytics, todayKey);
@@ -447,11 +527,7 @@ async function markStudyVisit(req, res) {
 
 async function addTaskStudyTime(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
-  const analytics = await StudentAnalytics.findOne({ studentId });
-
-  if (!analytics) {
-    return notFound(res, "Analytics", studentId);
-  }
+  const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
 
   const body = req.body || {};
   const minutesSpentRaw = Number(body.minutesSpent);
@@ -486,13 +562,18 @@ async function addTaskStudyTime(req, res) {
 
 async function getStudyHeatmap(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
-  const analytics = await StudentAnalytics.findOne({ studentId }).lean();
+  const year = parseHeatmapYear(req.query.year);
 
-  if (!analytics) {
-    return notFound(res, "Analytics", studentId);
+  if (year === null) {
+    return res.status(400).json({
+      message: "Invalid `year`. Use a year between 1970 and 9999.",
+    });
   }
 
-  const heatmap = buildHeatmapFromEntries(analytics.studyActivity?.entries || []);
+  const analyticsDoc = await getOrCreateStudentAnalyticsDoc(studentId);
+  const analytics = analyticsDoc.toObject();
+
+  const heatmap = buildHeatmapFromEntries(analytics.studyActivity?.entries || [], year);
   const summary = todaysStudySummary(analytics);
 
   return res.json({
@@ -505,8 +586,25 @@ async function getStudyHeatmap(req, res) {
   });
 }
 
+async function markMyStudyVisit(req, res) {
+  req.params.studentId = normalizeStudentId(req.auth?.email);
+  return markStudyVisit(req, res);
+}
+
+async function addMyTaskStudyTime(req, res) {
+  req.params.studentId = normalizeStudentId(req.auth?.email);
+  return addTaskStudyTime(req, res);
+}
+
+async function getMyStudyHeatmap(req, res) {
+  req.params.studentId = normalizeStudentId(req.auth?.email);
+  return getStudyHeatmap(req, res);
+}
+
 async function seedStudentData(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
+  const seededHeatmap = buildHeatmapFromEntries([]);
+  const seededStudyActivity = { entries: [] };
 
   const [profile, dailyTasks, analytics] = await Promise.all([
     StudentProfile.findOneAndUpdate(
@@ -521,7 +619,7 @@ async function seedStudentData(req, res) {
     ).lean(),
     StudentAnalytics.findOneAndUpdate(
       { studentId },
-      { $set: { studentId, ...studentAnalyticsSeed } },
+      { $set: { studentId, ...studentAnalyticsSeed, heatmap: seededHeatmap, studyActivity: seededStudyActivity } },
       { new: true, upsert: true, runValidators: true },
     ).lean(),
   ]);
@@ -555,6 +653,9 @@ module.exports = {
   markStudyVisit,
   addTaskStudyTime,
   getStudyHeatmap,
+  markMyStudyVisit,
+  addMyTaskStudyTime,
+  getMyStudyHeatmap,
   seedStudentData,
   listStudents,
 };

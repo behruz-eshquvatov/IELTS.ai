@@ -4,7 +4,7 @@ import {
   saveAuthSession,
 } from "./authSession";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:5000/api/v1";
 
 function buildUrl(path) {
@@ -118,6 +118,27 @@ export const authApi = {
   },
   login(payload) {
     return apiRequest("/auth/login", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    });
+  },
+  forgotPassword(payload) {
+    return apiRequest("/auth/forgot-password", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    });
+  },
+  verifyResetPasswordToken(payload) {
+    return apiRequest("/auth/reset-password/verify", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    });
+  },
+  resetPassword(payload) {
+    return apiRequest("/auth/reset-password", {
       method: "POST",
       body: payload,
       auth: false,

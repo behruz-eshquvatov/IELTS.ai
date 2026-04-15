@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 
-export function StudentActivityHeatmap({ months, activityData }) {
+export function StudentActivityHeatmap({ months, monthTicks = [], activityData, visibilityData = [] }) {
   const columns = useMemo(() => Math.ceil(activityData.length / 7), [activityData.length]);
   const canvasRef = useRef(null);
   const gridRef = useRef(null);
+  const hasMonthTicks = Array.isArray(monthTicks) && monthTicks.length > 0;
 
   const drawHeatmap = useCallback(() => {
     const canvas = canvasRef.current;
@@ -39,17 +40,23 @@ export function StudentActivityHeatmap({ months, activityData }) {
 
     for (let i = 0; i < activityData.length; i += 1) {
       const level = activityData[i] ?? 0;
+      const isVisible = visibilityData[i] !== false;
       const col = Math.floor(i / rows);
       const row = i % rows;
       const x = col * (cellSize + gap);
       const y = row * (cellSize + gap);
+
+      if (!isVisible) {
+        continue;
+      }
+
       ctx.fillStyle = colors[level] || colors[0];
       ctx.fillRect(x, y, cellSize, cellSize);
       ctx.strokeStyle = "rgba(148,163,184,0.35)";
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
     }
-  }, [activityData, columns]);
+  }, [activityData, columns, visibilityData]);
 
   useEffect(() => {
     drawHeatmap();
@@ -70,19 +77,34 @@ export function StudentActivityHeatmap({ months, activityData }) {
       <div className="rounded-none border border-slate-200/80 bg-[#fbf7f0]/90 p-4">
         <div className="grid grid-cols-[auto_1fr] items-center gap-4 text-xs uppercase tracking-[0.2em] text-slate-400">
           <span className="w-10" aria-hidden="true" />
-          <div className="flex w-full justify-between">
-            {months.map((month, index) => (
-              <span key={`${month}-${index}`}>{month}</span>
-            ))}
-          </div>
+          {hasMonthTicks ? (
+            <div
+              className="grid w-full"
+              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+            >
+              {monthTicks.map((tick, index) => (
+                <span
+                  key={`${tick.label}-${index}-${tick.column}`}
+                  style={{ gridColumnStart: Math.min(Math.max((tick.column || 0) + 1, 1), columns) }}
+                >
+                  {tick.label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="flex w-full justify-between">
+              {months.map((month, index) => (
+                <span key={`${month}-${index}`}>{month}</span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-[auto_1fr] gap-4">
           <div className="grid grid-rows-7 text-xs text-slate-400">
-            <span className="self-center" style={{ gridRow: 1 }}>Mon</span>
-            <span className="self-center" style={{ gridRow: 3 }}>Wed</span>
-            <span className="self-center" style={{ gridRow: 5 }}>Fri</span>
-            <span className="self-center" style={{ gridRow: 7 }}>Sun</span>
+            <span className="self-center" style={{ gridRow: 2 }}>Mon</span>
+            <span className="self-center" style={{ gridRow: 4 }}>Wed</span>
+            <span className="self-center" style={{ gridRow: 6 }}>Fri</span>
           </div>
 
           <div ref={gridRef} className="w-full">

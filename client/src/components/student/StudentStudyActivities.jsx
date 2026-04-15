@@ -1,36 +1,66 @@
-import { memo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import StudentActivityHeatmap from "./StudentActivityHeatmap";
-
-// 1. Static Data Generation (Runs ONCE outside the React lifecycle)
-// Generates a deterministic, realistic 365-day array (values 0-3 based on hours)
-// Ready to be swapped with an API call later.
-const generateStaticActivityData = () => {
-  return Array.from({ length: 365 }, (_, i) => {
-    const dayOfWeek = i % 7;
-    // Creates organic-looking "waves" of study activity
-    const streakFactor = Math.sin(i / 14); 
-
-    if (dayOfWeek === 6) return 0; // e.g., Sundays usually off
-    if (streakFactor > 0.6) return 3; // 3+ hours (Heavy study periods)
-    if (streakFactor > 0) return 2;   // 2 hours
-    if (dayOfWeek === 5) return 1;    // 1 hour (Light Fridays)
-    return i % 4 === 0 ? 1 : 0;       // Scattered light days
-  });
-};
-
-const activityData = generateStaticActivityData();
-const activityMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+import { apiRequest } from "../../lib/apiClient";
+import { buildBlankCalendarHeatmap } from "../../lib/heatmapCalendar";
 
 const StudentStudyActivities = memo(function StudentStudyActivities() {
+  const [dynamicHeatmap, setDynamicHeatmap] = useState(null);
+  const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
+  const blankHeatmap = useMemo(() => buildBlankCalendarHeatmap(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStudyActivity() {
+      try {
+        const response = await apiRequest("/students/me/study-activity/heatmap");
+
+        if (cancelled) {
+          return;
+        }
+
+        setDynamicHeatmap(response?.heatmap ?? null);
+        setTodayStudyMinutes(
+          Number.isFinite(Number(response?.todaysStudyTimeMinutes))
+            ? Number(response.todaysStudyTimeMinutes)
+            : 0,
+        );
+      } catch {
+        if (!cancelled) {
+          setDynamicHeatmap(null);
+          setTodayStudyMinutes(0);
+        }
+      }
+    }
+
+    loadStudyActivity();
+    const intervalId = window.setInterval(loadStudyActivity, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   return (
     <section className="space-y-3">
       <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
         Study activities
       </h2>
-      
-      {/* Ensure this child component is also wrapped in memo() in its own file */}
-      <StudentActivityHeatmap months={activityMonths} activityData={activityData} />
-
+      <StudentActivityHeatmap
+        months={dynamicHeatmap?.months?.length ? dynamicHeatmap.months : blankHeatmap.months}
+        monthTicks={dynamicHeatmap?.monthTicks?.length ? dynamicHeatmap.monthTicks : blankHeatmap.monthTicks}
+        activityData={
+          dynamicHeatmap?.activityData?.length ? dynamicHeatmap.activityData : blankHeatmap.activityData
+        }
+        visibilityData={
+          dynamicHeatmap?.visibilityData?.length ? dynamicHeatmap.visibilityData : blankHeatmap.visibilityData
+        }
+      />
+      <p className="text-sm text-slate-600">
+        Today's study time:{" "}
+        <span className="font-semibold text-slate-900">{todayStudyMinutes} minutes</span>
+      </p>
     </section>
   );
 });
