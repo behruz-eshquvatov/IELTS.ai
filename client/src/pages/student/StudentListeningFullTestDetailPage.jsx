@@ -705,6 +705,13 @@ function StudentListeningFullTestDetailPage() {
   const currentBlockPayload = currentBlockId ? blocksById[currentBlockId] : null;
   const currentBlock = currentBlockPayload?.block || null;
   const currentAudio = currentBlockPayload?.audio || null;
+  const blockIndexById = useMemo(() => {
+    const map = new Map();
+    orderedBlocks.forEach((entry, index) => {
+      map.set(entry.blockId, index);
+    });
+    return map;
+  }, [orderedBlocks]);
 
   const currentAudioUrl = useMemo(
     () =>
@@ -1144,15 +1151,22 @@ function StudentListeningFullTestDetailPage() {
         return;
       }
 
-      const isLastBlock = currentBlockIndex >= orderedBlocks.length - 1;
+      const resolvedCurrentIndex = blockIndexById.has(currentBlockId)
+        ? Number(blockIndexById.get(currentBlockId))
+        : currentBlockIndex;
+      const isLastBlock = resolvedCurrentIndex >= orderedBlocks.length - 1;
       if (isLastBlock) {
         await summarizeAndOpenFinalModal("");
         return;
       }
 
-      setCurrentBlockIndex((previousIndex) => previousIndex + 1);
+      setCurrentBlockIndex((previousIndex) => {
+        const baseIndex = Math.max(previousIndex, resolvedCurrentIndex);
+        return Math.min(baseIndex + 1, Math.max(orderedBlocks.length - 1, 0));
+      });
     },
     [
+      blockIndexById,
       currentBlockId,
       currentBlockIndex,
       orderedBlocks.length,
@@ -1235,18 +1249,12 @@ function StudentListeningFullTestDetailPage() {
       forceCompleteExam("You left or refreshed the page. Test auto-completed.", "page-hide");
     };
 
-    const handleWindowBlur = () => {
-      forceCompleteExam("You switched focus away from this page. Test auto-completed.", "window-blur");
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pagehide", handlePageHide);
-    window.addEventListener("blur", handleWindowBlur);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
-      window.removeEventListener("blur", handleWindowBlur);
     };
   }, [forceCompleteExam, hasExamStarted, isFinalModalOpen]);
 
