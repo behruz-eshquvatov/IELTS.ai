@@ -275,22 +275,6 @@ function StudentTestStartPage() {
         setIsCheckingEssay(false);
       }
 
-      if (payload.timeSpentSeconds > 0) {
-        try {
-          await apiRequest("/students/me/study-activity/task-time", {
-            method: "POST",
-            body: {
-              secondsSpent: payload.timeSpentSeconds,
-              source: payload.source,
-              taskType: "writingTask2-opinion",
-              setId: payload.setId,
-            },
-          });
-        } catch {
-          // Non-blocking: study activity tracking should not interrupt result navigation.
-        }
-      }
-
       const submissionWithAnalysisId =
         analysis && typeof analysis === "object" && analysis.id
           ? { ...payload, analysisId: analysis.id }

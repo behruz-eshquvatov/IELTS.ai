@@ -7,14 +7,18 @@ const {
   studentDailyTasksSeed,
   studentAnalyticsSeed,
 } = require("../data/studentSeedData");
+const {
+  buildYearHeatmapFromEntries,
+  getDateKey,
+  mergeDailyMinutes,
+  normalizeDateKey,
+  normalizeStudyHeatmapEntries,
+  todaysStudySummary,
+} = require("../utils/studyHeatmap");
 
 const VALID_RANGES = ["week", "month", "lifetime"];
 const VALID_PARTS = ["Listening", "Reading", "Writing"];
 const VALID_TASK_STATUSES = ["completed", "pending", "locked"];
-const HEATMAP_LEVEL_ONE_MINUTES = 30;
-const HEATMAP_LEVEL_TWO_MINUTES = 60;
-const HEATMAP_LEVEL_THREE_MINUTES = 120;
-const STUDY_ENTRY_RETENTION_DAYS = 366 * 5;
 
 function normalizeStudentId(studentId) {
   return String(studentId || "").trim().toLowerCase();
@@ -59,121 +63,6 @@ function cloneSeed(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function getDateKey(dateInput = new Date()) {
-  const date = new Date(dateInput);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function monthLabelFromDate(dateInput) {
-  return new Date(dateInput).toLocaleString("en-US", { month: "short" }).toUpperCase();
-}
-
-function getHeatmapLevel(entry) {
-  if (!entry) {
-    return 0;
-  }
-
-  if ((entry.taskActiveMinutes || 0) >= HEATMAP_LEVEL_THREE_MINUTES) {
-    return 3;
-  }
-
-  if ((entry.taskActiveMinutes || 0) >= HEATMAP_LEVEL_TWO_MINUTES) {
-    return 2;
-  }
-
-  if ((entry.taskActiveMinutes || 0) >= HEATMAP_LEVEL_ONE_MINUTES) {
-    return 1;
-  }
-
-  return 0;
-}
-
-function ensureStudyActivityShape(analyticsDoc) {
-  if (!analyticsDoc.studyActivity || typeof analyticsDoc.studyActivity !== "object") {
-    analyticsDoc.studyActivity = { entries: [] };
-  }
-
-  if (!Array.isArray(analyticsDoc.studyActivity.entries)) {
-    analyticsDoc.studyActivity.entries = [];
-  }
-}
-
-function upsertStudyEntry(analyticsDoc, dateKey) {
-  ensureStudyActivityShape(analyticsDoc);
-
-  const entries = analyticsDoc.studyActivity.entries;
-  let entry = entries.find((item) => item.dateKey === dateKey);
-
-  if (!entry) {
-    entry = {
-      dateKey,
-      visited: false,
-      taskActiveMinutes: 0,
-    };
-    entries.push(entry);
-  }
-
-  return entry;
-}
-
-function pruneStudyEntries(analyticsDoc, keepDays = STUDY_ENTRY_RETENTION_DAYS) {
-  ensureStudyActivityShape(analyticsDoc);
-  const entries = analyticsDoc.studyActivity.entries;
-  const today = new Date();
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() - keepDays);
-  const cutoffKey = getDateKey(cutoff);
-
-  analyticsDoc.studyActivity.entries = entries.filter((entry) => entry.dateKey >= cutoffKey);
-}
-
-function incrementTodayTaskMinutes(analyticsDoc, minutesSpent) {
-  const safeMinutes = Number.isFinite(Number(minutesSpent)) ? Number(minutesSpent) : 0;
-  if (safeMinutes <= 0) {
-    return null;
-  }
-
-  const todayKey = getDateKey();
-  const todayEntry = upsertStudyEntry(analyticsDoc, todayKey);
-  todayEntry.visited = true;
-  todayEntry.taskActiveMinutes = Number(
-    Math.max((todayEntry.taskActiveMinutes || 0) + safeMinutes, 0).toFixed(1),
-  );
-
-  pruneStudyEntries(analyticsDoc);
-  return todayEntry;
-}
-
-function startOfWeekSunday(dateInput) {
-  const date = new Date(dateInput);
-  const day = date.getDay(); // 0..6 (Sun..Sat)
-  date.setDate(date.getDate() - day);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function endOfWeekSaturday(dateInput) {
-  const sunday = startOfWeekSunday(dateInput);
-  const saturday = new Date(sunday);
-  saturday.setDate(sunday.getDate() + 6);
-  saturday.setHours(0, 0, 0, 0);
-  return saturday;
-}
-
-function toDateOnly(dateInput) {
-  const date = new Date(dateInput);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function diffDays(fromDate, toDate) {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay);
-}
-
 function parseHeatmapYear(yearInput, fallbackYear = new Date().getFullYear()) {
   if (yearInput === undefined || yearInput === null || yearInput === "") {
     return fallbackYear;
@@ -187,61 +76,6 @@ function parseHeatmapYear(yearInput, fallbackYear = new Date().getFullYear()) {
   return year;
 }
 
-function buildHeatmapFromEntries(entries, year = new Date().getFullYear()) {
-  const mapByDateKey = new Map();
-  entries.forEach((entry) => {
-    mapByDateKey.set(entry.dateKey, entry);
-  });
-
-  const firstDayOfYear = toDateOnly(new Date(year, 0, 1));
-  const lastDayOfYear = toDateOnly(new Date(year, 11, 31));
-  const rangeStart = startOfWeekSunday(firstDayOfYear);
-  const rangeEnd = endOfWeekSaturday(lastDayOfYear);
-
-  const activityData = [];
-  const visibilityData = [];
-  const monthTicks = [];
-
-  const totalDays = diffDays(rangeStart, rangeEnd) + 1;
-  for (let i = 0; i < totalDays; i += 1) {
-    const day = new Date(rangeStart);
-    day.setDate(rangeStart.getDate() + i);
-
-    const dateKey = getDateKey(day);
-    const isInsideCurrentYear = day >= firstDayOfYear && day <= lastDayOfYear;
-    visibilityData.push(isInsideCurrentYear);
-
-    if (!isInsideCurrentYear) {
-      activityData.push(0);
-      continue;
-    }
-
-    const entry = mapByDateKey.get(dateKey);
-    activityData.push(getHeatmapLevel(entry));
-  }
-
-  for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-    const firstOfMonth = toDateOnly(new Date(year, monthIndex, 1));
-    const column = Math.floor(diffDays(rangeStart, firstOfMonth) / 7);
-    monthTicks.push({
-      label: monthLabelFromDate(firstOfMonth),
-      column,
-    });
-  }
-
-  const months = monthTicks.map((tick) => tick.label);
-
-  return {
-    months,
-    monthTicks,
-    activityData,
-    visibilityData,
-    calendarYear: year,
-    startDateKey: getDateKey(rangeStart),
-    endDateKey: getDateKey(rangeEnd),
-  };
-}
-
 async function getOrCreateStudentAnalyticsDoc(studentId) {
   let analytics = await StudentAnalytics.findOne({ studentId });
   if (analytics) {
@@ -249,7 +83,7 @@ async function getOrCreateStudentAnalyticsDoc(studentId) {
   }
 
   const seededAnalytics = cloneSeed(studentAnalyticsSeed);
-  seededAnalytics.heatmap = buildHeatmapFromEntries([]);
+  seededAnalytics.heatmap = buildYearHeatmapFromEntries([]);
   seededAnalytics.studyActivity = { entries: [] };
 
   analytics = await StudentAnalytics.create({
@@ -260,19 +94,41 @@ async function getOrCreateStudentAnalyticsDoc(studentId) {
   return analytics;
 }
 
-function todaysStudySummary(analyticsDoc, dateKey = getDateKey()) {
-  ensureStudyActivityShape(analyticsDoc);
-  const todayEntry = analyticsDoc.studyActivity.entries.find((entry) => entry.dateKey === dateKey);
-  const todaysStudyTimeMinutes = Math.max(Number(todayEntry?.taskActiveMinutes || 0), 0);
-  const level = getHeatmapLevel(todayEntry);
+async function getStudentUserByStudentId(studentId, options = {}) {
+  const projection = options.projection || null;
+  const query = User.findOne({ email: studentId, role: "student" });
 
-  return {
-    date: dateKey,
-    todaysStudyTimeMinutes,
-    "today's study time": `${todaysStudyTimeMinutes} minutes`,
-    "today's study time :": `${todaysStudyTimeMinutes} minutes`,
-    level,
+  if (projection) {
+    query.select(projection);
+  }
+
+  return query.exec();
+}
+
+async function syncLegacyStudyActivityFromUser(studentId, heatmapEntries) {
+  const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
+  const normalizedEntries = normalizeStudyHeatmapEntries(heatmapEntries);
+
+  analytics.studyActivity = {
+    entries: normalizedEntries.map((entry) => ({
+      dateKey: entry.date,
+      visited: true,
+      taskActiveMinutes: Number(entry.minutesSpent || 0),
+    })),
   };
+  analytics.heatmap = buildYearHeatmapFromEntries(normalizedEntries);
+  await analytics.save();
+
+  return analytics;
+}
+
+async function getHeatmapEntriesForStudent(studentId) {
+  const user = await getStudentUserByStudentId(studentId, "+studyHeatmap");
+  if (!user || !user.isActive) {
+    return null;
+  }
+
+  return normalizeStudyHeatmapEntries(user.studyHeatmap || []);
 }
 
 async function getMyStudentProfile(req, res) {
@@ -410,9 +266,38 @@ async function updateTaskStatus(req, res) {
   const taskActiveMinutes = Number.isFinite(activeMinutes) && activeMinutes > 0 ? activeMinutes : minutesFromSeconds;
 
   if (nextStatus === "completed" && taskActiveMinutes > 0) {
-    const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
-    incrementTodayTaskMinutes(analytics, taskActiveMinutes);
-    await analytics.save();
+    const user = await getStudentUserByStudentId(studentId);
+    if (user && user.isActive) {
+      user.studyHeatmap = mergeDailyMinutes(user.studyHeatmap || [], {
+        date: getDateKey(),
+        minutesSpent: taskActiveMinutes,
+        mode: "increment",
+      });
+      await user.save();
+      await syncLegacyStudyActivityFromUser(studentId, user.studyHeatmap);
+    } else {
+      const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
+      const fallbackEntries = normalizeStudyHeatmapEntries(
+        (analytics.studyActivity?.entries || []).map((entry) => ({
+          date: entry.dateKey,
+          minutesSpent: entry.taskActiveMinutes || 0,
+        })),
+      );
+      const mergedFallback = mergeDailyMinutes(fallbackEntries, {
+        date: getDateKey(),
+        minutesSpent: taskActiveMinutes,
+        mode: "increment",
+      });
+      analytics.studyActivity = {
+        entries: mergedFallback.map((entry) => ({
+          dateKey: entry.date,
+          visited: true,
+          taskActiveMinutes: entry.minutesSpent,
+        })),
+      };
+      analytics.heatmap = buildYearHeatmapFromEntries(mergedFallback);
+      await analytics.save();
+    }
   }
 
   await doc.save();
@@ -453,8 +338,16 @@ async function getStudentAnalytics(req, res) {
   const analytics = analyticsDoc.toObject();
 
   const activeRange = analytics.ranges[range];
-  const dynamicHeatmap = buildHeatmapFromEntries(analytics.studyActivity?.entries || [], year);
-  const todaySummary = todaysStudySummary(analytics);
+  const legacyEntries = normalizeStudyHeatmapEntries(
+    (analytics.studyActivity?.entries || []).map((entry) => ({
+      date: entry.dateKey,
+      minutesSpent: entry.taskActiveMinutes || 0,
+    })),
+  );
+  const userEntries = await getHeatmapEntriesForStudent(studentId);
+  const activeEntries = Array.isArray(userEntries) ? userEntries : legacyEntries;
+  const dynamicHeatmap = buildYearHeatmapFromEntries(activeEntries, year);
+  const todaySummary = todaysStudySummary(activeEntries);
 
   return res.json({
     studentId,
@@ -465,6 +358,7 @@ async function getStudentAnalytics(req, res) {
     timeChart: activeRange.timeChart,
     weakSections: activeRange.weakSections[part],
     heatmap: dynamicHeatmap.months.length ? dynamicHeatmap : analytics.heatmap,
+    entries: activeEntries,
     todaysStudyTimeMinutes: todaySummary.todaysStudyTimeMinutes,
     "today's study time": todaySummary["today's study time"],
     "today's study time :": todaySummary["today's study time :"],
@@ -508,30 +402,40 @@ async function updateStudentAnalytics(req, res) {
 
 async function markStudyVisit(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
-  const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
+  const user = await getStudentUserByStudentId(studentId);
+  if (!user || !user.isActive) {
+    return notFound(res, "Student", studentId);
+  }
 
   const todayKey = getDateKey();
-  const todayEntry = upsertStudyEntry(analytics, todayKey);
-  todayEntry.visited = true;
+  user.studyHeatmap = mergeDailyMinutes(user.studyHeatmap || [], {
+    date: todayKey,
+    minutesSpent: 0,
+    mode: "max",
+  });
+  await user.save();
+  await syncLegacyStudyActivityFromUser(studentId, user.studyHeatmap);
 
-  pruneStudyEntries(analytics);
-  await analytics.save();
-
-  const summary = todaysStudySummary(analytics, todayKey);
+  const summary = todaysStudySummary(user.studyHeatmap || [], todayKey);
   return res.json({
     message: "Visit tracked.",
     studentId,
+    entries: normalizeStudyHeatmapEntries(user.studyHeatmap || []),
     ...summary,
   });
 }
 
 async function addTaskStudyTime(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
-  const analytics = await getOrCreateStudentAnalyticsDoc(studentId);
+  const user = await getStudentUserByStudentId(studentId);
+  if (!user || !user.isActive) {
+    return notFound(res, "Student", studentId);
+  }
 
   const body = req.body || {};
   const minutesSpentRaw = Number(body.minutesSpent);
   const secondsSpentRaw = Number(body.secondsSpent);
+  const date = normalizeDateKey(body.date, getDateKey());
 
   const derivedMinutesFromSeconds = Number.isFinite(secondsSpentRaw) && secondsSpentRaw > 0
     ? secondsSpentRaw / 60
@@ -546,16 +450,21 @@ async function addTaskStudyTime(req, res) {
     });
   }
 
-  const todayKey = getDateKey();
-  incrementTodayTaskMinutes(analytics, minutesSpent);
-  await analytics.save();
+  user.studyHeatmap = mergeDailyMinutes(user.studyHeatmap || [], {
+    date,
+    minutesSpent,
+    mode: "increment",
+  });
+  await user.save();
+  await syncLegacyStudyActivityFromUser(studentId, user.studyHeatmap);
 
-  const summary = todaysStudySummary(analytics, todayKey);
+  const summary = todaysStudySummary(user.studyHeatmap || [], date);
 
   return res.json({
     message: "Task study time tracked.",
     studentId,
     trackedMinutes: Number(minutesSpent.toFixed(1)),
+    entries: normalizeStudyHeatmapEntries(user.studyHeatmap || []),
     ...summary,
   });
 }
@@ -570,15 +479,19 @@ async function getStudyHeatmap(req, res) {
     });
   }
 
-  const analyticsDoc = await getOrCreateStudentAnalyticsDoc(studentId);
-  const analytics = analyticsDoc.toObject();
+  const user = await getStudentUserByStudentId(studentId, "+studyHeatmap");
+  if (!user || !user.isActive) {
+    return notFound(res, "Student", studentId);
+  }
 
-  const heatmap = buildHeatmapFromEntries(analytics.studyActivity?.entries || [], year);
-  const summary = todaysStudySummary(analytics);
+  const entries = normalizeStudyHeatmapEntries(user.studyHeatmap || []);
+  const heatmap = buildYearHeatmapFromEntries(entries, year);
+  const summary = todaysStudySummary(entries);
 
   return res.json({
     studentId,
     heatmap,
+    entries,
     todaysStudyTimeMinutes: summary.todaysStudyTimeMinutes,
     "today's study time": summary["today's study time"],
     "today's study time :": summary["today's study time :"],
@@ -603,7 +516,7 @@ async function getMyStudyHeatmap(req, res) {
 
 async function seedStudentData(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
-  const seededHeatmap = buildHeatmapFromEntries([]);
+  const seededHeatmap = buildYearHeatmapFromEntries([]);
   const seededStudyActivity = { entries: [] };
 
   const [profile, dailyTasks, analytics] = await Promise.all([
@@ -623,6 +536,11 @@ async function seedStudentData(req, res) {
       { new: true, upsert: true, runValidators: true },
     ).lean(),
   ]);
+
+  await User.updateOne(
+    { email: studentId, role: "student" },
+    { $set: { studyHeatmap: [] } },
+  );
 
   return res.status(201).json({
     message: "Student seed data is ready.",

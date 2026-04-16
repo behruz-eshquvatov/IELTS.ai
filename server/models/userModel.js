@@ -53,6 +53,27 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    studyHeatmap: {
+      type: [
+        new mongoose.Schema(
+          {
+            date: {
+              type: String,
+              required: true,
+              trim: true,
+            },
+            minutesSpent: {
+              type: Number,
+              required: true,
+              default: 0,
+              min: 0,
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 );

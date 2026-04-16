@@ -14,8 +14,9 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { memo, useEffect, useRef, useState } from "react";
 import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
-import { apiRequest, authApi } from "../lib/apiClient";
+import { authApi } from "../lib/apiClient";
 import { clearAuthSession } from "../lib/authSession";
+import useStudyHeatmapTracker from "../hooks/useStudyHeatmapTracker";
 
 const navGroups = [
   {
@@ -265,13 +266,7 @@ const StudentMainContent = memo(function StudentMainContent() {
 });
 
 function StudentLayout() {
-  useEffect(() => {
-    apiRequest("/students/me/study-activity/visit", {
-      method: "POST",
-    }).catch(() => {
-      // Visit tracking should not block page render.
-    });
-  }, []);
+  useStudyHeatmapTracker();
 
   return (
     <div className="min-h-screen bg-[#f7f4ef] text-slate-900 font-sans flex flex-col lg:flex-row">

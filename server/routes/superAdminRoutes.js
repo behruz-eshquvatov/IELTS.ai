@@ -7,6 +7,15 @@ const {
   deleteListeningAudio,
   extractListeningBlockFromImage,
   saveListeningBlock,
+  getReadingAdminEntry,
+  listReadingPassages,
+  listReadingBlocks,
+  listReadingTests,
+  extractReadingPassageFromImage,
+  extractReadingBlockFromImage,
+  saveReadingPassage,
+  saveReadingBlock,
+  saveReadingTest,
 } = require("../controllers/superAdminController");
 
 const router = express.Router();
@@ -58,5 +67,14 @@ router.post("/:password/listening/blocks/extract", parseListeningImageUpload, ex
 router.post("/:password/listening/blocks", saveListeningBlock);
 router.get("/:password/listening/:audioId/stream", streamListeningAudio);
 router.delete("/:password/listening/:audioId", deleteListeningAudio);
+router.get("/:password/reading", getReadingAdminEntry);
+router.get("/:password/reading/passages", listReadingPassages);
+router.get("/:password/reading/blocks", listReadingBlocks);
+router.get("/:password/reading/tests", listReadingTests);
+router.post("/:password/reading/passages/extract", parseListeningImageUpload, extractReadingPassageFromImage);
+router.post("/:password/reading/blocks/extract", parseListeningImageUpload, extractReadingBlockFromImage);
+router.post("/:password/reading/passages", saveReadingPassage);
+router.post("/:password/reading/blocks", saveReadingBlock);
+router.post("/:password/reading/tests", saveReadingTest);
 
 module.exports = router;

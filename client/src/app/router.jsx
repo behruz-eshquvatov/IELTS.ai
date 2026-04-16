@@ -260,6 +260,12 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: "/super-admin/:password/reading",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminReadingPage")).default,
+        }),
+      },
+      {
         path: "/",
         element: <SiteLayout />,
         children: [

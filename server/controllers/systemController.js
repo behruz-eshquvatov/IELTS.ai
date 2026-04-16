@@ -25,6 +25,7 @@ function getApiIndex(req, res) {
       "writing-task2-opinion",
       "listening-blocks",
       "listening-tests",
+      "reading-admin",
       "system",
     ],
     authRoutes: {
@@ -51,6 +52,10 @@ function getApiIndex(req, res) {
       myStudyTaskTime: "POST /api/v1/students/me/study-activity/task-time",
       myStudyHeatmap: "GET /api/v1/students/me/study-activity/heatmap?year=2026",
     },
+    userRoutes: {
+      myHeatmap: "GET /api/v1/users/me/heatmap?year=2026",
+      updateHeatmapDay: "POST /api/v1/users/me/heatmap/day",
+    },
     writingTask2OpinionRoutes: {
       list: "/api/v1/writing-task2-opinion",
       byEssayId: "/api/v1/writing-task2-opinion/:essayId",
@@ -69,6 +74,17 @@ function getApiIndex(req, res) {
     listeningTestsRoutes: {
       list: "/api/v1/listening-tests?status=published",
       byTestId: "/api/v1/listening-tests/:testId",
+    },
+    readingAdminRoutes: {
+      status: "/api/v1/super-admin/:password/reading",
+      listPassages: "/api/v1/super-admin/:password/reading/passages",
+      listBlocks: "/api/v1/super-admin/:password/reading/blocks",
+      listTests: "/api/v1/super-admin/:password/reading/tests",
+      extractPassageFromImage: "POST /api/v1/super-admin/:password/reading/passages/extract",
+      extractBlockFromImage: "POST /api/v1/super-admin/:password/reading/blocks/extract",
+      savePassage: "POST /api/v1/super-admin/:password/reading/passages",
+      saveBlock: "POST /api/v1/super-admin/:password/reading/blocks",
+      saveTest: "POST /api/v1/super-admin/:password/reading/tests",
     },
     health: "/api/v1/system/health",
   });

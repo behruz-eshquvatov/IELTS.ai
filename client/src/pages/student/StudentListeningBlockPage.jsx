@@ -476,6 +476,72 @@ function renderTaskContent(display, context) {
     );
   }
 
+  const legacyHeadings = Array.isArray(display?.headings) ? display.headings : [];
+  const legacyReservedKeys = new Set([
+    "title",
+    "headings",
+    "rows",
+    "columns",
+    "elements",
+    "sections",
+    "items",
+    "questions",
+    "question",
+    "options",
+  ]);
+  const legacyRows = Object.entries(display || {})
+    .filter(([key, value]) => !legacyReservedKeys.has(key) && Array.isArray(value))
+    .map(([key, value]) => ({
+      label: toReadableLabel(key),
+      cells: value,
+    }));
+
+  if (legacyHeadings.length > 0 && legacyRows.length > 0) {
+    return (
+      <div className="overflow-x-auto border border-slate-200">
+        <table className="min-w-full border-collapse text-sm text-slate-700">
+          <thead className="bg-slate-50">
+            <tr>
+              <th
+                className="border border-slate-200 px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-600"
+                scope="col"
+              >
+                -
+              </th>
+              {legacyHeadings.map((heading, headingIndex) => (
+                <th
+                  className="border border-slate-200 px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-600"
+                  key={`legacy-heading-${headingIndex}`}
+                  scope="col"
+                >
+                  {String(heading || "").trim() || "-"}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {legacyRows.map((row, rowIndex) => (
+              <tr className="align-top" key={`legacy-row-${rowIndex}`}>
+                <th className="border border-slate-200 bg-white px-3 py-2 text-left font-semibold text-slate-700" scope="row">
+                  {row.label || "-"}
+                </th>
+                {legacyHeadings.map((_, cellIndex) => (
+                  <td className="border border-slate-200 px-3 py-2 text-sm leading-7 text-slate-700" key={`legacy-row-${rowIndex}-cell-${cellIndex}`}>
+                    {renderStructuredContent(
+                      row.cells[cellIndex],
+                      context,
+                      `legacy-row-${rowIndex}-cell-${cellIndex}`,
+                    ) || "-"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   const items = Array.isArray(display?.items) ? display.items : [];
   if (items.length > 0) {
     return (
