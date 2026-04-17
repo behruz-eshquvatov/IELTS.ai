@@ -7,6 +7,7 @@ import { buildSuperAdminApiPath, buildSuperAdminPagePath, isValidSuperAdminPassw
 const PASSAGE_TEMPLATE = { _id: "rc_cmbr_10_1_1", title: "Passage title", section: "reading", provider: "cambridge", book: 10, test: 1, passageNumber: 1, contentBlocks: [{ type: "intro", text: "Intro..." }, { type: "paragraph", paragraphId: "A", text: "Paragraph A..." }], status: "draft" };
 const BLOCK_TEMPLATE = { _id: "rc_cmbr_10_1_1_1-6", passageId: "rc_cmbr_10_1_1", questionFamily: "matching", blockType: "matching_headings", instruction: { text: "Choose headings." }, passageScope: { type: "paragraphs", targets: ["A", "B"] }, display: { headingOptions: [{ key: "i", text: "Heading 1" }], prompts: [{ qid: "q1", number: 1, paragraphId: "A" }] }, questions: [{ id: "q1", number: 1, answers: ["i"] }], status: "draft" };
 const TEST_TEMPLATE = { _id: "rc_cmbr_10_1", title: "Cambridge 10 Test 1 Reading", section: "reading", module: "academic", totalQuestions: 40, status: "draft", passages: [{ passageNumber: 1, passageId: "rc_cmbr_10_1_1", questionRange: { start: 1, end: 13 }, blocks: [{ blockId: "rc_cmbr_10_1_1_1-6", order: 1 }] }] };
+const EMPTY_TEST_DRAFT = { _id: "", title: "", section: "reading", module: "academic", totalQuestions: 40, status: "draft", passages: [] };
 
 function parseJson(text) {
   try { return { ok: true, value: JSON.parse(String(text || "")), error: "" }; } catch (error) { return { ok: false, value: null, error: error.message || "Invalid JSON" }; }
@@ -30,6 +31,26 @@ function normalizeReadingBlockPayload(raw = {}) {
 }
 function normalizeReadingTestPayload(raw = {}) {
   return { ...raw, _id: normalizeText(raw._id), title: normalizeText(raw.title), section: "reading", module: normalizeText(raw.module || "academic").toLowerCase(), totalQuestions: Number(raw.totalQuestions), status: normalizeText(raw.status || "draft").toLowerCase(), passages: Array.isArray(raw.passages) ? raw.passages : [] };
+}
+function inferTestIdFromPassageId(passageId) {
+  const safe = normalizeText(passageId);
+  if (!safe) return "";
+  const parts = safe.split("_").filter(Boolean);
+  if (parts.length < 4) return "";
+  return parts.slice(0, 4).join("_");
+}
+function getWorkingReadingTestDraft(rawTestJson = "") {
+  const safeRaw = String(rawTestJson || "").trim();
+  if (!safeRaw) {
+    return { ok: true, value: normalizeReadingTestPayload(EMPTY_TEST_DRAFT), error: "" };
+  }
+
+  const parsed = parseJson(safeRaw);
+  if (!parsed.ok) {
+    return { ok: false, value: null, error: parsed.error };
+  }
+
+  return { ok: true, value: normalizeReadingTestPayload(parsed.value), error: "" };
 }
 function validateReadingPassagePayload(payload) {
   const errors = [];
@@ -166,31 +187,45 @@ function SuperAdminReadingPage() {
   }
 
   function addPassageRefToTestJson() {
-    const parsed = parseJson(testJson);
-    if (!parsed.ok) { setError(`JSON parse error: ${parsed.error}`); return; }
+    const draft = getWorkingReadingTestDraft(testJson);
+    if (!draft.ok) { setError(`JSON parse error: ${draft.error}`); return; }
     const safeId = normalizeText(testPassageId);
     const start = Number(testRangeStart);
     const end = Number(testRangeEnd);
     if (!safeId || !Number.isFinite(start) || !Number.isFinite(end)) { setError("Pick passage and valid range."); return; }
-    const normalized = normalizeReadingTestPayload(parsed.value);
+    const normalized = draft.value;
+    if (!normalizeText(normalized._id)) {
+      normalized._id = inferTestIdFromPassageId(safeId) || normalizeText(TEST_TEMPLATE._id);
+    }
+    if (!normalizeText(normalized.title) && normalizeText(normalized._id)) {
+      normalized.title = `${normalized._id} Reading Test`;
+    }
     normalized.passages = Array.isArray(normalized.passages) ? normalized.passages : [];
     const existing = normalized.passages.find((item) => normalizeText(item.passageId) === safeId);
     if (existing) existing.questionRange = { start, end };
     else normalized.passages.push({ passageNumber: normalized.passages.length + 1, passageId: safeId, questionRange: { start, end }, blocks: [] });
+    setError("");
     setTestJson(JSON.stringify(normalized, null, 2));
   }
 
   function addBlockRefToTestJson() {
-    const parsed = parseJson(testJson);
-    if (!parsed.ok) { setError(`JSON parse error: ${parsed.error}`); return; }
+    const draft = getWorkingReadingTestDraft(testJson);
+    if (!draft.ok) { setError(`JSON parse error: ${draft.error}`); return; }
     const safePassageId = normalizeText(testBlockPassageId);
     const safeBlockId = normalizeText(testBlockId);
     if (!safePassageId || !safeBlockId) { setError("Pick passage and block."); return; }
-    const normalized = normalizeReadingTestPayload(parsed.value);
+    const normalized = draft.value;
+    if (!normalizeText(normalized._id)) {
+      normalized._id = inferTestIdFromPassageId(safePassageId) || normalizeText(TEST_TEMPLATE._id);
+    }
+    if (!normalizeText(normalized.title) && normalizeText(normalized._id)) {
+      normalized.title = `${normalized._id} Reading Test`;
+    }
     const passage = Array.isArray(normalized.passages) ? normalized.passages.find((item) => normalizeText(item.passageId) === safePassageId) : null;
     if (!passage) { setError("Passage not found in current test JSON."); return; }
     passage.blocks = Array.isArray(passage.blocks) ? passage.blocks : [];
     if (!passage.blocks.some((item) => normalizeText(item.blockId) === safeBlockId)) passage.blocks.push({ blockId: safeBlockId, order: passage.blocks.length + 1 });
+    setError("");
     setTestJson(JSON.stringify(normalized, null, 2));
   }
 

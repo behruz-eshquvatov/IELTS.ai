@@ -5,37 +5,6 @@ import MagneticButton from "../../components/ui/MagneticButton";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
 import { apiRequest } from "../../lib/apiClient";
 
-function toReadableLabel(value) {
-  const safe = String(value || "").trim();
-  if (!safe) {
-    return "Unknown";
-  }
-
-  return safe
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function encodePathPart(value) {
-  return encodeURIComponent(String(value || "").trim());
-}
-
-function buildFamilyDescription(family) {
-  const count = Number(family?.count) || 0;
-  const blockTypes = Array.isArray(family?.blockTypes) ? family.blockTypes : [];
-  const readableTypes = blockTypes.map(toReadableLabel);
-
-  if (readableTypes.length === 0) {
-    return `${count} listening resources available in this question family.`;
-  }
-
-  const preview = readableTypes.slice(0, 2).join(", ");
-  const suffix = readableTypes.length > 2 ? ` +${readableTypes.length - 2} more` : "";
-  return `${count} listening resources. Block types: ${preview}${suffix}.`;
-}
-
 function ListeningCard({ section, viewMode }) {
   const cardRef = useRef(null);
 
@@ -124,43 +93,38 @@ function ListeningCard({ section, viewMode }) {
 
 function StudentListeningPage() {
   const [viewMode, setViewMode] = useLocalStorageState("student:listening:view-mode", "grid");
-  const [families, setFamilies] = useState([]);
-  const [tests, setTests] = useState([]);
-  const [isLoadingFamilies, setIsLoadingFamilies] = useState(false);
-  const [familiesError, setFamiliesError] = useState("");
+  const [testsCount, setTestsCount] = useState(null);
+  const [partGroupsCount, setPartGroupsCount] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadFamilies() {
-      setIsLoadingFamilies(true);
-      setFamiliesError("");
+    async function loadLibraryStats() {
+      setLoadError("");
 
       try {
-        const [familiesResponse, testsResponse] = await Promise.all([
-          apiRequest("/listening-blocks", { auth: false }),
-          apiRequest("/listening-tests?status=published&limit=50", { auth: false }),
+        const [testsResponse, partGroupsResponse] = await Promise.all([
+          apiRequest("/listening-tests?status=published&limit=1", { auth: false }),
+          apiRequest("/listening-tests/part-groups?status=published", { auth: false }),
         ]);
+
         if (!isMounted) {
           return;
         }
 
-        setFamilies(Array.isArray(familiesResponse?.families) ? familiesResponse.families : []);
-        setTests(Array.isArray(testsResponse?.tests) ? testsResponse.tests : []);
-      } catch (error) {
+        setTestsCount(Number(testsResponse?.pagination?.total) || 0);
+        setPartGroupsCount(Number(partGroupsResponse?.count) || 0);
+      } catch (nextError) {
         if (!isMounted) {
           return;
         }
 
-        setFamiliesError(error.message || "Failed to load listening question families.");
-      } finally {
-        if (isMounted) {
-          setIsLoadingFamilies(false);
-        }
+        setLoadError(nextError.message || "Failed to load listening library overview.");
       }
     }
 
-    loadFamilies();
+    loadLibraryStats();
 
     return () => {
       isMounted = false;
@@ -168,27 +132,55 @@ function StudentListeningPage() {
   }, []);
 
   const sections = useMemo(
-    () => {
-      const fullAudioSection = {
+    () => [
+      {
         title: "Full Listening Tests",
         description:
-          tests.length > 0
-            ? `${tests.length} full listening test(s) published. Latest: ${tests[0].title || tests[0]._id}.`
-            : "No published full listening tests yet. Add tests in `listening_tests`.",
+          testsCount === null
+            ? "Run complete IELTS listening tests with all parts in one continuous flow."
+            : `${testsCount} published full test(s) ready for complete exam-style practice.`,
         to: "/student/tests/listening/full",
-        cta: "Open full tests",
-      };
-
-      const familySections = families.map((family) => ({
-        title: toReadableLabel(family.questionFamily),
-        description: buildFamilyDescription(family),
-        to: `/student/tests/listening/${encodePathPart(family.questionFamily)}`,
-        cta: "Open tasks",
-      }));
-
-      return [fullAudioSection, ...familySections];
-    },
-    [families, tests],
+        cta: "Open resources",
+      },
+      {
+        title: "Part-by-Part Listening",
+        description:
+          partGroupsCount === null
+            ? "Practice listening by Part 1, Part 2, Part 3, and Part 4 with linked block order."
+            : `${partGroupsCount} published part task(s) grouped by test part and ordered blocks.`,
+        to: "/student/tests/listening/by-part",
+        cta: "Open resources",
+      },
+      {
+        title: "Multiple Choice",
+        description:
+          "Practice single-answer and multi-answer listening multiple-choice tasks as one family.",
+        to: "/student/tests/listening/multiple_choice",
+        cta: "Open resources",
+      },
+      {
+        title: "Matching",
+        description:
+          "Practice listening matching tasks with option-to-detail alignment and evidence tracking.",
+        to: "/student/tests/listening/matching",
+        cta: "Open resources",
+      },
+      {
+        title: "Gap Fill",
+        description:
+          "Practice form, note, table, and sentence completion under one gap-fill category.",
+        to: "/student/tests/listening/gap_fill",
+        cta: "Open resources",
+      },
+      {
+        title: "Map / Diagram Labeling",
+        description:
+          "Practice map labeling and diagram labeling together as one visual listening family.",
+        to: "/student/tests/listening/map_diagram_labeling",
+        cta: "Open resources",
+      },
+    ],
+    [partGroupsCount, testsCount],
   );
 
   const viewButtons = [
@@ -236,11 +228,7 @@ function StudentListeningPage() {
         </motion.div>
       </header>
 
-      {isLoadingFamilies ? <p className="text-sm text-slate-600">Loading listening resources...</p> : null}
-      {familiesError ? <p className="text-sm text-rose-600">{familiesError}</p> : null}
-      {!isLoadingFamilies && !familiesError && sections.length === 0 ? (
-        <p className="text-sm text-slate-600">No listening question families found.</p>
-      ) : null}
+      {loadError ? <p className="text-sm text-rose-600">{loadError}</p> : null}
 
       <div
         className={`grid gap-4 ${

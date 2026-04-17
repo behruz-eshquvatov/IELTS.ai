@@ -9,84 +9,56 @@ const sections = [
     title: "Full Reading Passages",
     description:
       "Read all three passages in one continuous run with mixed question types and full timing practice.",
-    to: "/student/tests/reading-full",
+    to: "/student/tests/reading/full",
     cta: "Open resources",
   },
   {
     title: "Passage-by-Passage Reading",
     description:
       "Work through Passage 1, Passage 2, and Passage 3 separately with focused pacing and review.",
-    to: "/student/tests/reading-by-passage",
+    to: "/student/tests/reading/by-passage",
     cta: "Open resources",
   },
   {
     title: "Multiple Choice",
     description:
-      "Single and multiple answer sets with paraphrase traps and inference vs. detail checks.",
-    to: "/student/tests/reading-multiple-choice",
+      "Practice single- and multiple-answer tasks under one question-family flow.",
+    to: "/student/tests/reading/multiple_choice",
     cta: "Open resources",
   },
   {
-    title: "True/False/Not Given",
+    title: "Binary Judgement",
     description:
-      "Identify factual agreement, contradiction, or missing information with precision.",
-    to: "/student/tests/reading-tfng",
+      "Train True/False/Not Given and Yes/No/Not Given together as one family.",
+    to: "/student/tests/reading/binary_judgement",
     cta: "Open resources",
   },
   {
-    title: "Yes/No/Not Given",
+    title: "Matching",
     description:
-      "Evaluate writer opinions and claims without over-inference or assumption.",
-    to: "/student/tests/reading-yng",
+      "Cover headings, information, features, sentence endings, and multiple matching in one family.",
+    to: "/student/tests/reading/matching",
     cta: "Open resources",
   },
   {
-    title: "Matching Headings",
+    title: "Gap Fill",
     description:
-      "Find the main idea of each paragraph quickly and match to the best heading.",
-    to: "/student/tests/reading-headings",
-    cta: "Open resources",
-  },
-  {
-    title: "Matching Information",
-    description:
-      "Locate specific details across paragraphs and match statements to locations.",
-    to: "/student/tests/reading-matching-info",
-    cta: "Open resources",
-  },
-  {
-    title: "Summary & Note Completion",
-    description:
-      "Complete summaries, notes, or tables using exact words from the passage.",
-    to: "/student/tests/reading-summary",
-    cta: "Open resources",
-  },
-  {
-    title: "Sentence Completion",
-    description:
-      "Fill sentence gaps using precise phrases while respecting word limits.",
-    to: "/student/tests/reading-sentence-completion",
+      "Practice summary, note, table, flow-chart, and sentence completion as one family.",
+    to: "/student/tests/reading/gap_fill",
     cta: "Open resources",
   },
   {
     title: "Short Answer Questions",
     description:
       "Provide concise answers with correct spelling, numbers, and limits.",
-    to: "/student/tests/reading-short-answer",
+    to: "/student/tests/reading/short_answer",
     cta: "Open resources",
   },
   {
     title: "Diagram Label Completion",
     description:
       "Label diagrams and visuals using exact terms from the passage within word limits.",
-    to: "/student/tests/reading-diagram",
-    cta: "Open resources",
-  },
-  {
-    title: "Multiple Matching",
-    description:
-      "Match statements to options across multiple paragraphs with efficient scanning.",
-    to: "/student/tests/reading-multiple-matching",
+    to: "/student/tests/reading/diagram_labeling",
     cta: "Open resources",
   },
 ];

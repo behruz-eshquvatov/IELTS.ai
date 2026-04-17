@@ -10,6 +10,25 @@ function normalizeFilterValue(value) {
   return String(value || "").trim();
 }
 
+function parseCsvValues(value) {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => String(item || "").split(","))
+      .map((item) => normalizeFilterValue(item))
+      .filter(Boolean);
+  }
+
+  const safe = normalizeFilterValue(value);
+  if (!safe) {
+    return [];
+  }
+
+  return safe
+    .split(",")
+    .map((item) => normalizeFilterValue(item))
+    .filter(Boolean);
+}
+
 function buildPaginationParams(query) {
   const requestedPage = Math.max(Number.parseInt(query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(Number.parseInt(query.limit, 10) || 10, 1), 100);
@@ -293,6 +312,86 @@ async function listListeningBlocks(req, res) {
   });
 }
 
+async function listListeningPracticeBlocks(req, res) {
+  const collectionName = await getListeningBlocksCollectionName();
+  const collection = mongoose.connection.db.collection(collectionName);
+  const blockTypes = Array.from(
+    new Set([
+      ...parseCsvValues(req.query.blockType),
+      ...parseCsvValues(req.query.blockTypes),
+    ]),
+  );
+
+  if (blockTypes.length === 0) {
+    return res.status(400).json({
+      message: "At least one block type is required. Use blockTypes=type_a,type_b.",
+    });
+  }
+
+  const filter = {
+    blockType: { $in: blockTypes },
+  };
+  const { requestedPage, limit } = buildPaginationParams(req.query);
+  const total = await collection.countDocuments(filter);
+  const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+  const page = Math.min(requestedPage, totalPages);
+  const skip = (page - 1) * limit;
+
+  const blocks = await collection
+    .find(filter, {
+      projection: {
+        _id: 1,
+        blockType: 1,
+        questionFamily: 1,
+        instruction: 1,
+        questions: 1,
+        "display.title": 1,
+      },
+    })
+    .sort({ _id: 1 })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+
+  const blockIds = blocks.map((item) => item._id);
+  const audioDocs = blockIds.length
+    ? await ListeningAudio.find({ _id: { $in: blockIds } }, { _id: 1 }).lean()
+    : [];
+  const audioIdSet = new Set(audioDocs.map((item) => item._id));
+
+  const list = blocks.map((block) => ({
+    _id: block._id,
+    blockType: block.blockType,
+    questionFamily: block.questionFamily,
+    instruction: block.instruction || {},
+    displayTitle: block.display?.title || "",
+    questionsCount: Array.isArray(block.questions) ? block.questions.length : 0,
+    questionNumbers: Array.isArray(block.questions)
+      ? block.questions
+        .map((question) => question.number)
+        .filter((number) => Number.isFinite(number))
+      : [],
+    hasAudio: audioIdSet.has(block._id),
+  }));
+
+  return res.json({
+    count: list.length,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    },
+    filters: {
+      blockTypes,
+    },
+    blocks: list,
+    sourceCollection: collectionName,
+  });
+}
+
 async function getListeningBlockById(req, res) {
   const collectionName = await getListeningBlocksCollectionName();
   const collection = mongoose.connection.db.collection(collectionName);
@@ -537,6 +636,7 @@ async function streamListeningBlockAudio(req, res) {
 module.exports = {
   listListeningQuestionFamilies,
   listListeningBlocks,
+  listListeningPracticeBlocks,
   getListeningBlockById,
   submitListeningBlockAttempt,
   getLatestListeningBlockAttempt,

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { AlertTriangle, ChevronLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { apiRequest, API_BASE_URL } from "../../lib/apiClient";
+import { getListeningPracticeConfig } from "../../data/listeningPractice";
 
 const START_COUNTDOWN_SECONDS = 3;
 const AUTO_COMPLETE_KEY_PREFIX = "student:listening:auto-complete:";
@@ -171,12 +172,50 @@ function getChoiceOptionValue(option, optionIndex) {
     return byKey;
   }
 
+  const byLabel = String(option?.label || "").trim();
+  if (byLabel) {
+    return byLabel;
+  }
+
   const byId = String(option?.id || "").trim();
   if (byId) {
     return byId;
   }
 
+  const byValue = String(option?.value || "").trim();
+  if (byValue) {
+    return byValue;
+  }
+
   return String.fromCharCode(65 + optionIndex);
+}
+
+function getChoiceOptionLabel(option, optionIndex) {
+  const byKey = String(option?.key || "").trim();
+  if (byKey) {
+    return byKey;
+  }
+
+  const byLabel = String(option?.label || "").trim();
+  if (byLabel) {
+    return byLabel;
+  }
+
+  return String.fromCharCode(65 + optionIndex);
+}
+
+function getChoiceOptionText(option, optionIndex) {
+  const byText = String(option?.text || "").trim();
+  if (byText) {
+    return byText;
+  }
+
+  const byTitle = String(option?.title || "").trim();
+  if (byTitle) {
+    return byTitle;
+  }
+
+  return getChoiceOptionValue(option, optionIndex);
 }
 
 function renderContentToken(token, key, context) {
@@ -319,18 +358,23 @@ function renderStructuredContent(value, context, keyPrefix = "content") {
   return null;
 }
 
-function renderChoiceOptions(question, options = [], keyPrefix = "option", context) {
+function renderChoiceOptions(question, options = [], keyPrefix = "option", context, fallbackIndex = 0) {
   if (!Array.isArray(options) || options.length === 0) {
     return null;
   }
 
-  const questionId = resolveQuestionIdForDisplay(question, context);
+  const questionId = resolveQuestionIdForDisplay(question, context, fallbackIndex);
   const selectedValues = toChoiceArray(context?.answersById?.[questionId]).map((item) =>
     normalizeAnswerText(item),
   );
+  const explicitSelectionLimit = Number(
+    question?.selectionLimit ?? question?.maxSelections ?? question?.maxAnswers,
+  );
   const selectionLimit = Math.max(
     1,
-    Number(context?.getChoiceSelectionLimit?.(question, questionId) || 1),
+    Number.isFinite(explicitSelectionLimit) && explicitSelectionLimit > 0
+      ? explicitSelectionLimit
+      : Number(context?.getChoiceSelectionLimit?.(question, questionId) || 1),
   );
 
   return (
@@ -354,9 +398,9 @@ function renderChoiceOptions(question, options = [], keyPrefix = "option", conte
             type="button"
           >
             <span className="inline-flex min-w-6 font-semibold text-slate-900">
-              {String(option?.key || String.fromCharCode(65 + optionIndex)).trim()}.
+              {getChoiceOptionLabel(option, optionIndex)}.
             </span>
-            <span>{String(option?.text || "").trim() || "-"}</span>
+            <span>{getChoiceOptionText(option, optionIndex) || "-"}</span>
           </button>
             );
           })()}
@@ -367,13 +411,61 @@ function renderChoiceOptions(question, options = [], keyPrefix = "option", conte
 }
 
 function renderTaskContent(display, context) {
-  const directQuestion = String(display?.question || "").trim();
+  const directQuestion = String(display?.question || display?.stem || "").trim();
   const directOptions = Array.isArray(display?.options) ? display.options : [];
   if (directQuestion && directOptions.length > 0) {
+    const hasExplicitQuestionReference =
+      Boolean(String(display?.qid || display?.id || "").trim()) ||
+      Number.isFinite(Number(display?.number));
+    const sharedQuestionTargets = hasExplicitQuestionReference
+      ? []
+      : Array.isArray(context?.orderedQuestions)
+        ? context.orderedQuestions
+          .map((question, index) => ({
+            id: String(question?.id || "").trim(),
+            number: Number.isFinite(Number(question?.number)) ? Number(question.number) : index + 1,
+          }))
+          .filter((question) => question.id)
+        : [];
+
+    if (sharedQuestionTargets.length > 1) {
+      return (
+        <section className="space-y-3 border border-slate-200 bg-slate-50/50 px-4 py-4">
+          <p className="text-base font-semibold leading-7 text-slate-900">{directQuestion}</p>
+          <div className="space-y-3">
+            {sharedQuestionTargets.map((question, questionIndex) => (
+              <section
+                className="space-y-2 border border-slate-200 bg-white/90 px-3 py-3"
+                key={`shared-question-${question.id}`}
+              >
+                <p className="text-sm font-semibold leading-6 text-slate-900">
+                  {Number.isFinite(Number(question.number))
+                    ? `${Number(question.number)}.`
+                    : `Question ${questionIndex + 1}`}
+                </p>
+                {renderChoiceOptions(
+                  {
+                    id: question.id,
+                    number: question.number,
+                    text: directQuestion,
+                    selectionLimit: 1,
+                  },
+                  directOptions,
+                  `shared-question-${questionIndex}-option`,
+                  context,
+                  questionIndex,
+                )}
+              </section>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="space-y-3 border border-slate-200 bg-slate-50/50 px-4 py-4">
         <p className="text-base font-semibold leading-7 text-slate-900">{directQuestion}</p>
-        {renderChoiceOptions(display, directOptions, "single-question-option", context)}
+        {renderChoiceOptions(display, directOptions, "single-question-option", context, 0)}
       </section>
     );
   }
@@ -401,6 +493,7 @@ function renderTaskContent(display, context) {
               Array.isArray(question?.options) ? question.options : [],
               `mc-question-${questionIndex}-option`,
               context,
+              questionIndex,
             )}
           </section>
         ))}
@@ -487,6 +580,7 @@ function renderTaskContent(display, context) {
     "items",
     "questions",
     "question",
+    "stem",
     "options",
   ]);
   const legacyRows = Object.entries(display || {})
@@ -557,8 +651,8 @@ function renderTaskContent(display, context) {
 }
 
 function StudentListeningBlockPage() {
-  const { questionFamily: questionFamilyParam = "", blockId: blockIdParam = "" } = useParams();
-  const questionFamily = decodeValue(questionFamilyParam);
+  const { practiceKey: practiceKeyParam = "", blockId: blockIdParam = "" } = useParams();
+  const practiceKey = decodeValue(practiceKeyParam);
   const blockId = decodeValue(blockIdParam);
 
   const [block, setBlock] = useState(null);
@@ -638,18 +732,29 @@ function StudentListeningBlockPage() {
     [blockId],
   );
 
-  const resolvedFamily = useMemo(() => {
-    const fromParam = decodeValue(questionFamily);
-    if (fromParam) {
-      return fromParam;
+  const resolvedPracticeConfig = useMemo(() => {
+    const byParam = getListeningPracticeConfig(practiceKey);
+    if (byParam) {
+      return byParam;
     }
 
-    return decodeValue(block?.questionFamily || "");
-  }, [block?.questionFamily, questionFamily]);
+    const byBlockType = getListeningPracticeConfig(block?.blockType || "");
+    if (byBlockType) {
+      return byBlockType;
+    }
 
-  const backLink = resolvedFamily
-    ? `/student/tests/listening/${encodeURIComponent(resolvedFamily)}`
+    const byQuestionFamily = getListeningPracticeConfig(block?.questionFamily || "");
+    if (byQuestionFamily) {
+      return byQuestionFamily;
+    }
+
+    return null;
+  }, [block?.blockType, block?.questionFamily, practiceKey]);
+
+  const backLink = resolvedPracticeConfig
+    ? `/student/tests/listening/${encodeURIComponent(resolvedPracticeConfig.canonicalKey)}`
     : "/student/tests/listening/full";
+  const backLabel = resolvedPracticeConfig?.title || "Full listening tests";
 
   const orderedGapIds = useMemo(() => {
     const nextIds = [];
@@ -694,14 +799,32 @@ function StudentListeningBlockPage() {
     return map;
   }, [orderedGapIds]);
 
-  const questionIdByNumber = useMemo(() => {
-    const map = new Map();
+  const orderedQuestions = useMemo(() => {
     const sortedQuestions = Array.isArray(block?.questions)
       ? [...block.questions].sort((left, right) => Number(left?.number || 0) - Number(right?.number || 0))
       : [];
 
-    sortedQuestions.forEach((question) => {
-      const questionId = String(question?.id || question?.qid || question?.number || "").trim();
+    return sortedQuestions
+      .map((question, index) => {
+        const questionId = String(question?.id || question?.qid || question?.number || "").trim();
+        if (!questionId) {
+          return null;
+        }
+
+        return {
+          id: questionId,
+          number: Number.isFinite(Number(question?.number)) ? Number(question.number) : index + 1,
+          text: String(question?.text || "").trim(),
+          answers: toAnswerArray(question?.answer || question?.answers),
+        };
+      })
+      .filter(Boolean);
+  }, [block?.questions]);
+
+  const questionIdByNumber = useMemo(() => {
+    const map = new Map();
+    orderedQuestions.forEach((question) => {
+      const questionId = String(question?.id || "").trim();
       const questionNumber = Number(question?.number);
       if (!questionId || !Number.isFinite(questionNumber) || map.has(questionNumber)) {
         return;
@@ -711,32 +834,22 @@ function StudentListeningBlockPage() {
     });
 
     return map;
-  }, [block?.questions]);
+  }, [orderedQuestions]);
 
   const orderedQuestionIds = useMemo(() => {
-    const sortedQuestions = Array.isArray(block?.questions)
-      ? [...block.questions].sort((left, right) => Number(left?.number || 0) - Number(right?.number || 0))
-      : [];
-
-    return sortedQuestions
-      .map((question) => String(question?.id || question?.qid || question?.number || "").trim())
-      .filter(Boolean);
-  }, [block?.questions]);
+    return orderedQuestions.map((question) => question.id);
+  }, [orderedQuestions]);
 
   const questionMetaById = useMemo(() => {
     const map = new Map();
     const instructionText = String(block?.instruction?.text || "").trim();
-    const sortedQuestions = Array.isArray(block?.questions)
-      ? [...block.questions].sort((left, right) => Number(left?.number || 0) - Number(right?.number || 0))
-      : [];
-
-    sortedQuestions.forEach((question) => {
-      const questionId = String(question?.id || question?.qid || question?.number || "").trim();
+    orderedQuestions.forEach((question) => {
+      const questionId = String(question?.id || "").trim();
       if (!questionId) {
         return;
       }
 
-      const acceptedAnswers = toAnswerArray(question?.answer || question?.answers);
+      const acceptedAnswers = toAnswerArray(question?.answers);
       const inferredLimit = inferChoiceSelectionLimit(
         String(question?.text || ""),
         instructionText,
@@ -749,7 +862,7 @@ function StudentListeningBlockPage() {
     });
 
     return map;
-  }, [block?.instruction?.text, block?.questions]);
+  }, [block?.instruction?.text, orderedQuestions]);
 
   const clearCountdownInterval = useCallback(() => {
     if (countdownIntervalRef.current) {
@@ -1248,7 +1361,7 @@ function StudentListeningBlockPage() {
         }
 
         const inferredFromQuestion = inferChoiceSelectionLimit(
-          String(question?.text || question?.question || ""),
+          String(question?.text || question?.question || question?.stem || ""),
           String(block?.instruction?.text || ""),
           1,
         );
@@ -1257,6 +1370,7 @@ function StudentListeningBlockPage() {
       isInputDisabled,
       onChoiceSelect: handleChoiceSelect,
       onGapKeyDown: handleGapKeyDown,
+      orderedQuestions,
       orderedQuestionIds,
       questionIdByNumber,
       registerGapInputRef,
@@ -1268,6 +1382,7 @@ function StudentListeningBlockPage() {
       handleChoiceSelect,
       handleGapKeyDown,
       isInputDisabled,
+      orderedQuestions,
       orderedQuestionIds,
       questionIdByNumber,
       registerGapInputRef,
@@ -1282,7 +1397,7 @@ function StudentListeningBlockPage() {
           to={backLink}
         >
           <ChevronLeft className="h-4 w-4" />
-          {resolvedFamily ? toReadableLabel(resolvedFamily) : "Full listening tests"}
+          {backLabel}
         </Link>
 
         {showAudioPlayingEffect ? (

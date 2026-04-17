@@ -57,19 +57,31 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: "tests/listening/by-part",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningByPartPage")).default,
+                }),
+              },
+              {
+                path: "tests/listening/by-part/:testId/:partNumber",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentListeningFullTestDetailPage")).default,
+                }),
+              },
+              {
                 path: "tests/listening/block/:blockId",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentListeningBlockPage")).default,
                 }),
               },
               {
-                path: "tests/listening/:questionFamily",
+                path: "tests/listening/:practiceKey",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentListeningFamilyPage")).default,
                 }),
               },
               {
-                path: "tests/listening/:questionFamily/:blockId",
+                path: "tests/listening/:practiceKey/:blockId",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentListeningBlockPage")).default,
                 }),
@@ -78,6 +90,42 @@ export const router = createBrowserRouter([
                 path: "tests/reading",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentReadingPage")).default,
+                }),
+              },
+              {
+                path: "tests/reading/full",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentReadingFullTestsPage")).default,
+                }),
+              },
+              {
+                path: "tests/reading/full/:testId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentReadingFullPassagesPage")).default,
+                }),
+              },
+              {
+                path: "tests/reading/by-passage",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentReadingByPassagePage")).default,
+                }),
+              },
+              {
+                path: "tests/reading/by-passage/:passageId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentReadingPassageTaskPage")).default,
+                }),
+              },
+              {
+                path: "tests/reading/:practiceKey",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentReadingPracticePage")).default,
+                }),
+              },
+              {
+                path: "tests/reading/:practiceKey/:passageId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentReadingPracticeTaskPage")).default,
                 }),
               },
               {

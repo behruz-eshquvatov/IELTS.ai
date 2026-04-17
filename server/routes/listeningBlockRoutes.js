@@ -2,6 +2,7 @@ const express = require("express");
 const {
   listListeningQuestionFamilies,
   listListeningBlocks,
+  listListeningPracticeBlocks,
   getListeningBlockById,
   submitListeningBlockAttempt,
   getLatestListeningBlockAttempt,
@@ -12,6 +13,7 @@ const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.get("/families", listListeningQuestionFamilies);
+router.get("/practice", listListeningPracticeBlocks);
 router.get("/:blockId/audio", streamListeningBlockAudio);
 router.get("/:blockId/attempts/latest", protect, authorizeRoles("student"), getLatestListeningBlockAttempt);
 router.post("/:blockId/submit", protect, authorizeRoles("student"), submitListeningBlockAttempt);

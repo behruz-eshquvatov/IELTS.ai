@@ -2,6 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Headphones } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
+import {
+  buildListeningPracticeQueryParams,
+  getListeningPracticeConfig,
+} from "../../data/listeningPractice";
+
+function decodeValue(value) {
+  try {
+    return decodeURIComponent(String(value || "").trim());
+  } catch {
+    return String(value || "").trim();
+  }
+}
 
 function toReadableLabel(value) {
   const safe = String(value || "").trim();
@@ -14,18 +26,6 @@ function toReadableLabel(value) {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function decodeFamily(value) {
-  try {
-    return decodeURIComponent(String(value || "").trim());
-  } catch {
-    return String(value || "").trim();
-  }
-}
-
-function encodePathPart(value) {
-  return encodeURIComponent(String(value || "").trim());
 }
 
 function buildVisiblePageItems(currentPage, totalPages) {
@@ -53,8 +53,13 @@ function buildVisiblePageItems(currentPage, totalPages) {
 }
 
 function StudentListeningFamilyPage() {
-  const { questionFamily: questionFamilyParam = "" } = useParams();
-  const questionFamily = decodeFamily(questionFamilyParam);
+  const { practiceKey: practiceKeyParam = "" } = useParams();
+  const practiceKey = decodeValue(practiceKeyParam).toLowerCase();
+  const practiceConfig = useMemo(
+    () => getListeningPracticeConfig(practiceKey),
+    [practiceKey],
+  );
+
   const [blocks, setBlocks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -66,23 +71,30 @@ function StudentListeningFamilyPage() {
   useEffect(() => {
     setCurrentPage(1);
     setActiveTipIndex(0);
-  }, [questionFamily]);
+  }, [practiceKey]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadBlocks() {
+      if (!practiceConfig) {
+        setBlocks([]);
+        setTotalPages(1);
+        setError("Unknown listening category.");
+        return;
+      }
+
       setIsLoading(true);
       setError("");
 
       try {
-        const params = new URLSearchParams({
-          questionFamily,
+        const params = buildListeningPracticeQueryParams(practiceConfig, {
           page: String(currentPage),
           limit: String(pageSize),
         });
-
-        const response = await apiRequest(`/listening-blocks?${params.toString()}`, { auth: false });
+        const response = await apiRequest(`/listening-blocks/practice?${params.toString()}`, {
+          auth: false,
+        });
         if (!isMounted) {
           return;
         }
@@ -114,18 +126,21 @@ function StudentListeningFamilyPage() {
     return () => {
       isMounted = false;
     };
-  }, [currentPage, questionFamily]);
+  }, [currentPage, practiceConfig]);
 
-  const pageTitle = toReadableLabel(questionFamily);
+  const pageTitle = practiceConfig?.title || "Listening Practice";
   const familyTaskTitlePrefix = `${pageTitle} Task`;
-  const listeningTips = useMemo(
-    () => [
-      `Before starting ${pageTitle}, skim the format and identify where the gaps are so you know what details to listen for.`,
-      "Keep answers exact. Spelling, singular/plural forms, and word limits can change a correct idea into a wrong answer.",
-      "Listen for signposting language (first, however, finally) and speaker corrections to avoid trap answers.",
-    ],
-    [pageTitle],
-  );
+  const listeningTips = useMemo(() => {
+    if (Array.isArray(practiceConfig?.tips) && practiceConfig.tips.length > 0) {
+      return practiceConfig.tips;
+    }
+
+    return [
+      "Skim instructions first and confirm answer format before audio starts.",
+      "Keep answers exact. Spelling and word limits matter.",
+      "Recover quickly after a missed item and continue with the next cue.",
+    ];
+  }, [practiceConfig?.tips]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -195,6 +210,11 @@ function StudentListeningFamilyPage() {
         </div>
       </section>
 
+      <section className="space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Task Group</p>
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-900">{pageTitle}</h1>
+      </section>
+
       {isLoading ? <p className="text-sm text-slate-600">Loading listening tasks...</p> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
@@ -207,7 +227,7 @@ function StudentListeningFamilyPage() {
             return (
               <Link
                 key={block._id}
-                to={`/student/tests/listening/${encodePathPart(questionFamily)}/${encodePathPart(block._id)}`}
+                to={`/student/tests/listening/${encodeURIComponent(practiceKey)}/${encodeURIComponent(block._id)}`}
                 className="group flex min-h-[104px] items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 transition hover:border-emerald-200/80 hover:bg-white"
               >
                 <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-600 shadow-sm transition group-hover:text-emerald-600">

@@ -163,12 +163,50 @@ function getChoiceOptionValue(option, optionIndex) {
     return byKey;
   }
 
+  const byLabel = String(option?.label || "").trim();
+  if (byLabel) {
+    return byLabel;
+  }
+
   const byId = String(option?.id || "").trim();
   if (byId) {
     return byId;
   }
 
+  const byValue = String(option?.value || "").trim();
+  if (byValue) {
+    return byValue;
+  }
+
   return String.fromCharCode(65 + optionIndex);
+}
+
+function getChoiceOptionLabel(option, optionIndex) {
+  const byKey = String(option?.key || "").trim();
+  if (byKey) {
+    return byKey;
+  }
+
+  const byLabel = String(option?.label || "").trim();
+  if (byLabel) {
+    return byLabel;
+  }
+
+  return String.fromCharCode(65 + optionIndex);
+}
+
+function getChoiceOptionText(option, optionIndex) {
+  const byText = String(option?.text || "").trim();
+  if (byText) {
+    return byText;
+  }
+
+  const byTitle = String(option?.title || "").trim();
+  if (byTitle) {
+    return byTitle;
+  }
+
+  return getChoiceOptionValue(option, optionIndex);
 }
 
 function collectQuestionIdsFromNode(node, ids) {
@@ -301,18 +339,23 @@ function renderStructuredContent(value, context, keyPrefix = "content") {
 
   return null;
 }
-function renderChoiceOptions(question, options = [], keyPrefix = "option", context) {
+function renderChoiceOptions(question, options = [], keyPrefix = "option", context, fallbackIndex = 0) {
   if (!Array.isArray(options) || options.length === 0) {
     return null;
   }
 
-  const questionId = resolveQuestionIdForDisplay(question, context);
+  const questionId = resolveQuestionIdForDisplay(question, context, fallbackIndex);
   const selectedValues = toChoiceArray(context?.answersById?.[questionId]).map((item) =>
     normalizeAnswerText(item),
   );
+  const explicitSelectionLimit = Number(
+    question?.selectionLimit ?? question?.maxSelections ?? question?.maxAnswers,
+  );
   const selectionLimit = Math.max(
     1,
-    Number(context?.getChoiceSelectionLimit?.(question, questionId) || 1),
+    Number.isFinite(explicitSelectionLimit) && explicitSelectionLimit > 0
+      ? explicitSelectionLimit
+      : Number(context?.getChoiceSelectionLimit?.(question, questionId) || 1),
   );
 
   return (
@@ -336,9 +379,9 @@ function renderChoiceOptions(question, options = [], keyPrefix = "option", conte
             type="button"
           >
             <span className="inline-flex min-w-6 font-semibold text-slate-900">
-              {String(option?.key || String.fromCharCode(65 + optionIndex)).trim()}.
+              {getChoiceOptionLabel(option, optionIndex)}.
             </span>
-            <span>{String(option?.text || "").trim() || "-"}</span>
+            <span>{getChoiceOptionText(option, optionIndex) || "-"}</span>
           </button>
             );
           })()}
@@ -386,13 +429,61 @@ function renderDisplayElement(element, index, context) {
 }
 
 function renderTaskContent(display, context) {
-  const directQuestion = String(display?.question || "").trim();
+  const directQuestion = String(display?.question || display?.stem || "").trim();
   const directOptions = Array.isArray(display?.options) ? display.options : [];
   if (directQuestion && directOptions.length > 0) {
+    const hasExplicitQuestionReference =
+      Boolean(String(display?.qid || display?.id || "").trim()) ||
+      Number.isFinite(Number(display?.number));
+    const sharedQuestionTargets = hasExplicitQuestionReference
+      ? []
+      : Array.isArray(context?.orderedQuestions)
+        ? context.orderedQuestions
+          .map((question, index) => ({
+            id: String(question?.id || "").trim(),
+            number: Number.isFinite(Number(question?.number)) ? Number(question.number) : index + 1,
+          }))
+          .filter((question) => question.id)
+        : [];
+
+    if (sharedQuestionTargets.length > 1) {
+      return (
+        <section className="space-y-3 border border-slate-200 bg-slate-50/50 px-4 py-4">
+          <p className="text-base font-semibold leading-7 text-slate-900">{directQuestion}</p>
+          <div className="space-y-3">
+            {sharedQuestionTargets.map((question, questionIndex) => (
+              <section
+                className="space-y-2 border border-slate-200 bg-white/90 px-3 py-3"
+                key={`shared-question-${question.id}`}
+              >
+                <p className="text-sm font-semibold leading-6 text-slate-900">
+                  {Number.isFinite(Number(question.number))
+                    ? `${Number(question.number)}.`
+                    : `Question ${questionIndex + 1}`}
+                </p>
+                {renderChoiceOptions(
+                  {
+                    id: question.id,
+                    number: question.number,
+                    text: directQuestion,
+                    selectionLimit: 1,
+                  },
+                  directOptions,
+                  `shared-question-${questionIndex}-option`,
+                  context,
+                  questionIndex,
+                )}
+              </section>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="space-y-3 border border-slate-200 bg-slate-50/50 px-4 py-4">
         <p className="text-base font-semibold leading-7 text-slate-900">{directQuestion}</p>
-        {renderChoiceOptions(display, directOptions, "single-question-option", context)}
+        {renderChoiceOptions(display, directOptions, "single-question-option", context, 0)}
       </section>
     );
   }
@@ -420,6 +511,7 @@ function renderTaskContent(display, context) {
               Array.isArray(question?.options) ? question.options : [],
               `mc-question-${questionIndex}-option`,
               context,
+              questionIndex,
             )}
           </section>
         ))}
@@ -506,6 +598,7 @@ function renderTaskContent(display, context) {
     "items",
     "questions",
     "question",
+    "stem",
     "options",
   ]);
   const legacyRows = Object.entries(display || {})
@@ -576,8 +669,15 @@ function renderTaskContent(display, context) {
 }
 
 function StudentListeningFullTestDetailPage() {
-  const { testId: testIdParam = "" } = useParams();
+  const { testId: testIdParam = "", partNumber: partNumberParam = "" } = useParams();
   const testId = decodeValue(testIdParam);
+  const parsedPartNumber = Number.parseInt(decodeValue(partNumberParam), 10);
+  const activePartNumber =
+    Number.isFinite(parsedPartNumber) && parsedPartNumber > 0 ? parsedPartNumber : null;
+  const isPartMode = Number.isFinite(activePartNumber);
+  const backLink = isPartMode ? "/student/tests/listening/by-part" : "/student/tests/listening/full";
+  const backLabel = isPartMode ? "Part-by-part listening" : "Full listening tests";
+  const runTypeLabel = isPartMode ? `Part ${activePartNumber}` : "full listening test";
 
   const [test, setTest] = useState(null);
   const [blocksById, setBlocksById] = useState({});
@@ -668,13 +768,16 @@ function StudentListeningFullTestDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [testId]);
+  }, [activePartNumber, testId]);
 
   const orderedBlocks = useMemo(() => {
     const parts = Array.isArray(test?.parts) ? test.parts : [];
+    const scopedParts = isPartMode
+      ? parts.filter((part) => Number(part?.partNumber) === Number(activePartNumber))
+      : parts;
     const flattened = [];
 
-    for (const part of parts) {
+    for (const part of scopedParts) {
       const blocks = Array.isArray(part?.blocks) ? part.blocks : [];
       for (const block of blocks) {
         const blockId = String(block?.blockId || "").trim();
@@ -704,7 +807,7 @@ function StudentListeningFullTestDetailPage() {
 
       return String(left.blockId).localeCompare(String(right.blockId));
     });
-  }, [test?.parts]);
+  }, [activePartNumber, isPartMode, test?.parts]);
 
   useEffect(() => {
     let isMounted = true;
@@ -713,6 +816,9 @@ function StudentListeningFullTestDetailPage() {
       if (!orderedBlocks.length) {
         setBlocksById({});
         setIsStartModalOpen(false);
+        if (isPartMode) {
+          setError(`No blocks found for Part ${activePartNumber}.`);
+        }
         return;
       }
 
@@ -764,7 +870,7 @@ function StudentListeningFullTestDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [orderedBlocks]);
+  }, [activePartNumber, isPartMode, orderedBlocks]);
 
   const currentEntry = orderedBlocks[currentBlockIndex] || null;
   const currentBlockId = currentEntry?.blockId || "";
@@ -795,6 +901,7 @@ function StudentListeningFullTestDetailPage() {
         return {
           id: questionId,
           number: Number.isFinite(Number(question?.number)) ? Number(question.number) : index + 1,
+          text: String(question?.text || "").trim(),
           answers: toAnswerArray(question?.answer || question?.answers),
         };
       })
@@ -843,7 +950,7 @@ function StudentListeningFullTestDetailPage() {
   const currentAnswers = answersByBlockId[currentBlockId] || {};
 
   const hasInlineChoiceQuestions = useMemo(() => {
-    const directQuestion = String(currentBlock?.display?.question || "").trim();
+    const directQuestion = String(currentBlock?.display?.question || currentBlock?.display?.stem || "").trim();
     const directOptions = Array.isArray(currentBlock?.display?.options) ? currentBlock.display.options : [];
     const groupedQuestions = Array.isArray(currentBlock?.display?.questions) ? currentBlock.display.questions : [];
     return (directQuestion && directOptions.length > 0) || groupedQuestions.length > 0;
@@ -1250,10 +1357,10 @@ function StudentListeningFullTestDetailPage() {
       setSubmitError("");
       void completeCurrentBlockAndMoveNext(
         submitReason || "auto-complete",
-        reasonText || "This full listening test was auto-completed.",
+        reasonText || `This ${runTypeLabel} was auto-completed.`,
       );
     },
-    [completeCurrentBlockAndMoveNext, isFinalModalOpen],
+    [completeCurrentBlockAndMoveNext, isFinalModalOpen, runTypeLabel],
   );
 
   useEffect(() => {
@@ -1467,7 +1574,7 @@ function StudentListeningFullTestDetailPage() {
         }
 
         return inferChoiceSelectionLimit(
-          String(question?.text || question?.question || ""),
+          String(question?.text || question?.question || question?.stem || ""),
           String(currentBlock?.instruction?.text || ""),
           1,
         );
@@ -1476,6 +1583,7 @@ function StudentListeningFullTestDetailPage() {
       onAnswerChange: handleAnswerChange,
       onAnswerKeyDown: handleAnswerKeyDown,
       onChoiceSelect: handleChoiceSelect,
+      orderedQuestions,
       orderedQuestionIds,
       questionIdByNumber,
       registerAnswerInputRef,
@@ -1488,6 +1596,7 @@ function StudentListeningFullTestDetailPage() {
       handleAnswerKeyDown,
       handleChoiceSelect,
       isInputDisabled,
+      orderedQuestions,
       orderedQuestionIds,
       questionIdByNumber,
       registerAnswerInputRef,
@@ -1502,10 +1611,10 @@ function StudentListeningFullTestDetailPage() {
       <header className="flex items-center justify-between gap-3">
         <Link
           className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 transition hover:text-slate-900"
-          to="/student/tests/listening/full"
+          to={backLink}
         >
           <ChevronLeft className="h-4 w-4" />
-          Full listening tests
+          {backLabel}
         </Link>
 
         {showAudioPlayingEffect ? (
@@ -1750,7 +1859,7 @@ function StudentListeningFullTestDetailPage() {
               </button>
               <Link
                 className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
-                to="/student/tests/listening/full"
+                to={backLink}
               >
                 Leave
               </Link>
