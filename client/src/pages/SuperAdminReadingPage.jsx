@@ -2,80 +2,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpenText, Blocks, FileCheck2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
+import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
+import {
+  BLOCK_TEMPLATE,
+  PASSAGE_TEMPLATE,
+  TEST_TEMPLATE,
+  getWorkingReadingTestDraft,
+  inferTestIdFromPassageId,
+  normalizeReadingBlockPayload,
+  normalizeReadingPassagePayload,
+  normalizeReadingTestPayload,
+  normalizeText,
+  validateReadingBlockPayload,
+  validateReadingPassagePayload,
+  validateReadingTestPayload,
+} from "../lib/readingAdminPayload";
 import { buildSuperAdminApiPath, buildSuperAdminPagePath, isValidSuperAdminPassword } from "../lib/superAdmin";
-
-const PASSAGE_TEMPLATE = { _id: "rc_cmbr_10_1_1", title: "Passage title", section: "reading", provider: "cambridge", book: 10, test: 1, passageNumber: 1, contentBlocks: [{ type: "intro", text: "Intro..." }, { type: "paragraph", paragraphId: "A", text: "Paragraph A..." }], status: "draft" };
-const BLOCK_TEMPLATE = { _id: "rc_cmbr_10_1_1_1-6", passageId: "rc_cmbr_10_1_1", questionFamily: "matching", blockType: "matching_headings", instruction: { text: "Choose headings." }, passageScope: { type: "paragraphs", targets: ["A", "B"] }, display: { headingOptions: [{ key: "i", text: "Heading 1" }], prompts: [{ qid: "q1", number: 1, paragraphId: "A" }] }, questions: [{ id: "q1", number: 1, answers: ["i"] }], status: "draft" };
-const TEST_TEMPLATE = { _id: "rc_cmbr_10_1", title: "Cambridge 10 Test 1 Reading", section: "reading", module: "academic", totalQuestions: 40, status: "draft", passages: [{ passageNumber: 1, passageId: "rc_cmbr_10_1_1", questionRange: { start: 1, end: 13 }, blocks: [{ blockId: "rc_cmbr_10_1_1_1-6", order: 1 }] }] };
-const EMPTY_TEST_DRAFT = { _id: "", title: "", section: "reading", module: "academic", totalQuestions: 40, status: "draft", passages: [] };
-
-function parseJson(text) {
-  try { return { ok: true, value: JSON.parse(String(text || "")), error: "" }; } catch (error) { return { ok: false, value: null, error: error.message || "Invalid JSON" }; }
-}
-async function parseRawResponse(response) {
-  const text = await response.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return { message: text }; }
-}
-function normalizeText(value) { return String(value || "").trim().replace(/\s+/g, " "); }
-function toAnswersArray(value) {
-  if (Array.isArray(value)) return value.map((item) => normalizeText(item)).filter(Boolean);
-  const safe = normalizeText(value);
-  return safe ? [safe] : [];
-}
-function normalizeReadingPassagePayload(raw = {}) {
-  return { ...raw, _id: normalizeText(raw._id), title: normalizeText(raw.title), section: "reading", provider: normalizeText(raw.provider).toLowerCase(), book: Number(raw.book), test: Number(raw.test), passageNumber: Number(raw.passageNumber), contentBlocks: Array.isArray(raw.contentBlocks) ? raw.contentBlocks : [], status: normalizeText(raw.status || "draft").toLowerCase() };
-}
-function normalizeReadingBlockPayload(raw = {}) {
-  return { ...raw, _id: normalizeText(raw._id), passageId: normalizeText(raw.passageId), questionFamily: normalizeText(raw.questionFamily).toLowerCase(), blockType: normalizeText(raw.blockType).toLowerCase(), instruction: { ...(raw.instruction || {}), text: normalizeText(raw?.instruction?.text) }, display: raw.display && typeof raw.display === "object" ? raw.display : {}, questions: Array.isArray(raw.questions) ? raw.questions.map((q, index) => ({ ...(q || {}), id: normalizeText(q?.id || q?.qid || `q${index + 1}`), number: Number(q?.number || index + 1), answers: toAnswersArray(q?.answers ?? q?.answer) })) : [], status: normalizeText(raw.status || "draft").toLowerCase() };
-}
-function normalizeReadingTestPayload(raw = {}) {
-  return { ...raw, _id: normalizeText(raw._id), title: normalizeText(raw.title), section: "reading", module: normalizeText(raw.module || "academic").toLowerCase(), totalQuestions: Number(raw.totalQuestions), status: normalizeText(raw.status || "draft").toLowerCase(), passages: Array.isArray(raw.passages) ? raw.passages : [] };
-}
-function inferTestIdFromPassageId(passageId) {
-  const safe = normalizeText(passageId);
-  if (!safe) return "";
-  const parts = safe.split("_").filter(Boolean);
-  if (parts.length < 4) return "";
-  return parts.slice(0, 4).join("_");
-}
-function getWorkingReadingTestDraft(rawTestJson = "") {
-  const safeRaw = String(rawTestJson || "").trim();
-  if (!safeRaw) {
-    return { ok: true, value: normalizeReadingTestPayload(EMPTY_TEST_DRAFT), error: "" };
-  }
-
-  const parsed = parseJson(safeRaw);
-  if (!parsed.ok) {
-    return { ok: false, value: null, error: parsed.error };
-  }
-
-  return { ok: true, value: normalizeReadingTestPayload(parsed.value), error: "" };
-}
-function validateReadingPassagePayload(payload) {
-  const errors = [];
-  if (!normalizeText(payload?._id)) errors.push("`_id` is required.");
-  if (!normalizeText(payload?.title)) errors.push("`title` is required.");
-  if (!Array.isArray(payload?.contentBlocks) || payload.contentBlocks.length === 0) errors.push("`contentBlocks` must be non-empty.");
-  return errors;
-}
-function validateReadingBlockPayload(payload) {
-  const errors = [];
-  if (!normalizeText(payload?._id)) errors.push("`_id` is required.");
-  if (!normalizeText(payload?.passageId)) errors.push("`passageId` is required.");
-  if (!normalizeText(payload?.questionFamily)) errors.push("`questionFamily` is required.");
-  if (!normalizeText(payload?.blockType)) errors.push("`blockType` is required.");
-  if (!normalizeText(payload?.instruction?.text)) errors.push("`instruction.text` is required.");
-  if (!Array.isArray(payload?.questions) || payload.questions.length === 0) errors.push("`questions` must be non-empty.");
-  return errors;
-}
-function validateReadingTestPayload(payload) {
-  const errors = [];
-  if (!normalizeText(payload?._id)) errors.push("`_id` is required.");
-  if (!normalizeText(payload?.title)) errors.push("`title` is required.");
-  if (!Array.isArray(payload?.passages) || payload.passages.length === 0) errors.push("`passages` must be non-empty.");
-  return errors;
-}
 
 function SuperAdminReadingPage() {
   const { password = "" } = useParams();
@@ -147,7 +89,7 @@ function SuperAdminReadingPage() {
     try {
       const endpoint = type === "passages" ? "/reading/passages/extract" : "/reading/blocks/extract";
       const response = await fetch(`${API_BASE_URL}${buildSuperAdminApiPath(password, endpoint)}`, { method: "POST", headers: { "Content-Type": extractImageFile.type || "image/png", "X-Image-Filename": extractImageFile.name || `reading-${Date.now()}.png` }, body: extractImageFile });
-      const body = await parseRawResponse(response);
+      const body = await parseRawFetchResponse(response);
       if (!response.ok) throw new Error(body?.message || "Extraction failed.");
       if (type === "passages") setPassageJson(JSON.stringify(body?.passage || {}, null, 2));
       if (type === "blocks") setBlockJson(JSON.stringify(body?.block || {}, null, 2));
@@ -164,7 +106,7 @@ function SuperAdminReadingPage() {
   function validateCurrent() {
     setError(""); setFeedback("");
     const rawJson = activeTab === "passages" ? passageJson : activeTab === "blocks" ? blockJson : testJson;
-    const parsed = parseJson(rawJson);
+    const parsed = parseJsonInput(rawJson);
     if (!parsed.ok) { setValidationErrors([`JSON parse error: ${parsed.error}`]); return null; }
     if (activeTab === "passages") { const normalized = normalizeReadingPassagePayload(parsed.value); const errors = validateReadingPassagePayload(normalized); setValidationErrors(errors); return { normalized, errors, key: "passage" }; }
     if (activeTab === "blocks") { const normalized = normalizeReadingBlockPayload(parsed.value); const errors = validateReadingBlockPayload(normalized); setValidationErrors(errors); return { normalized, errors, key: "block" }; }
@@ -261,7 +203,7 @@ function SuperAdminReadingPage() {
 
             <article className="space-y-3 border border-slate-200/80 bg-white p-4" onPaste={handleImagePaste}>
               {(activeTab === "passages" || activeTab === "blocks") ? <div className="grid gap-3 lg:grid-cols-[280px_1fr]"><div className="space-y-2"><input accept="image/*" className="block w-full cursor-pointer border border-slate-200/80 bg-slate-50 px-3 py-2 text-sm text-slate-700 file:mr-3 file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-700" onChange={(event) => setExtractImageFile(event.target.files?.[0] || null)} type="file" /><p className="text-xs text-slate-500">Tip: click here and paste image with Ctrl+V.</p><button className="emerald-gradient-fill inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300/20 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55" disabled={extracting || !extractImageFile} onClick={() => extractFromImage(activeTab)} type="button"><Upload className="h-4 w-4" />{extracting ? "Extracting..." : "Extract JSON from image"}</button></div></div> : null}
-              {activeTab === "blocks" ? <select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400" onChange={(event) => setBlockJson((prev) => { const parsed = parseJson(prev); if (!parsed.ok || !parsed.value || typeof parsed.value !== "object") return prev; parsed.value.passageId = event.target.value; setSelectedPassageForBlock(event.target.value); return JSON.stringify(parsed.value, null, 2); })} value={selectedPassageForBlock || ""}><option value="">Choose passageId to attach block</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select> : null}
+              {activeTab === "blocks" ? <select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400" onChange={(event) => setBlockJson((prev) => { const parsed = parseJsonInput(prev); if (!parsed.ok || !parsed.value || typeof parsed.value !== "object") return prev; parsed.value.passageId = event.target.value; setSelectedPassageForBlock(event.target.value); return JSON.stringify(parsed.value, null, 2); })} value={selectedPassageForBlock || ""}><option value="">Choose passageId to attach block</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select> : null}
               {activeTab === "tests" ? <div className="grid gap-2 border border-slate-200/80 bg-slate-50/50 p-3 lg:grid-cols-2"><div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Add passage ref</p><select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestPassageId(event.target.value)} value={testPassageId}><option value="">PassageId</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select><div className="grid grid-cols-2 gap-2"><input className="border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestRangeStart(event.target.value)} placeholder="start" type="number" value={testRangeStart} /><input className="border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestRangeEnd(event.target.value)} placeholder="end" type="number" value={testRangeEnd} /></div><button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={addPassageRefToTestJson} type="button">Add passage</button></div><div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Add block ref</p><select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestBlockPassageId(event.target.value)} value={testBlockPassageId}><option value="">PassageId</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select><select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestBlockId(event.target.value)} value={testBlockId}><option value="">BlockId</option>{blockIds.map((id) => <option key={id} value={id}>{id}</option>)}</select><button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={addBlockRefToTestJson} type="button">Add block</button></div></div> : null}
               <textarea className="h-[360px] w-full border border-slate-200/80 bg-slate-50/60 p-3 font-mono text-xs leading-6 text-slate-800 outline-none focus:border-emerald-400" onChange={(event) => { if (activeTab === "passages") setPassageJson(event.target.value); if (activeTab === "blocks") setBlockJson(event.target.value); if (activeTab === "tests") setTestJson(event.target.value); }} placeholder="JSON editor" spellCheck={false} value={activeTab === "passages" ? passageJson : activeTab === "blocks" ? blockJson : testJson} />
               <div className="flex flex-wrap gap-2"><button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={validateCurrent} type="button">Validate JSON</button><button className="emerald-gradient-fill inline-flex items-center justify-center rounded-full border border-emerald-300/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white disabled:cursor-not-allowed disabled:opacity-55" disabled={saving || !(activeTab === "passages" ? passageJson : activeTab === "blocks" ? blockJson : testJson).trim()} onClick={saveCurrent} type="button">{saving ? "Saving..." : `Save to ${activeTab === "passages" ? "reading_passages" : activeTab === "blocks" ? "reading_blocks" : "reading_tests"}`}</button></div>

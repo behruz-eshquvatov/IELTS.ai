@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
-import ReadingPassageWithBlocks, { toReadableLabel } from "../../components/student/ReadingPassageWithBlocks";
+import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
 
 function decodeValue(value) {
   try {
@@ -12,6 +12,19 @@ function decodeValue(value) {
   }
 }
 
+function toReadableLabel(value) {
+  const safe = String(value || "").trim();
+  if (!safe) {
+    return "Unknown";
+  }
+
+  return safe
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function StudentReadingFullPassagesPage() {
   const { testId: testIdParam = "" } = useParams();
   const testId = decodeValue(testIdParam);
@@ -19,6 +32,7 @@ function StudentReadingFullPassagesPage() {
   const [test, setTest] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activePassageIndex, setActivePassageIndex] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -42,6 +56,7 @@ function StudentReadingFullPassagesPage() {
         }
 
         setTest(response?.test || null);
+        setActivePassageIndex(0);
       } catch (nextError) {
         if (!isMounted) {
           return;
@@ -62,7 +77,27 @@ function StudentReadingFullPassagesPage() {
     };
   }, [testId]);
 
-  const testPassages = Array.isArray(test?.passages) ? test.passages : [];
+  const testPassages = useMemo(() => (Array.isArray(test?.passages) ? test.passages : []), [test?.passages]);
+  const normalizedPassageCount = testPassages.length;
+
+  useEffect(() => {
+    setActivePassageIndex((previousIndex) => {
+      if (!Number.isFinite(previousIndex) || previousIndex < 0) {
+        return 0;
+      }
+
+      if (normalizedPassageCount <= 0) {
+        return 0;
+      }
+
+      return Math.min(previousIndex, normalizedPassageCount - 1);
+    });
+  }, [normalizedPassageCount]);
+
+  const activePassageEntry = useMemo(
+    () => testPassages[activePassageIndex] || null,
+    [activePassageIndex, testPassages],
+  );
 
   return (
     <div className="space-y-8 pt-2 sm:pt-4">
@@ -95,35 +130,47 @@ function StudentReadingFullPassagesPage() {
             </header>
 
             {testPassages.length > 0 ? (
-              <div className="space-y-5">
-                {testPassages.map((entry, index) => {
-                  if (!entry?.passage) {
-                    return (
-                      <div
-                        className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-                        key={`missing-passage-${test?._id || "test"}-${index}`}
-                      >
-                        Passage {entry?.passageNumber || index + 1} is missing in `reading_passages`, so linked blocks were not rendered.
-                      </div>
-                    );
-                  }
+              <div className="space-y-4">
+                {testPassages.length > 1 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {testPassages.map((entry, index) => {
+                      const isActive = index === activePassageIndex;
+                      return (
+                        <button
+                          className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                            isActive
+                              ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                              : "border-slate-300 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
+                          }`}
+                          key={`passage-switch-${entry?.passageId || index}`}
+                          onClick={() => setActivePassageIndex(index)}
+                          type="button"
+                        >
+                          Passage {entry?.passageNumber || index + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
-                  const range = entry?.questionRange || {};
-                  const rangeLabel =
-                    Number.isFinite(Number(range?.start)) && Number.isFinite(Number(range?.end))
-                      ? `Questions ${Number(range.start)}-${Number(range.end)}`
-                      : "";
-
-                  return (
-                    <ReadingPassageWithBlocks
-                      blocks={Array.isArray(entry?.blocks) ? entry.blocks : []}
-                      key={`${test?._id || "test"}-${entry?.passageId || index}`}
-                      passage={entry.passage}
-                      sectionMeta={rangeLabel}
-                      sectionTitle={`Passage ${entry?.passageNumber || index + 1}`}
-                    />
-                  );
-                })}
+                {activePassageEntry?.passage ? (
+                  <ReadingPassageWithBlocks
+                    blocks={Array.isArray(activePassageEntry?.blocks) ? activePassageEntry.blocks : []}
+                    key={`${test?._id || "test"}-${activePassageEntry?.passageId || activePassageIndex}`}
+                    passage={activePassageEntry.passage}
+                    sectionMeta={(() => {
+                      const range = activePassageEntry?.questionRange || {};
+                      return Number.isFinite(Number(range?.start)) && Number.isFinite(Number(range?.end))
+                        ? `Questions ${Number(range.start)}-${Number(range.end)}`
+                        : "";
+                    })()}
+                    sectionTitle={`Passage ${activePassageEntry?.passageNumber || activePassageIndex + 1}`}
+                  />
+                ) : (
+                  <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Passage {activePassageEntry?.passageNumber || activePassageIndex + 1} is missing in `reading_passages`, so linked blocks were not rendered.
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-slate-600">No passage map is attached to this test.</p>

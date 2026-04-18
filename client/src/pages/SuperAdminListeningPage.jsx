@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Headphones, Trash2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
+import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
 import {
   buildListeningStreamUrl,
   buildSuperAdminApiPath,
@@ -39,35 +40,6 @@ function formatTimestamp(value) {
   }
 
   return date.toLocaleString();
-}
-
-async function parseRawResponse(response) {
-  const text = await response.text();
-  if (!text) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { message: text };
-  }
-}
-
-function tryParseJson(value) {
-  try {
-    return {
-      ok: true,
-      value: JSON.parse(String(value || "")),
-      error: "",
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      value: null,
-      error: error.message || "Invalid JSON.",
-    };
-  }
 }
 
 function validateListeningBlockJson(block) {
@@ -193,7 +165,7 @@ function SuperAdminListeningPage() {
         body: audioFile,
       });
 
-      const responseBody = await parseRawResponse(response);
+      const responseBody = await parseRawFetchResponse(response);
       if (!response.ok) {
         throw new Error(responseBody?.message || "Audio upload failed.");
       }
@@ -280,7 +252,7 @@ function SuperAdminListeningPage() {
         body: blockImageFile,
       });
 
-      const responseBody = await parseRawResponse(response);
+      const responseBody = await parseRawFetchResponse(response);
       if (!response.ok) {
         throw new Error(responseBody?.message || "Failed to extract block JSON from image.");
       }
@@ -313,7 +285,7 @@ function SuperAdminListeningPage() {
     setBlockErrorMessage("");
     setBlockFeedbackMessage("");
 
-    const parsed = tryParseJson(blockJsonText);
+    const parsed = parseJsonInput(blockJsonText);
     if (!parsed.ok) {
       setBlockValidationErrors([`JSON parse error: ${parsed.error}`]);
       return;
@@ -333,7 +305,7 @@ function SuperAdminListeningPage() {
     setBlockErrorMessage("");
     setBlockFeedbackMessage("");
 
-    const parsed = tryParseJson(blockJsonText);
+    const parsed = parseJsonInput(blockJsonText);
     if (!parsed.ok) {
       setBlockValidationErrors([`JSON parse error: ${parsed.error}`]);
       return;

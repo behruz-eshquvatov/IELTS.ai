@@ -8,6 +8,7 @@ import { apiRequest, API_BASE_URL } from "../../lib/apiClient";
 const START_COUNTDOWN_SECONDS = 3;
 const GOOD_SCORE_THRESHOLD_PERCENT = 70;
 const TOMATO_COLOR = "#ff6347";
+const BLOCK_RANGE_ID_PATTERN = /^(.*)_(\d+)-(\d+)$/;
 
 function toReadableLabel(value) {
   const safe = String(value || "").trim();
@@ -28,6 +29,88 @@ function decodeValue(value) {
   } catch {
     return String(value || "").trim();
   }
+}
+
+function toFiniteNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function parseBlockQuestionRange(blockId) {
+  const safeBlockId = String(blockId || "").trim();
+  if (!safeBlockId) {
+    return null;
+  }
+
+  const match = safeBlockId.match(BLOCK_RANGE_ID_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  const start = Number.parseInt(match[2], 10);
+  const end = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+    return null;
+  }
+
+  return { start, end };
+}
+
+function resolveQuestionRangeFromBlockEntry(block = {}) {
+  const explicitStart = toFiniteNumber(block?.questionRange?.start);
+  const explicitEnd = toFiniteNumber(block?.questionRange?.end);
+  if (Number.isFinite(explicitStart) && Number.isFinite(explicitEnd) && explicitStart <= explicitEnd) {
+    return { start: explicitStart, end: explicitEnd };
+  }
+
+  return parseBlockQuestionRange(block?.blockId);
+}
+
+function compareBlocksByQuestionRange(left, right) {
+  const leftStart = toFiniteNumber(left?.questionRange?.start);
+  const rightStart = toFiniteNumber(right?.questionRange?.start);
+  const leftStartIsFinite = Number.isFinite(leftStart);
+  const rightStartIsFinite = Number.isFinite(rightStart);
+  if (leftStartIsFinite || rightStartIsFinite) {
+    if (leftStartIsFinite && !rightStartIsFinite) {
+      return -1;
+    }
+
+    if (!leftStartIsFinite && rightStartIsFinite) {
+      return 1;
+    }
+
+    const startDiff = leftStart - rightStart;
+    if (startDiff !== 0) {
+      return startDiff;
+    }
+  }
+
+  const leftEnd = toFiniteNumber(left?.questionRange?.end);
+  const rightEnd = toFiniteNumber(right?.questionRange?.end);
+  const leftEndIsFinite = Number.isFinite(leftEnd);
+  const rightEndIsFinite = Number.isFinite(rightEnd);
+  if (leftEndIsFinite || rightEndIsFinite) {
+    if (leftEndIsFinite && !rightEndIsFinite) {
+      return -1;
+    }
+
+    if (!leftEndIsFinite && rightEndIsFinite) {
+      return 1;
+    }
+
+    const endDiff = leftEnd - rightEnd;
+    if (endDiff !== 0) {
+      return endDiff;
+    }
+  }
+
+  const partDiff = Number(left?.partNumber || 0) - Number(right?.partNumber || 0);
+  if (partDiff !== 0) {
+    return partDiff;
+  }
+
+  return String(left?.blockId || "").localeCompare(String(right?.blockId || ""));
 }
 
 function normalizeAnswerText(value) {
@@ -776,37 +859,27 @@ function StudentListeningFullTestDetailPage() {
       ? parts.filter((part) => Number(part?.partNumber) === Number(activePartNumber))
       : parts;
     const flattened = [];
+    const seenBlockIds = new Set();
 
     for (const part of scopedParts) {
       const blocks = Array.isArray(part?.blocks) ? part.blocks : [];
       for (const block of blocks) {
         const blockId = String(block?.blockId || "").trim();
-        if (!blockId) {
+        if (!blockId || seenBlockIds.has(blockId)) {
           continue;
         }
+        seenBlockIds.add(blockId);
 
         flattened.push({
           blockId,
           partNumber: part?.partNumber,
-          order: Number.isFinite(Number(block?.order)) ? Number(block.order) : 0,
+          questionRange: resolveQuestionRangeFromBlockEntry(block),
           questionFamily: block?.questionFamily || "",
         });
       }
     }
 
-    return flattened.sort((left, right) => {
-      const partDiff = Number(left.partNumber || 0) - Number(right.partNumber || 0);
-      if (partDiff !== 0) {
-        return partDiff;
-      }
-
-      const orderDiff = Number(left.order || 0) - Number(right.order || 0);
-      if (orderDiff !== 0) {
-        return orderDiff;
-      }
-
-      return String(left.blockId).localeCompare(String(right.blockId));
-    });
+    return flattened.sort(compareBlocksByQuestionRange);
   }, [activePartNumber, isPartMode, test?.parts]);
 
   useEffect(() => {
