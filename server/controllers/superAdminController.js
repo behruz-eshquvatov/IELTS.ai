@@ -503,6 +503,24 @@ async function saveListeningBlock(req, res) {
   });
 }
 
+async function listListeningBlocks(req, res) {
+  if (!hasValidSuperAdminPassword(req.params.password)) {
+    return denyInvalidPassword(res);
+  }
+
+  const collectionName = await getListeningBlocksCollectionName();
+  const blocks = await mongoose.connection.db
+    .collection(collectionName)
+    .find({})
+    .sort({ updatedAt: -1, createdAt: -1, _id: 1 })
+    .toArray();
+
+  return res.json({
+    collection: collectionName,
+    blocks,
+  });
+}
+
 async function getReadingAdminEntry(req, res) {
   if (!hasValidSuperAdminPassword(req.params.password)) {
     return denyInvalidPassword(res);
@@ -858,6 +876,7 @@ module.exports = {
   deleteListeningAudio,
   extractListeningBlockFromImage,
   saveListeningBlock,
+  listListeningBlocks,
   getReadingAdminEntry,
   listReadingPassages,
   listReadingBlocks,

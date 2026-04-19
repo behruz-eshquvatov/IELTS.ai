@@ -149,6 +149,70 @@ function inferChoiceSelectionLimit(questionText, instructionText, fallback = 1) 
   return Math.max(1, Number(fallback) || 1);
 }
 
+function computeNextChoiceValue(currentValue, value, selectionLimit = 1) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) {
+    return currentValue || "";
+  }
+
+  const nextLimit = Math.max(1, Number(selectionLimit) || 1);
+  const currentValues = toChoiceArray(currentValue);
+  const normalizedCurrent = currentValues.map((item) => normalizeAnswerText(item));
+  const normalizedSafeValue = normalizeAnswerText(safeValue);
+  const existingIndex = normalizedCurrent.findIndex((item) => item === normalizedSafeValue);
+
+  if (existingIndex >= 0) {
+    const nextValues = currentValues.filter((_, index) => index !== existingIndex);
+    return nextLimit <= 1 ? (nextValues[0] || "") : nextValues;
+  }
+
+  if (nextLimit <= 1) {
+    return safeValue;
+  }
+
+  if (currentValues.length >= nextLimit) {
+    return currentValues;
+  }
+
+  return [...currentValues, safeValue];
+}
+
+function toOrderedQuestionNumbers(values = []) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const numbers = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .filter((value) => {
+      const key = String(value);
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => left - right);
+
+  return numbers;
+}
+
+function formatQuestionRangeLabel(questionNumbers = []) {
+  const numbers = toOrderedQuestionNumbers(questionNumbers);
+  if (numbers.length === 0) {
+    return "";
+  }
+
+  if (numbers.length === 1) {
+    return `Question ${numbers[0]}`;
+  }
+
+  return `Questions ${numbers[0]}-${numbers[numbers.length - 1]}`;
+}
+
 function resolveQuestionIdForDisplay(question, context, fallbackIndex = 0) {
   const explicitId = String(question?.qid || question?.id || "").trim();
   if (explicitId) {
@@ -411,8 +475,63 @@ function renderChoiceOptions(question, options = [], keyPrefix = "option", conte
 }
 
 function renderTaskContent(display, context) {
-  const directQuestion = String(display?.question || display?.stem || "").trim();
+  const isMultipleChoiceMultiBlock = Boolean(context?.isMultipleChoiceMultiBlock);
+  const directQuestion = String(display?.prompt || display?.question || display?.stem || "").trim();
   const directOptions = Array.isArray(display?.options) ? display.options : [];
+
+  if (isMultipleChoiceMultiBlock) {
+    const legacyQuestions = Array.isArray(display?.questions) ? display.questions : [];
+    const fallbackQuestion = legacyQuestions[0] || {};
+    const prompt = directQuestion || String(fallbackQuestion?.text || "").trim();
+    const options =
+      directOptions.length > 0
+        ? directOptions
+        : Array.isArray(fallbackQuestion?.options)
+          ? fallbackQuestion.options
+          : [];
+    const questionNumbersFromDisplay = toOrderedQuestionNumbers(display?.questionNumbers);
+    const fallbackQuestionNumbers = Array.isArray(context?.orderedQuestions)
+      ? context.orderedQuestions
+        .map((question) => Number(question?.number))
+        .filter((number) => Number.isFinite(number))
+      : [];
+    const resolvedQuestionNumbers =
+      questionNumbersFromDisplay.length > 0 ? questionNumbersFromDisplay : toOrderedQuestionNumbers(fallbackQuestionNumbers);
+    const questionRangeLabel = formatQuestionRangeLabel(resolvedQuestionNumbers);
+    const sharedQuestionId = String(
+      context?.sharedMultiChoiceQuestionId || context?.orderedQuestionIds?.[0] || "",
+    ).trim();
+
+    if (prompt && options.length > 0) {
+      return (
+        <section className="space-y-3 border border-slate-200 bg-slate-50/50 px-4 py-4">
+          {String(display?.title || "").trim() ? (
+            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-700">
+              {String(display.title).trim()}
+            </h3>
+          ) : null}
+          {questionRangeLabel ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+              {questionRangeLabel}
+            </p>
+          ) : null}
+          <p className="text-base font-semibold leading-7 text-slate-900">{prompt}</p>
+          {renderChoiceOptions(
+            {
+              id: sharedQuestionId,
+              text: prompt,
+              selectionLimit: context?.multipleChoiceSelectionLimit || 2,
+            },
+            options,
+            "multiple-choice-multi-option",
+            context,
+            0,
+          )}
+        </section>
+      );
+    }
+  }
+
   if (directQuestion && directOptions.length > 0) {
     const hasExplicitQuestionReference =
       Boolean(String(display?.qid || display?.id || "").trim()) ||
@@ -428,7 +547,7 @@ function renderTaskContent(display, context) {
           .filter((question) => question.id)
         : [];
 
-    if (sharedQuestionTargets.length > 1) {
+    if (sharedQuestionTargets.length > 1 && !isMultipleChoiceMultiBlock) {
       return (
         <section className="space-y-3 border border-slate-200 bg-slate-50/50 px-4 py-4">
           <p className="text-base font-semibold leading-7 text-slate-900">{directQuestion}</p>
@@ -471,7 +590,7 @@ function renderTaskContent(display, context) {
   }
 
   const mcQuestions = Array.isArray(display?.questions) ? display.questions : [];
-  if (mcQuestions.length > 0) {
+  if (mcQuestions.length > 0 && !isMultipleChoiceMultiBlock) {
     return (
       <div className="space-y-4">
         {String(display?.title || "").trim() ? (
@@ -840,6 +959,48 @@ function StudentListeningBlockPage() {
     return orderedQuestions.map((question) => question.id);
   }, [orderedQuestions]);
 
+  const isMultipleChoiceMultiBlock = useMemo(
+    () =>
+      /multiple[_-]?choice[_-]?multi/i.test(
+        `${String(block?.blockType || "")} ${String(block?.questionFamily || "")}`,
+      ),
+    [block?.blockType, block?.questionFamily],
+  );
+
+  const sharedMultiChoiceQuestionIds = useMemo(
+    () => (isMultipleChoiceMultiBlock ? orderedQuestionIds : []),
+    [isMultipleChoiceMultiBlock, orderedQuestionIds],
+  );
+  const sharedMultiChoiceQuestionIdSet = useMemo(
+    () => new Set(sharedMultiChoiceQuestionIds),
+    [sharedMultiChoiceQuestionIds],
+  );
+
+  const multipleChoiceSelectionLimit = useMemo(() => {
+    const explicitCorrectCount = Number(block?.instruction?.correctCount);
+    if (isMultipleChoiceMultiBlock && Number.isFinite(explicitCorrectCount) && explicitCorrectCount >= 2) {
+      return explicitCorrectCount;
+    }
+
+    const fallbackAnswerCount = Math.max(
+      ...orderedQuestions.map((question) => toAnswerArray(question?.answers).length),
+      1,
+    );
+    return inferChoiceSelectionLimit(
+      String(block?.display?.prompt || block?.display?.question || block?.display?.stem || ""),
+      String(block?.instruction?.text || ""),
+      fallbackAnswerCount,
+    );
+  }, [
+    block?.display?.prompt,
+    block?.display?.question,
+    block?.display?.stem,
+    block?.instruction?.correctCount,
+    block?.instruction?.text,
+    isMultipleChoiceMultiBlock,
+    orderedQuestions,
+  ]);
+
   const questionMetaById = useMemo(() => {
     const map = new Map();
     const instructionText = String(block?.instruction?.text || "").trim();
@@ -850,11 +1011,13 @@ function StudentListeningBlockPage() {
       }
 
       const acceptedAnswers = toAnswerArray(question?.answers);
-      const inferredLimit = inferChoiceSelectionLimit(
-        String(question?.text || ""),
-        instructionText,
-        acceptedAnswers.length > 1 ? acceptedAnswers.length : 1,
-      );
+      const inferredLimit = isMultipleChoiceMultiBlock
+        ? multipleChoiceSelectionLimit
+        : inferChoiceSelectionLimit(
+          String(question?.text || ""),
+          instructionText,
+          acceptedAnswers.length > 1 ? acceptedAnswers.length : 1,
+        );
 
       map.set(questionId, {
         selectionLimit: inferredLimit,
@@ -862,7 +1025,7 @@ function StudentListeningBlockPage() {
     });
 
     return map;
-  }, [block?.instruction?.text, orderedQuestions]);
+  }, [block?.instruction?.text, isMultipleChoiceMultiBlock, multipleChoiceSelectionLimit, orderedQuestions]);
 
   const clearCountdownInterval = useCallback(() => {
     if (countdownIntervalRef.current) {
@@ -1273,37 +1436,30 @@ function StudentListeningBlockPage() {
       return;
     }
 
-    setSelectedAnswersById((previousMap) => ({
-      ...previousMap,
-      [safeQuestionId]: (() => {
-        const safeValue = String(value || "").trim();
-        if (!safeValue) {
-          return previousMap[safeQuestionId] || "";
-        }
+    setSelectedAnswersById((previousMap) => {
+      const targetQuestionIds =
+        isMultipleChoiceMultiBlock && sharedMultiChoiceQuestionIdSet.has(safeQuestionId)
+          ? sharedMultiChoiceQuestionIds
+          : [safeQuestionId];
+      const sourceQuestionId = targetQuestionIds[0] || safeQuestionId;
+      const nextValue = computeNextChoiceValue(previousMap[sourceQuestionId], value, selectionLimit);
+      const nextMap = {
+        ...previousMap,
+      };
 
-        const nextLimit = Math.max(1, Number(selectionLimit) || 1);
-        const currentValues = toChoiceArray(previousMap[safeQuestionId]);
-        const normalizedCurrent = currentValues.map((item) => normalizeAnswerText(item));
-        const normalizedSafeValue = normalizeAnswerText(safeValue);
-        const existingIndex = normalizedCurrent.findIndex((item) => item === normalizedSafeValue);
+      targetQuestionIds.forEach((targetQuestionId) => {
+        nextMap[targetQuestionId] = nextValue;
+      });
 
-        if (existingIndex >= 0) {
-          const nextValues = currentValues.filter((_, index) => index !== existingIndex);
-          return nextLimit <= 1 ? (nextValues[0] || "") : nextValues;
-        }
-
-        if (nextLimit <= 1) {
-          return safeValue;
-        }
-
-        if (currentValues.length >= nextLimit) {
-          return currentValues;
-        }
-
-        return [...currentValues, safeValue];
-      })(),
-    }));
-  }, [hasAttemptStarted, isAutoCompleted]);
+      return nextMap;
+    });
+  }, [
+    hasAttemptStarted,
+    isAutoCompleted,
+    isMultipleChoiceMultiBlock,
+    sharedMultiChoiceQuestionIdSet,
+    sharedMultiChoiceQuestionIds,
+  ]);
 
   const isInputDisabled = isAutoCompleted || !hasAttemptStarted;
   const showAudioPlayingEffect =
@@ -1355,6 +1511,10 @@ function StudentListeningBlockPage() {
     () => ({
       answersById: selectedAnswersById,
       getChoiceSelectionLimit: (question, questionId) => {
+        if (isMultipleChoiceMultiBlock) {
+          return multipleChoiceSelectionLimit;
+        }
+
         const questionMeta = questionMetaById.get(String(questionId || "").trim());
         if (questionMeta?.selectionLimit) {
           return questionMeta.selectionLimit;
@@ -1367,16 +1527,22 @@ function StudentListeningBlockPage() {
         );
         return inferredFromQuestion;
       },
+      isMultipleChoiceMultiBlock,
       isInputDisabled,
+      multipleChoiceSelectionLimit,
       onChoiceSelect: handleChoiceSelect,
       onGapKeyDown: handleGapKeyDown,
       orderedQuestions,
       orderedQuestionIds,
       questionIdByNumber,
       registerGapInputRef,
+      sharedMultiChoiceQuestionIdSet,
+      sharedMultiChoiceQuestionId: sharedMultiChoiceQuestionIds[0] || "",
     }),
     [
       selectedAnswersById,
+      isMultipleChoiceMultiBlock,
+      multipleChoiceSelectionLimit,
       questionMetaById,
       block?.instruction?.text,
       handleChoiceSelect,
@@ -1386,6 +1552,8 @@ function StudentListeningBlockPage() {
       orderedQuestionIds,
       questionIdByNumber,
       registerGapInputRef,
+      sharedMultiChoiceQuestionIdSet,
+      sharedMultiChoiceQuestionIds,
     ],
   );
 

@@ -7,6 +7,7 @@ const {
   deleteListeningAudio,
   extractListeningBlockFromImage,
   saveListeningBlock,
+  listListeningBlocks,
   getReadingAdminEntry,
   listReadingPassages,
   listReadingBlocks,
@@ -65,6 +66,7 @@ router.get("/:password/listening", listListeningAudios);
 router.post("/:password/listening", parseListeningAudioUpload, uploadListeningAudio);
 router.post("/:password/listening/blocks/extract", parseListeningImageUpload, extractListeningBlockFromImage);
 router.post("/:password/listening/blocks", saveListeningBlock);
+router.get("/:password/listening/blocks", listListeningBlocks);
 router.get("/:password/listening/:audioId/stream", streamListeningAudio);
 router.delete("/:password/listening/:audioId", deleteListeningAudio);
 router.get("/:password/reading", getReadingAdminEntry);

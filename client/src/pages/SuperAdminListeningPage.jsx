@@ -45,6 +45,9 @@ function formatTimestamp(value) {
 function validateListeningBlockJson(block) {
   const errors = [];
   const safeBlock = block && typeof block === "object" ? block : null;
+  const blockType = String(safeBlock?.blockType || "").trim().toLowerCase();
+  const isMultipleChoiceBlock = blockType.startsWith("multiple_choice");
+  const isMultipleChoiceMulti = blockType === "multiple_choice_multi";
 
   if (!safeBlock) {
     return ["Block must be a JSON object."];
@@ -64,8 +67,25 @@ function validateListeningBlockJson(block) {
 
   if (!safeBlock.instruction || typeof safeBlock.instruction !== "object") {
     errors.push("`instruction` object is required.");
-  } else if (!String(safeBlock.instruction.text || "").trim()) {
-    errors.push("`instruction.text` is required.");
+  } else {
+    if (!String(safeBlock.instruction.text || "").trim()) {
+      errors.push("`instruction.text` is required.");
+    }
+
+    if (
+      isMultipleChoiceBlock &&
+      safeBlock.instruction.maxWords !== null &&
+      safeBlock.instruction.maxWords !== undefined
+    ) {
+      errors.push("Remove `instruction.maxWords` for multiple_choice blocks.");
+    }
+
+    if (isMultipleChoiceMulti) {
+      const correctCount = Number(safeBlock.instruction.correctCount);
+      if (!Number.isFinite(correctCount) || correctCount < 2) {
+        errors.push("`instruction.correctCount` must be numeric and >= 2 for multiple_choice_multi.");
+      }
+    }
   }
 
   if (!safeBlock.display || typeof safeBlock.display !== "object") {
@@ -74,6 +94,38 @@ function validateListeningBlockJson(block) {
 
   if (!Array.isArray(safeBlock.questions) || safeBlock.questions.length === 0) {
     errors.push("`questions` must be a non-empty array.");
+  }
+
+  if (isMultipleChoiceMulti) {
+    const prompt = String(safeBlock?.display?.prompt || "").trim();
+    const options = Array.isArray(safeBlock?.display?.options) ? safeBlock.display.options : [];
+    const questionNumbers = Array.isArray(safeBlock?.display?.questionNumbers)
+      ? safeBlock.display.questionNumbers
+      : [];
+    const normalizedQuestionNumbers = questionNumbers
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
+    const uniqueQuestionNumbers = new Set(normalizedQuestionNumbers.map((value) => String(value)));
+
+    if (!prompt) {
+      errors.push("`display.prompt` is required for multiple_choice_multi.");
+    }
+
+    if (options.length === 0) {
+      errors.push("`display.options` must be a non-empty array for multiple_choice_multi.");
+    }
+
+    if (normalizedQuestionNumbers.length === 0) {
+      errors.push("`display.questionNumbers` must be a non-empty numeric array for multiple_choice_multi.");
+    } else if (normalizedQuestionNumbers.length !== questionNumbers.length || uniqueQuestionNumbers.size !== questionNumbers.length) {
+      errors.push("`display.questionNumbers` contains invalid or duplicated values.");
+    }
+
+    if (Array.isArray(safeBlock.questions) && normalizedQuestionNumbers.length > 0) {
+      if (safeBlock.questions.length !== normalizedQuestionNumbers.length) {
+        errors.push("`questions` length must match `display.questionNumbers` for multiple_choice_multi.");
+      }
+    }
   }
 
   return errors;
@@ -89,11 +141,14 @@ function SuperAdminListeningPage() {
   const [blockJsonText, setBlockJsonText] = useState("");
   const [blockValidationErrors, setBlockValidationErrors] = useState([]);
   const [audios, setAudios] = useState([]);
+  const [blocks, setBlocks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingBlocks, setIsLoadingBlocks] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isExtractingBlock, setIsExtractingBlock] = useState(false);
   const [isSavingBlock, setIsSavingBlock] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState("");
+  const [selectedBlockId, setSelectedBlockId] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [blockFeedbackMessage, setBlockFeedbackMessage] = useState("");
@@ -125,17 +180,25 @@ function SuperAdminListeningPage() {
     }
 
     setIsLoading(true);
+    setIsLoadingBlocks(true);
     setErrorMessage("");
 
     try {
-      const data = await apiRequest(buildSuperAdminApiPath(password, "/listening"), {
-        auth: false,
-      });
-      setAudios(Array.isArray(data?.audios) ? data.audios : []);
+      const [audiosData, blocksData] = await Promise.all([
+        apiRequest(buildSuperAdminApiPath(password, "/listening"), {
+          auth: false,
+        }),
+        apiRequest(buildSuperAdminApiPath(password, "/listening/blocks"), {
+          auth: false,
+        }),
+      ]);
+      setAudios(Array.isArray(audiosData?.audios) ? audiosData.audios : []);
+      setBlocks(Array.isArray(blocksData?.blocks) ? blocksData.blocks : []);
     } catch (error) {
-      setErrorMessage(error.message || "Failed to load listening audios.");
+      setErrorMessage(error.message || "Failed to load listening manager data.");
     } finally {
       setIsLoading(false);
+      setIsLoadingBlocks(false);
     }
   }, [isPasswordValid, password]);
 
@@ -331,12 +394,27 @@ function SuperAdminListeningPage() {
       });
 
       const blockId = response?.block?._id || parsed.value?._id;
+      setSelectedBlockId(String(blockId || ""));
       setBlockFeedbackMessage(response?.message || `Listening block '${blockId}' saved.`);
+      await loadAudios();
     } catch (error) {
       setBlockErrorMessage(error.message || "Failed to save listening block.");
     } finally {
       setIsSavingBlock(false);
     }
+  }
+
+  function handleLoadSavedBlock(block) {
+    if (!block || typeof block !== "object") {
+      return;
+    }
+
+    const blockId = String(block._id || "").trim();
+    setSelectedBlockId(blockId);
+    setBlockJsonText(JSON.stringify(block, null, 2));
+    setBlockValidationErrors([]);
+    setBlockErrorMessage("");
+    setBlockFeedbackMessage(blockId ? `Loaded block '${blockId}' into editor.` : "Loaded block into editor.");
   }
 
   if (!isPasswordValid) {
@@ -505,6 +583,56 @@ function SuperAdminListeningPage() {
               ) : null}
             </div>
           </div>
+        </article>
+
+        <article className="border border-slate-200/80 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.28)]">
+          <div className="mb-4 inline-flex items-center gap-2 text-emerald-700">
+            <Headphones className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em]">
+              listening_blocks collection
+            </span>
+          </div>
+
+          {isLoadingBlocks ? (
+            <p className="text-sm text-slate-600">Loading pushed listening blocks...</p>
+          ) : null}
+
+          {!isLoadingBlocks && blocks.length === 0 ? (
+            <p className="text-sm text-slate-600">
+              No listening blocks pushed yet. Save a block above to create your first record.
+            </p>
+          ) : null}
+
+          {!isLoadingBlocks && blocks.length > 0 ? (
+            <div className="space-y-2">
+              {blocks.map((block, index) => {
+                const blockId = String(block?._id || "");
+                const isSelected = selectedBlockId && selectedBlockId === blockId;
+                const instructionText = String(block?.instruction?.text || "").trim();
+                return (
+                  <button
+                    className={`w-full border px-3 py-2 text-left transition ${
+                      isSelected
+                        ? "border-emerald-300 bg-emerald-50/70"
+                        : "border-slate-200 bg-slate-50/45 hover:bg-slate-100"
+                    }`}
+                    key={blockId || `listening-block-${index}`}
+                    onClick={() => handleLoadSavedBlock(block)}
+                    type="button"
+                  >
+                    <p className="font-mono text-xs text-slate-800">{blockId || "(missing _id)"}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {String(block?.questionFamily || "-")} | {String(block?.blockType || "-")} | Questions:{" "}
+                      {Array.isArray(block?.questions) ? block.questions.length : 0}
+                    </p>
+                    {instructionText ? (
+                      <p className="mt-1 text-xs text-slate-500">{instructionText}</p>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </article>
 
         {feedbackMessage ? (

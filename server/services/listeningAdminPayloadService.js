@@ -64,6 +64,89 @@ function toNormalizedAnswerArray(value) {
   return safe ? [safe] : [];
 }
 
+function normalizeChoiceOptionItem(option, fallbackIndex = 0) {
+  const source = option && typeof option === "object" ? option : {};
+  const safeKey = normalizeText(source.key || source.label || source.id || source.value);
+  const safeText = normalizeText(source.text || source.title || source.value || source.label);
+  const fallbackKey = String.fromCharCode(65 + fallbackIndex);
+
+  return {
+    key: safeKey || fallbackKey,
+    text: safeText || safeKey || fallbackKey,
+  };
+}
+
+function normalizeChoiceOptions(options = []) {
+  if (!Array.isArray(options)) {
+    return [];
+  }
+
+  return options
+    .map((option, index) => normalizeChoiceOptionItem(option, index))
+    .filter((option) => normalizeText(option.key));
+}
+
+function normalizeQuestionNumberList(values = []) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const numbers = [];
+
+  values.forEach((value) => {
+    const safeNumber = normalizeNumericValue(value);
+    if (!Number.isFinite(safeNumber) || seen.has(safeNumber)) {
+      return;
+    }
+
+    seen.add(safeNumber);
+    numbers.push(safeNumber);
+  });
+
+  return numbers;
+}
+
+function normalizeMultipleChoiceMultiDisplay(display = {}, normalizedQuestions = []) {
+  const source = display && typeof display === "object" ? display : {};
+  const legacyQuestions = Array.isArray(source.questions) ? source.questions : [];
+  const firstLegacyQuestion = legacyQuestions[0] || {};
+  const normalizedDisplay = {};
+
+  const safeTitle = normalizeText(source.title);
+  if (safeTitle) {
+    normalizedDisplay.title = safeTitle;
+  }
+
+  const prompt = normalizeText(
+    source.prompt || source.question || source.stem || firstLegacyQuestion.text,
+  );
+  if (prompt) {
+    normalizedDisplay.prompt = prompt;
+  }
+
+  const questionNumbersFromDisplay = normalizeQuestionNumberList(source.questionNumbers);
+  const questionNumbersFromQuestions = normalizeQuestionNumberList(
+    normalizedQuestions.map((question) => question.number),
+  );
+  const questionNumbersFromLegacyDisplayQuestions = normalizeQuestionNumberList(
+    legacyQuestions.map((question) => question?.number),
+  );
+  const resolvedQuestionNumbers =
+    questionNumbersFromDisplay.length > 0
+      ? questionNumbersFromDisplay
+      : questionNumbersFromQuestions.length > 0
+        ? questionNumbersFromQuestions
+        : questionNumbersFromLegacyDisplayQuestions;
+  normalizedDisplay.questionNumbers = resolvedQuestionNumbers;
+
+  const optionsFromDisplay = normalizeChoiceOptions(source.options);
+  const optionsFromLegacy = normalizeChoiceOptions(firstLegacyQuestion.options);
+  normalizedDisplay.options = optionsFromDisplay.length > 0 ? optionsFromDisplay : optionsFromLegacy;
+
+  return normalizedDisplay;
+}
+
 function normalizeListeningQuestionItem(question, fallbackIndex) {
   const source = question && typeof question === "object" ? question : {};
   const safeNumber = normalizeNumericValue(source.number) || fallbackIndex + 1;
@@ -78,25 +161,37 @@ function normalizeListeningQuestionItem(question, fallbackIndex) {
 
 function normalizeListeningBlockPayload(rawBlock = {}) {
   const source = rawBlock && typeof rawBlock === "object" ? rawBlock : {};
+  const normalizedBlockType = normalizeEnum(source.blockType);
+  const isMultipleChoiceBlock = /^multiple[_-]?choice/.test(normalizedBlockType);
   const rawInstruction = source.instruction && typeof source.instruction === "object" ? source.instruction : {};
   const normalizedInstruction = {
     text: normalizeText(rawInstruction.text),
-    maxWords: normalizeNumericValue(rawInstruction.maxWords),
   };
+
+  if (!isMultipleChoiceBlock) {
+    normalizedInstruction.maxWords = normalizeNumericValue(rawInstruction.maxWords);
+  }
 
   if (Object.prototype.hasOwnProperty.call(rawInstruction, "correctCount")) {
     normalizedInstruction.correctCount = normalizeNumericValue(rawInstruction.correctCount);
   }
 
+  const normalizedQuestions = Array.isArray(source.questions)
+    ? source.questions.map((question, index) => normalizeListeningQuestionItem(question, index))
+    : [];
+  const sourceDisplay = source.display && typeof source.display === "object" ? source.display : {};
+  const normalizedDisplay =
+    normalizedBlockType === "multiple_choice_multi"
+      ? normalizeMultipleChoiceMultiDisplay(sourceDisplay, normalizedQuestions)
+      : sourceDisplay;
+
   return {
     _id: normalizeText(source._id),
     questionFamily: normalizeEnum(source.questionFamily),
-    blockType: normalizeEnum(source.blockType),
+    blockType: normalizedBlockType,
     instruction: normalizedInstruction,
-    display: source.display && typeof source.display === "object" ? source.display : {},
-    questions: Array.isArray(source.questions)
-      ? source.questions.map((question, index) => normalizeListeningQuestionItem(question, index))
-      : [],
+    display: normalizedDisplay,
+    questions: normalizedQuestions,
     status: normalizeEnum(source.status) || "draft",
   };
 }
@@ -104,6 +199,9 @@ function normalizeListeningBlockPayload(rawBlock = {}) {
 function validateListeningBlockPayload(block) {
   const errors = [];
   const safeBlock = block && typeof block === "object" ? block : null;
+  const blockType = normalizeEnum(safeBlock?.blockType);
+  const isMultipleChoiceBlock = /^multiple[_-]?choice/.test(blockType);
+  const isMultipleChoiceMultiBlock = blockType === "multiple_choice_multi";
 
   if (!safeBlock) {
     return ["Block payload must be a JSON object."];
@@ -143,12 +241,27 @@ function validateListeningBlockPayload(block) {
     }
 
     if (
+      isMultipleChoiceBlock &&
+      safeBlock.instruction.maxWords !== null &&
+      safeBlock.instruction.maxWords !== undefined
+    ) {
+      errors.push("Remove `instruction.maxWords` for multiple_choice blocks.");
+    }
+
+    if (
       Object.prototype.hasOwnProperty.call(safeBlock.instruction, "correctCount") &&
       safeBlock.instruction.correctCount !== null &&
       safeBlock.instruction.correctCount !== undefined &&
       !Number.isFinite(Number(safeBlock.instruction.correctCount))
     ) {
       errors.push("`instruction.correctCount` must be numeric when provided.");
+    }
+
+    if (isMultipleChoiceMultiBlock) {
+      const correctCount = Number(safeBlock.instruction.correctCount);
+      if (!Number.isFinite(correctCount) || correctCount < 2) {
+        errors.push("`instruction.correctCount` must be numeric and >= 2 for multiple_choice_multi.");
+      }
     }
   }
 
@@ -184,6 +297,59 @@ function validateListeningBlockPayload(block) {
     });
   }
 
+  if (isMultipleChoiceMultiBlock) {
+    const safePrompt = normalizeText(
+      safeBlock?.display?.prompt || safeBlock?.display?.question || safeBlock?.display?.stem,
+    );
+    if (!safePrompt) {
+      errors.push("`display.prompt` is required for multiple_choice_multi.");
+    }
+
+    const options = Array.isArray(safeBlock?.display?.options) ? safeBlock.display.options : [];
+    if (options.length === 0) {
+      errors.push("`display.options` must be a non-empty array for multiple_choice_multi.");
+    } else {
+      options.forEach((option, optionIndex) => {
+        if (!normalizeText(option?.key)) {
+          errors.push(`display.options[${optionIndex}].key is required for multiple_choice_multi.`);
+        }
+
+        if (!normalizeText(option?.text)) {
+          errors.push(`display.options[${optionIndex}].text is required for multiple_choice_multi.`);
+        }
+      });
+    }
+
+    const rawQuestionNumbers = Array.isArray(safeBlock?.display?.questionNumbers)
+      ? safeBlock.display.questionNumbers
+      : [];
+    const questionNumbers = normalizeQuestionNumberList(rawQuestionNumbers);
+    if (questionNumbers.length === 0) {
+      errors.push("`display.questionNumbers` must be a non-empty numeric array for multiple_choice_multi.");
+    } else if (questionNumbers.length !== rawQuestionNumbers.length) {
+      errors.push("`display.questionNumbers` contains invalid or duplicated numbers.");
+    }
+
+    if (Array.isArray(safeBlock.questions) && questionNumbers.length > 0) {
+      if (safeBlock.questions.length !== questionNumbers.length) {
+        errors.push("`questions` length must match `display.questionNumbers` length for multiple_choice_multi.");
+      } else {
+        const questionNumberSet = new Set(
+          safeBlock.questions
+            .map((question) => normalizeNumericValue(question?.number))
+            .filter((number) => Number.isFinite(number))
+            .map((number) => String(number)),
+        );
+        const displayNumberSet = new Set(questionNumbers.map((number) => String(number)));
+        const sameSize = questionNumberSet.size === displayNumberSet.size;
+        const sameMembers = sameSize && Array.from(displayNumberSet).every((number) => questionNumberSet.has(number));
+        if (!sameMembers) {
+          errors.push("`questions[].number` must match `display.questionNumbers` for multiple_choice_multi.");
+        }
+      }
+    }
+  }
+
   if (!LISTENING_STATUSES.has(normalizeEnum(safeBlock.status))) {
     errors.push("`status` must be one of: draft, published.");
   }
@@ -206,7 +372,7 @@ function buildListeningBlockExtractionPrompt() {
     '  "_id": "...",',
     '  "questionFamily": "...",',
     '  "blockType": "...",',
-    '  "instruction": { "text": "...", "maxWords": 1, "correctCount": 2 },',
+    '  "instruction": { "text": "...", "correctCount": 2 },',
     '  "display": { ... },',
     '  "questions": [ { "id": "q1", "number": 1, "answer": ["..."] } ],',
     '  "status": "draft"',
@@ -235,12 +401,15 @@ function buildListeningBlockExtractionPrompt() {
     "- display must include a `questions` array.",
     "- Each display question object must include `qid`, `number`, `text`, `options`.",
     "- `options` must be an array of { key, text }.",
+    "- Do not include `instruction.maxWords`.",
     "",
     "2) multiple_choice_multi",
-    "- Keep one shared prompt/instruction area if the image uses shared options.",
-    "- Keep options once in display if shared.",
-    "- `questions` array must still contain one item per question number.",
-    "- If instruction indicates choosing 2 or 3 answers, include `instruction.correctCount` when visible.",
+    "- display must use ONE shared structure (NOT display.questions).",
+    "- Required display shape:",
+    '  { "prompt":"...", "questionNumbers":[11,12], "options":[{"key":"A","text":"..."}, ...] }',
+    "- `questions` array must still contain one item per question number in `display.questionNumbers`.",
+    "- If instruction indicates choosing 2 or 3 answers, include `instruction.correctCount`.",
+    "- Do not include `instruction.maxWords`.",
     "",
     "3) matching",
     "- display must include `prompts` and `options`.",
@@ -249,6 +418,7 @@ function buildListeningBlockExtractionPrompt() {
     "",
     "4) form_completion / note_completion",
     "- Preserve title/sections/labels and text flow.",
+    "- Include `instruction.maxWords` only when visible/relevant.",
     "- Tokenize blanks as gap objects inside token arrays.",
     '- Gap token format: { "type":"gap", "qid":"q31", "number":31 }',
     "- Example tokenized line:",

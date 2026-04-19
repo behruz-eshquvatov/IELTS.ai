@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
+
+const FULL_TEST_DURATION_SECONDS = 60 * 60;
 
 function decodeValue(value) {
   try {
@@ -10,19 +12,6 @@ function decodeValue(value) {
   } catch {
     return String(value || "").trim();
   }
-}
-
-function toReadableLabel(value) {
-  const safe = String(value || "").trim();
-  if (!safe) {
-    return "Unknown";
-  }
-
-  return safe
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function StudentReadingFullPassagesPage() {
@@ -98,6 +87,44 @@ function StudentReadingFullPassagesPage() {
     () => testPassages[activePassageIndex] || null,
     [activePassageIndex, testPassages],
   );
+  const allPassageNumbers = useMemo(
+    () =>
+      testPassages.map((entry, index) =>
+        Number.isFinite(Number(entry?.passageNumber)) ? Number(entry.passageNumber) : index + 1,
+      ),
+    [testPassages],
+  );
+  const activePassageNumber = Number.isFinite(Number(activePassageEntry?.passageNumber))
+    ? Number(activePassageEntry.passageNumber)
+    : activePassageIndex + 1;
+  const flattenedEvaluationBlocks = useMemo(
+    () =>
+      testPassages.flatMap((entry) =>
+        Array.isArray(entry?.blocks) ? entry.blocks : [],
+      ),
+    [testPassages],
+  );
+  const isFirstPassage = activePassageIndex <= 0;
+  const isLastPassage = normalizedPassageCount <= 0 || activePassageIndex >= normalizedPassageCount - 1;
+  const handleAttemptSubmit = useCallback(
+    async (attemptPayload) => {
+      const resolvedTestId = String(test?._id || testId || "").trim();
+      if (!resolvedTestId) {
+        return;
+      }
+
+      await apiRequest(`/reading/full-tests/${encodeURIComponent(resolvedTestId)}/submit`, {
+        method: "POST",
+        body: {
+          submitReason: String(attemptPayload?.submitReason || "manual"),
+          forceReason: String(attemptPayload?.forceReason || ""),
+          evaluation: attemptPayload?.evaluation || {},
+          passageTiming: Array.isArray(attemptPayload?.passageTiming) ? attemptPayload.passageTiming : [],
+        },
+      });
+    },
+    [test?._id, testId],
+  );
 
   return (
     <div className="space-y-8 pt-2 sm:pt-4">
@@ -116,55 +143,34 @@ function StudentReadingFullPassagesPage() {
 
       {!isLoading && !error && test ? (
         <section className="space-y-6">
-          <article className="space-y-4 border border-slate-200 bg-white p-5 sm:p-6">
-            <header className="space-y-1 border-b border-slate-200 pb-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                {toReadableLabel(test?.module || "academic")} | {toReadableLabel(test?.status || "unknown")}
-              </p>
-              <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-900">
-                {String(test?.title || test?._id || "Reading Test").trim()}
-              </h1>
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
-                {Number(test?.totalQuestions) || 0} questions | {testPassages.length} passage(s)
-              </p>
-            </header>
-
+          <article className="space-y-4 bg-white">
             {testPassages.length > 0 ? (
-              <div className="space-y-4">
-                {testPassages.length > 1 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {testPassages.map((entry, index) => {
-                      const isActive = index === activePassageIndex;
-                      return (
-                        <button
-                          className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${
-                            isActive
-                              ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                              : "border-slate-300 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
-                          }`}
-                          key={`passage-switch-${entry?.passageId || index}`}
-                          onClick={() => setActivePassageIndex(index)}
-                          type="button"
-                        >
-                          Passage {entry?.passageNumber || index + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
+              <div>
 
                 {activePassageEntry?.passage ? (
                   <ReadingPassageWithBlocks
+                    activePassageNumber={activePassageNumber}
+                    allPassageNumbers={allPassageNumbers}
+                    attemptDurationSeconds={FULL_TEST_DURATION_SECONDS}
+                    attemptSessionKey={`student:reading:full-test:${String(test?._id || testId || "unknown")}`}
                     blocks={Array.isArray(activePassageEntry?.blocks) ? activePassageEntry.blocks : []}
-                    key={`${test?._id || "test"}-${activePassageEntry?.passageId || activePassageIndex}`}
+                    evaluationBlocks={flattenedEvaluationBlocks}
+                    isSecondaryActionVisible={!isFirstPassage}
+                    onPrimaryAction={
+                      isLastPassage
+                        ? null
+                        : () => {
+                          setActivePassageIndex((previousIndex) => Math.min(previousIndex + 1, testPassages.length - 1));
+                        }
+                    }
+                    onSecondaryAction={() => {
+                      setActivePassageIndex((previousIndex) => Math.max(previousIndex - 1, 0));
+                    }}
                     passage={activePassageEntry.passage}
-                    sectionMeta={(() => {
-                      const range = activePassageEntry?.questionRange || {};
-                      return Number.isFinite(Number(range?.start)) && Number.isFinite(Number(range?.end))
-                        ? `Questions ${Number(range.start)}-${Number(range.end)}`
-                        : "";
-                    })()}
-                    sectionTitle={`Passage ${activePassageEntry?.passageNumber || activePassageIndex + 1}`}
+                    onAttemptSubmit={handleAttemptSubmit}
+                    primaryActionLabel={isLastPassage ? "Complete" : "Next"}
+                    resetOnContentChange={false}
+                    secondaryActionLabel="Previous"
                   />
                 ) : (
                   <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

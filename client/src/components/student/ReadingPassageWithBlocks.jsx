@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 const START_COUNTDOWN_SECONDS = 3;
-const ATTEMPT_DURATION_SECONDS = 20 * 60;
+const DEFAULT_ATTEMPT_DURATION_SECONDS = 20 * 60;
 const GOOD_SCORE_THRESHOLD_PERCENT = 70;
 const TOMATO_COLOR = "#ff6347";
 const AUTO_COMPLETE_KEY_PREFIX = "student:reading:auto-complete:";
+const EMPTY_ARRAY = Object.freeze([]);
 
 function toReadableLabel(value) {
   const safe = String(value || "").trim();
@@ -573,7 +574,7 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
               <span>{String(prompt?.text || prompt?.statement || "").trim() || "-"}</span>
             </div>
 
-            {answerContext?.isBinaryJudgement && promptQuestionId ? (
+            {answerContext?.showPromptSelect && promptQuestionId ? (
               <select
                 className={`h-9 min-w-30 border bg-white px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 outline-none transition ${
                   answerContext?.isInputDisabled
@@ -599,19 +600,31 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
   );
 }
 
-function renderOptionList(options = [], title = "Options", keyPrefix = "option-list") {
+function renderOptionList(
+  options = [],
+  title = "Options",
+  keyPrefix = "option-list",
+  boxed = false,
+  valuesOnly = false,
+) {
   if (!Array.isArray(options) || options.length === 0) {
     return null;
   }
 
   return (
-    <div className="space-y-2">
+    <div className={boxed ? "space-y-2 border border-slate-200 bg-slate-50 px-4 py-3" : "space-y-2"}>
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</p>
       <ul className="space-y-1.5 text-sm text-slate-700">
         {options.map((option, optionIndex) => (
           <li className="flex items-start gap-2" key={`${keyPrefix}-${optionIndex}`}>
-            <span className="font-semibold text-slate-900">{getOptionLabel(option, optionIndex)}.</span>
-            <span>{getOptionText(option)}</span>
+            {valuesOnly ? (
+              <span className="font-semibold text-slate-900">{getOptionValue(option, optionIndex)}.</span>
+            ) : (
+              <>
+                <span className="font-semibold text-slate-900">{getOptionLabel(option, optionIndex)}.</span>
+                <span>{getOptionText(option)}</span>
+              </>
+            )}
           </li>
         ))}
       </ul>
@@ -653,7 +666,7 @@ function renderReadingBlockDisplay(block, answerContext = null) {
     return (
       <div className="space-y-3">
         {!isBinaryJudgement ? renderOptionList(directOptions, "Options", "display-options") : null}
-        {!isBinaryJudgement ? renderOptionList(headingOptions, "Heading Options", "heading-options") : null}
+        {!isBinaryJudgement ? renderOptionList(headingOptions, "Heading Options", "heading-options", true, true) : null}
         {!isBinaryJudgement ? renderOptionList(featureOptions, "Feature Options", "feature-options") : null}
         {renderPromptList(displayPrompts, "display-prompts", answerContext)}
       </div>
@@ -719,8 +732,9 @@ function getQuestionId(question, questionIndex = 0) {
   return safeId;
 }
 
-function getBlockQuestions(block) {
+function getBlockQuestions(block, blockIndex = 0) {
   const rawQuestions = Array.isArray(block?.questions) ? [...block.questions] : [];
+  const blockKey = String(block?._id || block?.id || `block-${blockIndex + 1}`).trim() || `block-${blockIndex + 1}`;
   return rawQuestions
     .map((question, questionIndex) => {
       const id = getQuestionId(question, questionIndex);
@@ -730,6 +744,7 @@ function getBlockQuestions(block) {
 
       return {
         id,
+        storageId: `${blockKey}::${id}`,
         number: Number.isFinite(Number(question?.number)) ? Number(question.number) : questionIndex + 1,
         text: String(question?.text || question?.question || "").trim(),
         answers: toAnswerArray(question?.answers ?? question?.answer),
@@ -845,7 +860,7 @@ function ReadingBlockPanel({ block, children, displayAnswerContext = null }) {
           {questionRange ? ` | ${questionRange}` : ""}
         </p>
         {String(block?.instruction?.text || "").trim() ? (
-          <p className="text-sm leading-7 text-slate-700">{String(block.instruction.text).trim()}</p>
+          <p className="text-sm font-semibold leading-7 text-slate-700">{String(block.instruction.text).trim()}</p>
         ) : null}
       </header>
       <div className="space-y-3 px-4 py-4 sm:px-5">
@@ -859,15 +874,31 @@ function ReadingBlockPanel({ block, children, displayAnswerContext = null }) {
 function ReadingPassageWithBlocks({
   passage,
   blocks = [],
+  evaluationBlocks = null,
+  activePassageNumber = null,
+  allPassageNumbers = null,
+  onAttemptSubmit = null,
   emptyBlocksText = "No reading blocks found for this passage.",
+  attemptDurationSeconds = DEFAULT_ATTEMPT_DURATION_SECONDS,
+  attemptSessionKey = "",
+  resetOnContentChange = true,
+  primaryActionLabel = "Complete",
+  onPrimaryAction = null,
+  secondaryActionLabel = "",
+  onSecondaryAction = null,
+  isSecondaryActionVisible = false,
+  isPrimaryActionDisabled = null,
+  isSecondaryActionDisabled = false,
 }) {
+  const normalizedAttemptDuration = Math.max(1, Number(attemptDurationSeconds) || DEFAULT_ATTEMPT_DURATION_SECONDS);
+  const attemptMinutesLabel = Math.max(1, Math.round(normalizedAttemptDuration / 60));
   const contentBlocks = Array.isArray(passage?.contentBlocks) ? passage.contentBlocks : [];
 
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [isCountdownRunning, setIsCountdownRunning] = useState(false);
   const [countdownValue, setCountdownValue] = useState(null);
   const [hasAttemptStarted, setHasAttemptStarted] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(ATTEMPT_DURATION_SECONDS);
+  const [remainingSeconds, setRemainingSeconds] = useState(normalizedAttemptDuration);
   const [isSubmittingAttempt, setIsSubmittingAttempt] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [selectedAnswersById, setSelectedAnswersById] = useState({});
@@ -880,23 +911,55 @@ function ReadingPassageWithBlocks({
   const timerIntervalRef = useRef(null);
   const countdownIntervalRef = useRef(null);
   const hasSubmittedAttemptRef = useRef(false);
+  const passageTimingMsByNumberRef = useRef({});
+  const activeTrackedPassageNumberRef = useRef(null);
+  const activeTrackedStartedAtRef = useRef(null);
 
-  const autoCompleteStorageKey = useMemo(
-    () => `${AUTO_COMPLETE_KEY_PREFIX}${encodeURIComponent(
-      [String(passage?._id || ""), ...blocks.map((block) => String(block?._id || ""))]
-        .filter(Boolean)
-        .join("|"),
-    )}`,
+  const defaultAutoCompleteStorageKey = useMemo(
+    () =>
+      `${AUTO_COMPLETE_KEY_PREFIX}${encodeURIComponent(
+        [String(passage?._id || ""), ...blocks.map((block) => String(block?._id || ""))]
+          .filter(Boolean)
+          .join("|"),
+      )}`,
     [blocks, passage?._id],
   );
+  const autoCompleteStorageKey = String(attemptSessionKey || defaultAutoCompleteStorageKey).trim() || defaultAutoCompleteStorageKey;
+  const normalizedActivePassageNumber = Number.isFinite(Number(activePassageNumber))
+    ? Number(activePassageNumber)
+    : null;
+  const normalizedPassageNumbers = useMemo(() => {
+    const fromProp = Array.isArray(allPassageNumbers) ? allPassageNumbers : EMPTY_ARRAY;
+    const normalized = fromProp
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    if (normalized.length === 0 && Number.isFinite(normalizedActivePassageNumber)) {
+      return [normalizedActivePassageNumber];
+    }
+
+    return Array.from(new Set(normalized)).sort((left, right) => left - right);
+  }, [allPassageNumbers, normalizedActivePassageNumber]);
 
   const blocksWithQuestions = useMemo(() => {
     return blocks.map((block, index) => ({
       block,
       index,
-      questions: getBlockQuestions(block),
+      questions: getBlockQuestions(block, index),
     }));
   }, [blocks]);
+  const evaluationBlocksWithQuestions = useMemo(() => {
+    const sourceBlocks =
+      Array.isArray(evaluationBlocks) && evaluationBlocks.length > 0 ? evaluationBlocks : blocks;
+
+    return sourceBlocks.map((block, index) => ({
+      block,
+      index,
+      questions: getBlockQuestions(block, index),
+    }));
+  }, [blocks, evaluationBlocks]);
+  const contentResetKey = resetOnContentChange ? blocksWithQuestions.length : 0;
+  const attemptResetSignature = `${autoCompleteStorageKey}|${contentResetKey}`;
 
   const clearRunningIntervals = useCallback(() => {
     if (timerIntervalRef.current) {
@@ -918,6 +981,85 @@ function ReadingPassageWithBlocks({
     const highlightedNodes = passageRef.current.querySelectorAll("[data-reading-highlight='true']");
     highlightedNodes.forEach((node) => unwrapHighlightNode(node));
   }, []);
+
+  const initializePassageTimingState = useCallback(
+    (timingEntries = []) => {
+      const nextMap = {};
+      normalizedPassageNumbers.forEach((passageNumber) => {
+        nextMap[passageNumber] = 0;
+      });
+
+      if (Array.isArray(timingEntries)) {
+        timingEntries.forEach((entry) => {
+          const passageNumber = Number(entry?.passageNumber);
+          if (!Number.isFinite(passageNumber) || passageNumber <= 0) {
+            return;
+          }
+
+          const seconds = Math.max(0, Number(entry?.timeSpentSeconds) || 0);
+          nextMap[passageNumber] = Math.round(seconds * 1000);
+        });
+      }
+
+      if (Number.isFinite(normalizedActivePassageNumber) && !Object.prototype.hasOwnProperty.call(nextMap, normalizedActivePassageNumber)) {
+        nextMap[normalizedActivePassageNumber] = 0;
+      }
+
+      passageTimingMsByNumberRef.current = nextMap;
+      activeTrackedPassageNumberRef.current = Number.isFinite(normalizedActivePassageNumber)
+        ? normalizedActivePassageNumber
+        : null;
+      activeTrackedStartedAtRef.current = null;
+    },
+    [normalizedActivePassageNumber, normalizedPassageNumbers],
+  );
+
+  const commitActivePassageTiming = useCallback((nowMs = Date.now()) => {
+    const currentPassageNumber = activeTrackedPassageNumberRef.current;
+    const startedAtMs = activeTrackedStartedAtRef.current;
+    if (
+      typeof currentPassageNumber !== "number" ||
+      !Number.isFinite(currentPassageNumber) ||
+      typeof startedAtMs !== "number" ||
+      !Number.isFinite(startedAtMs)
+    ) {
+      return;
+    }
+
+    const elapsedMs = Math.max(0, nowMs - startedAtMs);
+    if (elapsedMs > 0) {
+      const currentValue = Math.max(0, Number(passageTimingMsByNumberRef.current[currentPassageNumber]) || 0);
+      passageTimingMsByNumberRef.current[currentPassageNumber] = currentValue + elapsedMs;
+    }
+
+    activeTrackedStartedAtRef.current = null;
+  }, []);
+
+  const buildPassageTimingPayload = useCallback(() => {
+    const nowMs = Date.now();
+    const timingMap = { ...passageTimingMsByNumberRef.current };
+    const currentPassageNumber = activeTrackedPassageNumberRef.current;
+    const startedAtMs = activeTrackedStartedAtRef.current;
+    if (
+      typeof currentPassageNumber === "number" &&
+      Number.isFinite(currentPassageNumber) &&
+      typeof startedAtMs === "number" &&
+      Number.isFinite(startedAtMs)
+    ) {
+      const elapsedMs = Math.max(0, nowMs - startedAtMs);
+      timingMap[currentPassageNumber] = Math.max(0, Number(timingMap[currentPassageNumber]) || 0) + elapsedMs;
+    }
+
+    const numbersFromMap = Object.keys(timingMap)
+      .map((key) => Number(key))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const allNumbers = Array.from(new Set([...normalizedPassageNumbers, ...numbersFromMap])).sort((left, right) => left - right);
+
+    return allNumbers.map((passageNumber) => ({
+      passageNumber,
+      timeSpentSeconds: Math.max(0, Math.round((Number(timingMap[passageNumber]) || 0) / 1000)),
+    }));
+  }, [normalizedPassageNumbers]);
 
   const handleTextSelectionToggle = useCallback(() => {
     const rootElement = passageRef.current;
@@ -974,7 +1116,7 @@ function ReadingPassageWithBlocks({
   }, []);
 
   const evaluateAttempt = useCallback(() => {
-    const blockResults = blocksWithQuestions.map(({ block, index, questions }) => {
+    const blockResults = evaluationBlocksWithQuestions.map(({ block, index, questions }) => {
       const isMultipleChoiceBlock = /multiple[_-]?choice/i.test(
         `${String(block?.blockType || "")} ${String(block?.questionFamily || "")}`,
       );
@@ -995,7 +1137,8 @@ function ReadingPassageWithBlocks({
 
         const submittedChoiceSet = new Set();
         questions.forEach((question) => {
-          const rawStudentValue = selectedAnswersById[question.id];
+          const storageId = String(question?.storageId || question?.id || "").trim();
+          const rawStudentValue = selectedAnswersById[storageId];
           const studentAnswer = Array.isArray(rawStudentValue)
             ? rawStudentValue.join(", ")
             : String(rawStudentValue || "").trim();
@@ -1018,7 +1161,8 @@ function ReadingPassageWithBlocks({
         });
       } else {
         questionResults = questions.map((question) => {
-          const rawStudentValue = selectedAnswersById[question.id];
+          const storageId = String(question?.storageId || question?.id || "").trim();
+          const rawStudentValue = selectedAnswersById[storageId];
           const studentAnswer = Array.isArray(rawStudentValue)
             ? rawStudentValue.join(", ")
             : String(rawStudentValue || "").trim();
@@ -1101,10 +1245,10 @@ function ReadingPassageWithBlocks({
       percentage,
       incorrectItems,
     };
-  }, [blocksWithQuestions, selectedAnswersById]);
+  }, [evaluationBlocksWithQuestions, selectedAnswersById]);
 
   const completeAttempt = useCallback(
-    (submitReason, forceReason = "") => {
+    async (submitReason, forceReason = "") => {
       if (hasSubmittedAttemptRef.current) {
         return;
       }
@@ -1114,17 +1258,33 @@ function ReadingPassageWithBlocks({
       setSubmitError("");
 
       try {
+        commitActivePassageTiming(Date.now());
         clearRunningIntervals();
         setHasAttemptStarted(false);
         setIsCountdownRunning(false);
         setCountdownValue(null);
         setIsStartModalOpen(false);
 
+        const passageTiming = buildPassageTimingPayload();
         const nextResult = {
           ...evaluateAttempt(),
           submitReason: String(submitReason || "manual"),
           forceReason: forceReason || "",
+          passageTiming,
         };
+
+        if (typeof onAttemptSubmit === "function") {
+          try {
+            await onAttemptSubmit({
+              submitReason: String(submitReason || "manual"),
+              forceReason: forceReason || "",
+              evaluation: nextResult,
+              passageTiming,
+            });
+          } catch (submitError) {
+            setSubmitError(submitError?.message || "This attempt was completed locally but could not be synced.");
+          }
+        }
 
         if (forceReason) {
           persistAutoCompleteState(autoCompleteStorageKey, {
@@ -1143,7 +1303,14 @@ function ReadingPassageWithBlocks({
         setIsSubmittingAttempt(false);
       }
     },
-    [autoCompleteStorageKey, clearRunningIntervals, evaluateAttempt],
+    [
+      autoCompleteStorageKey,
+      buildPassageTimingPayload,
+      clearRunningIntervals,
+      commitActivePassageTiming,
+      evaluateAttempt,
+      onAttemptSubmit,
+    ],
   );
 
   const autoCompleteAttempt = useCallback(
@@ -1184,7 +1351,7 @@ function ReadingPassageWithBlocks({
           setCountdownValue(null);
           setIsStartModalOpen(false);
           setHasAttemptStarted(true);
-          setRemainingSeconds(ATTEMPT_DURATION_SECONDS);
+          setRemainingSeconds(normalizedAttemptDuration);
           return null;
         }
 
@@ -1197,25 +1364,34 @@ function ReadingPassageWithBlocks({
     hasAttemptStarted,
     isCountdownRunning,
     isResultModalOpen,
+    normalizedAttemptDuration,
   ]);
 
   const handleTryAgain = useCallback(() => {
     clearAutoCompleteState(autoCompleteStorageKey);
     clearRunningIntervals();
     clearPassageHighlights();
+    initializePassageTimingState();
     hasSubmittedAttemptRef.current = false;
     setSelectedAnswersById({});
     setResult(null);
     setIsResultModalOpen(false);
     setSubmitError("");
-    setRemainingSeconds(ATTEMPT_DURATION_SECONDS);
+    setRemainingSeconds(normalizedAttemptDuration);
     setHasAttemptStarted(false);
     setIsCountdownRunning(false);
     setCountdownValue(null);
     setIsAutoCompleted(false);
     setAutoCompleteReason("");
     setIsStartModalOpen(blocksWithQuestions.length > 0);
-  }, [autoCompleteStorageKey, blocksWithQuestions.length, clearPassageHighlights, clearRunningIntervals]);
+  }, [
+    autoCompleteStorageKey,
+    blocksWithQuestions.length,
+    clearPassageHighlights,
+    clearRunningIntervals,
+    initializePassageTimingState,
+    normalizedAttemptDuration,
+  ]);
 
   const handleAnswerChange = useCallback((questionId, value) => {
     const safeQuestionId = String(questionId || "").trim();
@@ -1274,8 +1450,53 @@ function ReadingPassageWithBlocks({
   );
 
   useEffect(() => {
+    const nowMs = Date.now();
+    const nextPassageNumber = Number.isFinite(normalizedActivePassageNumber) ? normalizedActivePassageNumber : null;
+    const previousPassageNumber = activeTrackedPassageNumberRef.current;
+
+    if (
+      typeof nextPassageNumber === "number" &&
+      !Object.prototype.hasOwnProperty.call(passageTimingMsByNumberRef.current, nextPassageNumber)
+    ) {
+      passageTimingMsByNumberRef.current[nextPassageNumber] = 0;
+    }
+
+    if (
+      typeof previousPassageNumber === "number" &&
+      Number.isFinite(previousPassageNumber) &&
+      previousPassageNumber !== nextPassageNumber
+    ) {
+      commitActivePassageTiming(nowMs);
+    }
+
+    activeTrackedPassageNumberRef.current = nextPassageNumber;
+
+    const shouldTrackCurrentPassage =
+      hasAttemptStarted &&
+      !isResultModalOpen &&
+      typeof nextPassageNumber === "number" &&
+      Number.isFinite(nextPassageNumber);
+
+    if (shouldTrackCurrentPassage) {
+      if (!Number.isFinite(Number(activeTrackedStartedAtRef.current))) {
+        activeTrackedStartedAtRef.current = nowMs;
+      }
+      return;
+    }
+
+    commitActivePassageTiming(nowMs);
+  }, [commitActivePassageTiming, hasAttemptStarted, isResultModalOpen, normalizedActivePassageNumber]);
+
+  useEffect(() => {
+    return () => {
+      commitActivePassageTiming(Date.now());
+    };
+  }, [commitActivePassageTiming]);
+
+  useEffect(() => {
     clearRunningIntervals();
     clearPassageHighlights();
+    initializePassageTimingState();
     setSubmitError("");
     setSelectedAnswersById({});
     setResult(null);
@@ -1283,13 +1504,14 @@ function ReadingPassageWithBlocks({
     setHasAttemptStarted(false);
     setIsCountdownRunning(false);
     setCountdownValue(null);
-    setRemainingSeconds(ATTEMPT_DURATION_SECONDS);
+    setRemainingSeconds(normalizedAttemptDuration);
     hasSubmittedAttemptRef.current = false;
     setIsAutoCompleted(false);
     setAutoCompleteReason("");
 
     const persisted = readAutoCompleteState(autoCompleteStorageKey);
     if (persisted?.result) {
+      initializePassageTimingState(persisted?.result?.passageTiming);
       setResult(persisted.result);
       setIsResultModalOpen(true);
       setIsStartModalOpen(false);
@@ -1300,7 +1522,14 @@ function ReadingPassageWithBlocks({
     }
 
     setIsStartModalOpen(blocksWithQuestions.length > 0);
-  }, [autoCompleteStorageKey, blocksWithQuestions.length, clearPassageHighlights, clearRunningIntervals]);
+  }, [
+    attemptResetSignature,
+    autoCompleteStorageKey,
+    clearPassageHighlights,
+    clearRunningIntervals,
+    initializePassageTimingState,
+    normalizedAttemptDuration,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1356,10 +1585,12 @@ function ReadingPassageWithBlocks({
 
     const handleBeforeUnload = () => {
       const snapshot = evaluateAttempt();
+      const passageTiming = buildPassageTimingPayload();
       persistAutoCompleteState(autoCompleteStorageKey, {
         reason: "You refreshed or left the page. This reading task was auto-submitted.",
         result: {
           ...snapshot,
+          passageTiming,
           submitReason: "before-unload",
           forceReason: "You refreshed or left the page. This reading task was auto-submitted.",
         },
@@ -1378,10 +1609,19 @@ function ReadingPassageWithBlocks({
       window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [autoCompleteAttempt, autoCompleteStorageKey, evaluateAttempt, hasAttemptStarted, isResultModalOpen]);
+  }, [
+    autoCompleteAttempt,
+    autoCompleteStorageKey,
+    buildPassageTimingPayload,
+    evaluateAttempt,
+    hasAttemptStarted,
+    isResultModalOpen,
+  ]);
 
   const currentTimerLabel = formatTimerLabel(remainingSeconds);
   const isInputDisabled = !hasAttemptStarted || isResultModalOpen || isSubmittingAttempt;
+  const resolvedPrimaryActionDisabled =
+    typeof isPrimaryActionDisabled === "boolean" ? isPrimaryActionDisabled : isInputDisabled;
   const resultPercentage = Number(result?.percentage || 0);
   const isGoodResult = resultPercentage >= GOOD_SCORE_THRESHOLD_PERCENT;
 
@@ -1421,14 +1661,33 @@ function ReadingPassageWithBlocks({
                   {currentTimerLabel}
                 </p>
               </div>
-              <button
-                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isInputDisabled}
-                onClick={() => completeAttempt("manual")}
-                type="button"
-              >
-                {isSubmittingAttempt ? "Submitting..." : "Complete"}
-              </button>
+              <div className="flex items-center gap-2">
+                {isSecondaryActionVisible && typeof onSecondaryAction === "function" ? (
+                  <button
+                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSecondaryActionDisabled}
+                    onClick={onSecondaryAction}
+                    type="button"
+                  >
+                    {secondaryActionLabel || "Previous"}
+                  </button>
+                ) : null}
+                <button
+                  className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={resolvedPrimaryActionDisabled}
+                  onClick={() => {
+                    if (typeof onPrimaryAction === "function") {
+                      onPrimaryAction();
+                      return;
+                    }
+
+                    completeAttempt("manual");
+                  }}
+                  type="button"
+                >
+                  {isSubmittingAttempt && typeof onPrimaryAction !== "function" ? "Submitting..." : primaryActionLabel}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1438,17 +1697,18 @@ function ReadingPassageWithBlocks({
                 {blocksWithQuestions.map(({ block, index, questions }) => (
                   (() => {
                     const isBinaryJudgement = isBinaryJudgementBlock(block);
+                    const display = block?.display && typeof block.display === "object" ? block.display : {};
                     const displayPrompts = getDisplayPrompts(
-                      block?.display && typeof block.display === "object" ? block.display : {},
+                      display,
                     );
                     const questionIdByNumber = new Map(
                       questions
-                        .map((question) => [Number(question?.number), String(question?.id || "").trim()])
+                        .map((question) => [Number(question?.number), String(question?.storageId || question?.id || "").trim()])
                         .filter(([number, questionId]) => Number.isFinite(number) && questionId),
                     );
-                    const optionItems = (
-                      Array.isArray(block?.display?.options) && block.display.options.length > 0
-                        ? block.display.options.map((option, optionIndex) => {
+                    const binaryOptionItems = (
+                      Array.isArray(display?.options) && display.options.length > 0
+                        ? display.options.map((option, optionIndex) => {
                           const optionText = String(getOptionText(option)).trim();
                           const optionValue = optionText || String(getOptionValue(option, optionIndex)).trim();
                           return {
@@ -1458,21 +1718,43 @@ function ReadingPassageWithBlocks({
                         })
                         : inferBinaryOptionItems(block)
                     ).filter((item) => item.value);
+                    const headingOptionItems = (
+                      Array.isArray(display?.headingOptions) ? display.headingOptions : []
+                    )
+                      .map((option, optionIndex) => {
+                        const optionValue = String(getOptionValue(option, optionIndex)).trim();
+                        if (!optionValue) {
+                          return null;
+                        }
+
+                        return {
+                          value: optionValue,
+                          label: optionValue,
+                        };
+                      })
+                      .filter(Boolean);
+                    const hasInlineHeadingPrompts =
+                      !isBinaryJudgement
+                      && displayPrompts.length > 0
+                      && headingOptionItems.length > 0;
                     const hasInlineBinaryPrompts =
                       isBinaryJudgement
                       && displayPrompts.length > 0
-                      && optionItems.length > 0;
+                      && binaryOptionItems.length > 0;
+                    const hasInlinePromptSelect = hasInlineBinaryPrompts || hasInlineHeadingPrompts;
+                    const promptSelectItems = hasInlineBinaryPrompts ? binaryOptionItems : headingOptionItems;
 
                     return (
                       <ReadingBlockPanel
                         block={block}
                         displayAnswerContext={
-                          hasInlineBinaryPrompts
+                          hasInlinePromptSelect
                             ? {
-                              isBinaryJudgement: true,
+                              isBinaryJudgement,
+                              showPromptSelect: true,
                               isInputDisabled,
                               onSelect: (questionId, value) => handleChoiceSelect(questionId, value, 1),
-                              optionItems,
+                              optionItems: promptSelectItems,
                               questionIdByNumber,
                               selectedAnswersById,
                             }
@@ -1480,7 +1762,7 @@ function ReadingPassageWithBlocks({
                         }
                         key={block?._id || `block-${index}`}
                       >
-                        {questions.length > 0 && !hasInlineBinaryPrompts ? (
+                        {questions.length > 0 && !hasInlinePromptSelect ? (
                           <section className="space-y-3">
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Answers</p>
                         <div className="space-y-3">
@@ -1501,7 +1783,8 @@ function ReadingPassageWithBlocks({
                                 : inferredSelectionLimit,
                             );
 
-                            const selectedChoices = toChoiceArray(selectedAnswersById[question.id]).map((item) =>
+                            const answerStorageId = String(question?.storageId || question?.id || "").trim();
+                            const selectedChoices = toChoiceArray(selectedAnswersById[answerStorageId]).map((item) =>
                               normalizeAnswerText(item),
                             );
 
@@ -1528,7 +1811,7 @@ function ReadingPassageWithBlocks({
                                                 : "bg-white text-slate-700 hover:bg-emerald-50/40"
                                             } ${isInputDisabled ? "cursor-not-allowed opacity-75" : ""}`}
                                             disabled={isInputDisabled}
-                                            onClick={() => handleChoiceSelect(question.id, optionValue, selectionLimit)}
+                                            onClick={() => handleChoiceSelect(answerStorageId, optionValue, selectionLimit)}
                                             type="button"
                                           >
                                             <span className="inline-flex min-w-6 font-semibold text-slate-900">
@@ -1550,13 +1833,13 @@ function ReadingPassageWithBlocks({
                                     }`}
                                     disabled={isInputDisabled}
                                     maxLength={64}
-                                    onChange={(event) => handleAnswerChange(question.id, event.target.value)}
+                                    onChange={(event) => handleAnswerChange(answerStorageId, event.target.value)}
                                     spellCheck={false}
                                     type="text"
                                     value={
-                                      Array.isArray(selectedAnswersById[question.id])
-                                        ? selectedAnswersById[question.id].join(", ")
-                                        : selectedAnswersById[question.id] || ""
+                                      Array.isArray(selectedAnswersById[answerStorageId])
+                                        ? selectedAnswersById[answerStorageId].join(", ")
+                                        : selectedAnswersById[answerStorageId] || ""
                                     }
                                   />
                                 )}
@@ -1648,7 +1931,7 @@ function ReadingPassageWithBlocks({
 
             <div className="mx-auto mt-4 max-w-2xl space-y-2 text-base font-medium leading-8 text-slate-700">
               <p>
-                You have <span className="text-yellow-500">20 minutes</span> for this reading task.
+                You have <span className="text-yellow-500">{attemptMinutesLabel} minutes</span> for this reading task.
                 If you <span className="text-yellow-500">switch</span> tabs, <span className="text-yellow-500">change</span> browser, or <span className="text-yellow-500">refresh</span>, this task is <span className="text-yellow-500">auto-submitted</span>.
                 Select text in the passage to highlight it. Select the same highlighted text again to remove highlight.
               </p>
@@ -1656,7 +1939,7 @@ function ReadingPassageWithBlocks({
 
             <button
               className="mx-auto mt-6 inline-flex w-full max-w-[330px] items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-8 py-4 text-sm font-black uppercase tracking-[0.22em] text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isCountdownRunning || blocksWithQuestions.length === 0}
+              disabled={isCountdownRunning}
               onClick={handleUnderstandStart}
               type="button"
             >

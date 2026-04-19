@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const ReadingFullTestAttempt = require("../models/readingFullTestAttemptModel");
 
 const READING_PASSAGES_COLLECTION = "reading_passages";
 const READING_BLOCKS_COLLECTION = "reading_blocks";
@@ -43,6 +44,81 @@ function getStatusFilter(statusQuery, fallbackStatus = "published") {
   }
 
   return status;
+}
+
+function sanitizePassageTiming(passageTiming, fallbackPassages = []) {
+  const fallbackPassageNumbers = (Array.isArray(fallbackPassages) ? fallbackPassages : [])
+    .map((entry, index) =>
+      Number.isFinite(Number(entry?.passageNumber)) ? Number(entry.passageNumber) : index + 1,
+    )
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  const passageTimingByNumber = new Map();
+  if (Array.isArray(passageTiming)) {
+    passageTiming.forEach((item) => {
+      const passageNumber = Number(item?.passageNumber);
+      if (!Number.isFinite(passageNumber) || passageNumber <= 0) {
+        return;
+      }
+
+      const timeSpentSeconds = Math.max(0, Math.round(Number(item?.timeSpentSeconds) || 0));
+      passageTimingByNumber.set(passageNumber, timeSpentSeconds);
+    });
+  }
+
+  fallbackPassageNumbers.forEach((passageNumber) => {
+    if (!passageTimingByNumber.has(passageNumber)) {
+      passageTimingByNumber.set(passageNumber, 0);
+    }
+  });
+
+  return Array.from(passageTimingByNumber.entries())
+    .sort((left, right) => Number(left[0] || 0) - Number(right[0] || 0))
+    .map(([passageNumber, timeSpentSeconds]) => ({
+      passageNumber,
+      timeSpentSeconds,
+    }));
+}
+
+function sanitizeEvaluationPayload(value) {
+  const safe = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const incorrectItems = Array.isArray(safe?.incorrectItems)
+    ? safe.incorrectItems.map((item) => ({
+      blockTitle: normalizeValue(item?.blockTitle),
+      questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
+      studentAnswer: normalizeValue(item?.studentAnswer),
+      acceptedAnswers: Array.isArray(item?.acceptedAnswers)
+        ? item.acceptedAnswers.map((answer) => normalizeValue(answer)).filter(Boolean)
+        : [],
+    }))
+    : [];
+
+  return {
+    totalQuestions: Math.max(0, Math.round(Number(safe?.totalQuestions) || 0)),
+    correctCount: Math.max(0, Math.round(Number(safe?.correctCount) || 0)),
+    incorrectCount: Math.max(0, Math.round(Number(safe?.incorrectCount) || 0)),
+    percentage: Math.max(0, Math.round(Number(safe?.percentage) || 0)),
+    submitReason: normalizeValue(safe?.submitReason) || "manual",
+    forceReason: normalizeValue(safe?.forceReason),
+    incorrectItems,
+  };
+}
+
+function summarizeReadingFullTestAttempt(attemptDoc) {
+  if (!attemptDoc) {
+    return null;
+  }
+
+  return {
+    id: String(attemptDoc?._id || ""),
+    testId: normalizeValue(attemptDoc?.testId),
+    attemptNumber: Number(attemptDoc?.attemptNumber || 0),
+    submitReason: normalizeValue(attemptDoc?.submitReason),
+    forceReason: normalizeValue(attemptDoc?.forceReason),
+    submittedAt: attemptDoc?.submittedAt || null,
+    evaluation: attemptDoc?.evaluation || {},
+    passageTiming: Array.isArray(attemptDoc?.passageTiming) ? attemptDoc.passageTiming : [],
+  };
 }
 
 function getQuestionStartNumber(block) {
@@ -495,9 +571,80 @@ async function listReadingPracticeGroups(req, res) {
   });
 }
 
+async function submitFullReadingTestAttempt(req, res) {
+  const studentId = normalizeValue(req.auth?.userId);
+  if (!studentId) {
+    return res.status(401).json({
+      message: "Student authorization is required.",
+    });
+  }
+
+  const db = mongoose.connection.db;
+  const testId = normalizeValue(req.params.testId);
+  if (!testId) {
+    return res.status(400).json({
+      message: "Reading test id is required.",
+    });
+  }
+
+  const testDoc = await db.collection(READING_TESTS_COLLECTION).findOne(
+    { _id: testId },
+    {
+      projection: {
+        _id: 1,
+        title: 1,
+        module: 1,
+        passages: 1,
+      },
+    },
+  );
+
+  if (!testDoc) {
+    return res.status(404).json({
+      message: `Reading test '${testId}' not found.`,
+    });
+  }
+
+  const submitReason = normalizeValue(req.body?.submitReason) || "manual";
+  const forceReason = normalizeValue(req.body?.forceReason);
+  const evaluation = sanitizeEvaluationPayload(req.body?.evaluation);
+  const passageTiming = sanitizePassageTiming(req.body?.passageTiming, testDoc?.passages);
+
+  const previousAttempt = await ReadingFullTestAttempt.findOne({ studentId, testId })
+    .sort({ submittedAt: -1, createdAt: -1 })
+    .lean();
+  const previousAttemptNumber = Number(previousAttempt?.attemptNumber || 0);
+  const attemptNumber = previousAttemptNumber > 0 ? previousAttemptNumber + 1 : 1;
+
+  const savedAttempt = await ReadingFullTestAttempt.create({
+    studentId,
+    testId,
+    testTitle: normalizeValue(testDoc?.title),
+    testModule: normalizeValue(testDoc?.module),
+    status: "completed",
+    submitReason,
+    forceReason,
+    attemptNumber,
+    passageTiming,
+    evaluation: {
+      ...evaluation,
+      submitReason,
+      forceReason,
+    },
+    submittedAt: new Date(),
+  });
+
+  return res.status(201).json({
+    message: "Full reading test submitted successfully.",
+    attempt: summarizeReadingFullTestAttempt(savedAttempt),
+    previousAttempt: summarizeReadingFullTestAttempt(previousAttempt),
+  });
+}
+
 module.exports = {
   listFullReadingTests,
   getFullReadingTestById,
   listReadingPassagesWithBlocks,
   listReadingPracticeGroups,
+  submitFullReadingTestAttempt,
 };
