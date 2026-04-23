@@ -16,6 +16,7 @@
   html {
     scroll-behavior: smooth;
     background: var(--page-bg);
+    overflow-y: scroll;
   }
 
   body {
