@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { SelectControl } from "../ui/StyledFormControls";
 
 const START_COUNTDOWN_SECONDS = 3;
 const DEFAULT_ATTEMPT_DURATION_SECONDS = 20 * 60;
@@ -575,11 +576,11 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
             </div>
 
             {answerContext?.showPromptSelect && promptQuestionId ? (
-              <select
-                className={`h-9 min-w-30 border bg-white px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 outline-none transition ${
+              <SelectControl
+                className={`h-9 min-w-30 px-3 pr-10 text-xs font-semibold uppercase tracking-[0.12em] ${
                   answerContext?.isInputDisabled
                     ? "cursor-not-allowed border-slate-300 text-slate-400"
-                    : "border-slate-300 focus:border-emerald-500"
+                    : "border-slate-300"
                 }`}
                 disabled={answerContext?.isInputDisabled}
                 onChange={(event) => answerContext?.onSelect?.(promptQuestionId, event.target.value)}
@@ -591,7 +592,7 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
                     {item.label}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             ) : null}
           </div>
         );

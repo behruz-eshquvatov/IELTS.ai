@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpenText, Blocks, FileCheck2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { SelectControl } from "../components/ui/StyledFormControls";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
 import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
 import {
@@ -203,8 +204,87 @@ function SuperAdminReadingPage() {
 
             <article className="space-y-3 border border-slate-200/80 bg-white p-4" onPaste={handleImagePaste}>
               {(activeTab === "passages" || activeTab === "blocks") ? <div className="grid gap-3 lg:grid-cols-[280px_1fr]"><div className="space-y-2"><input accept="image/*" className="block w-full cursor-pointer border border-slate-200/80 bg-slate-50 px-3 py-2 text-sm text-slate-700 file:mr-3 file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-700" onChange={(event) => setExtractImageFile(event.target.files?.[0] || null)} type="file" /><p className="text-xs text-slate-500">Tip: click here and paste image with Ctrl+V.</p><button className="emerald-gradient-fill inline-flex items-center justify-center gap-2 rounded-full border border-emerald-300/20 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55" disabled={extracting || !extractImageFile} onClick={() => extractFromImage(activeTab)} type="button"><Upload className="h-4 w-4" />{extracting ? "Extracting..." : "Extract JSON from image"}</button></div></div> : null}
-              {activeTab === "blocks" ? <select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400" onChange={(event) => setBlockJson((prev) => { const parsed = parseJsonInput(prev); if (!parsed.ok || !parsed.value || typeof parsed.value !== "object") return prev; parsed.value.passageId = event.target.value; setSelectedPassageForBlock(event.target.value); return JSON.stringify(parsed.value, null, 2); })} value={selectedPassageForBlock || ""}><option value="">Choose passageId to attach block</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select> : null}
-              {activeTab === "tests" ? <div className="grid gap-2 border border-slate-200/80 bg-slate-50/50 p-3 lg:grid-cols-2"><div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Add passage ref</p><select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestPassageId(event.target.value)} value={testPassageId}><option value="">PassageId</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select><div className="grid grid-cols-2 gap-2"><input className="border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestRangeStart(event.target.value)} placeholder="start" type="number" value={testRangeStart} /><input className="border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestRangeEnd(event.target.value)} placeholder="end" type="number" value={testRangeEnd} /></div><button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={addPassageRefToTestJson} type="button">Add passage</button></div><div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Add block ref</p><select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestBlockPassageId(event.target.value)} value={testBlockPassageId}><option value="">PassageId</option>{passageIds.map((id) => <option key={id} value={id}>{id}</option>)}</select><select className="w-full border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestBlockId(event.target.value)} value={testBlockId}><option value="">BlockId</option>{blockIds.map((id) => <option key={id} value={id}>{id}</option>)}</select><button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={addBlockRefToTestJson} type="button">Add block</button></div></div> : null}
+              {activeTab === "blocks" ? (
+                <SelectControl
+                  className="px-3 py-2 pr-10 text-sm text-slate-700"
+                  onChange={(event) =>
+                    setBlockJson((prev) => {
+                      const parsed = parseJsonInput(prev);
+                      if (!parsed.ok || !parsed.value || typeof parsed.value !== "object") {
+                        return prev;
+                      }
+
+                      parsed.value.passageId = event.target.value;
+                      setSelectedPassageForBlock(event.target.value);
+                      return JSON.stringify(parsed.value, null, 2);
+                    })
+                  }
+                  value={selectedPassageForBlock || ""}
+                >
+                  <option value="">Choose passageId to attach block</option>
+                  {passageIds.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                </SelectControl>
+              ) : null}
+              {activeTab === "tests" ? (
+                <div className="grid gap-2 border border-slate-200/80 bg-slate-50/50 p-3 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Add passage ref
+                    </p>
+                    <SelectControl
+                      className="px-3 py-2 pr-10 text-sm"
+                      onChange={(event) => setTestPassageId(event.target.value)}
+                      value={testPassageId}
+                    >
+                      <option value="">PassageId</option>
+                      {passageIds.map((id) => (
+                        <option key={id} value={id}>
+                          {id}
+                        </option>
+                      ))}
+                    </SelectControl>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className="border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestRangeStart(event.target.value)} placeholder="start" type="number" value={testRangeStart} />
+                      <input className="border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => setTestRangeEnd(event.target.value)} placeholder="end" type="number" value={testRangeEnd} />
+                    </div>
+                    <button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={addPassageRefToTestJson} type="button">Add passage</button>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Add block ref
+                    </p>
+                    <SelectControl
+                      className="px-3 py-2 pr-10 text-sm"
+                      onChange={(event) => setTestBlockPassageId(event.target.value)}
+                      value={testBlockPassageId}
+                    >
+                      <option value="">PassageId</option>
+                      {passageIds.map((id) => (
+                        <option key={id} value={id}>
+                          {id}
+                        </option>
+                      ))}
+                    </SelectControl>
+                    <SelectControl
+                      className="px-3 py-2 pr-10 text-sm"
+                      onChange={(event) => setTestBlockId(event.target.value)}
+                      value={testBlockId}
+                    >
+                      <option value="">BlockId</option>
+                      {blockIds.map((id) => (
+                        <option key={id} value={id}>
+                          {id}
+                        </option>
+                      ))}
+                    </SelectControl>
+                    <button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={addBlockRefToTestJson} type="button">Add block</button>
+                  </div>
+                </div>
+              ) : null}
               <textarea className="h-[360px] w-full border border-slate-200/80 bg-slate-50/60 p-3 font-mono text-xs leading-6 text-slate-800 outline-none focus:border-emerald-400" onChange={(event) => { if (activeTab === "passages") setPassageJson(event.target.value); if (activeTab === "blocks") setBlockJson(event.target.value); if (activeTab === "tests") setTestJson(event.target.value); }} placeholder="JSON editor" spellCheck={false} value={activeTab === "passages" ? passageJson : activeTab === "blocks" ? blockJson : testJson} />
               <div className="flex flex-wrap gap-2"><button className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50" onClick={validateCurrent} type="button">Validate JSON</button><button className="emerald-gradient-fill inline-flex items-center justify-center rounded-full border border-emerald-300/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white disabled:cursor-not-allowed disabled:opacity-55" disabled={saving || !(activeTab === "passages" ? passageJson : activeTab === "blocks" ? blockJson : testJson).trim()} onClick={saveCurrent} type="button">{saving ? "Saving..." : `Save to ${activeTab === "passages" ? "reading_passages" : activeTab === "blocks" ? "reading_blocks" : "reading_tests"}`}</button></div>
               {validationErrors.length > 0 ? <div className="border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900"><p className="font-semibold uppercase tracking-[0.12em]">Validation issues</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationErrors.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}

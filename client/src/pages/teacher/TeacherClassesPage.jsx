@@ -4,6 +4,7 @@ import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LayoutGrid, List, Plus, Search, X } from "lucide-react";
 import TeacherClassCard from "../../components/teacher/TeacherClassCard";
+import { TimePickerField } from "../../components/ui/StyledFormControls";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
 import {
   buildNewTeacherClass,
@@ -208,7 +209,7 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
         <form
-          className="w-full max-w-xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]"
+          className="w-full max-w-xl overflow-visible bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]"
           onSubmit={onSubmit}
         >
           <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
@@ -242,11 +243,10 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               </label>
               <label className="space-y-2 text-sm text-slate-600">
                 <span className="font-medium text-slate-900">Class time</span>
-                <input
-                  className="w-full border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
+                <TimePickerField
+                  className=""
                   name="startTime"
                   onChange={onChange}
-                  type="time"
                   value={form.startTime}
                 />
               </label>

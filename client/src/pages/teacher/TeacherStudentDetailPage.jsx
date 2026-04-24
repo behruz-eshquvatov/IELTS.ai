@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, ChevronDown } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, ChevronDown, Send } from "lucide-react";
 import { PanelShell, SectionTitle } from "../../components/teacher/TeacherPanelPrimitives";
 import { teacherStudents } from "../../data/teacherPanel";
 
@@ -22,6 +22,10 @@ function getClassStudentIndex(student) {
 
 function snapBandScore(value) {
   return Math.round(value * 2) / 2;
+}
+
+function clampBandScore(value) {
+  return Math.max(4.0, Math.min(9.0, snapBandScore(value)));
 }
 
 function getStudentScoreMetrics(student) {
@@ -206,11 +210,16 @@ const aminaTestTypeProfiles = {
     ],
   },
   "Writing Task 1": {
-    snapshotItems: [
-      { label: "Weak Area", value: "Overview Control" },
-      { label: "Estimated Band", value: "6.0" },
-      { label: "Common Errors", value: "missed comparisons, unclear overview" },
-      { label: "Last Review", value: "Line graph report" },
+    layout: "writing",
+    topItems: [
+      { label: "Average score", value: "6.0" },
+      { label: "Weak areas", value: "Overview control, comparison language" },
+    ],
+    rubricItems: [
+      { label: "Coherence and Cohesion", value: "6.0" },
+      { label: "Lexical resource", value: "6.0" },
+      { label: "Grammatical Range", value: "5.5" },
+      { label: "Task Achievement", value: "6.5" },
     ],
     recommendations: [
       "AI suggests improving overview sentences so the main trends are clear before supporting details appear.",
@@ -219,11 +228,16 @@ const aminaTestTypeProfiles = {
     ],
   },
   "Writing Task 2": {
-    snapshotItems: [
-      { label: "Weak Area", value: "Cohesion" },
-      { label: "Estimated Band", value: "6.5" },
-      { label: "Common Errors", value: "thin support, repetitive linking" },
-      { label: "Last Review", value: "Opinion essay draft" },
+    layout: "writing",
+    topItems: [
+      { label: "Average score", value: "6.5" },
+      { label: "Weak areas", value: "Cohesion, idea support" },
+    ],
+    rubricItems: [
+      { label: "Coherence and Cohesion", value: "6.0" },
+      { label: "Lexical resource", value: "6.5" },
+      { label: "Grammatical Range", value: "6.5" },
+      { label: "Task Achievement", value: "7.0" },
     ],
     recommendations: [
       "AI suggests improving paragraph cohesion so each idea develops more clearly from claim to support.",
@@ -232,6 +246,39 @@ const aminaTestTypeProfiles = {
     ],
   },
 };
+
+function buildWritingWeakAreas(selectedTestType, focusArea, seed) {
+  const fallbackAreas = selectedTestType === "Writing Task 1"
+    ? ["Overview control", "Key feature selection", "Comparison language", "Trend grouping"]
+    : ["Cohesion", "Idea support", "Lexical resource", "Argument balance"];
+  const normalizedFocusArea = toTitleCase(focusArea);
+  const alternateArea = fallbackAreas.find((item) => item.toLowerCase() !== normalizedFocusArea.toLowerCase())
+    ?? fallbackAreas[seed % fallbackAreas.length];
+
+  return [normalizedFocusArea, alternateArea]
+    .filter((item, index, array) => array.findIndex((entry) => entry.toLowerCase() === item.toLowerCase()) === index)
+    .join(", ");
+}
+
+function buildWritingRubricItems(selectedTestType, averageBand, seed) {
+  const safeAverageBand = Number.isFinite(averageBand) ? clampBandScore(averageBand) : 6.0;
+  const offsets = selectedTestType === "Writing Task 1"
+    ? [0, 0, -0.5, 0.5]
+    : [-0.5, 0, 0, 0.5];
+  const seedAdjustments = [-0.5, 0, 0.5];
+
+  return [
+    "Coherence and Cohesion",
+    "Lexical resource",
+    "Grammatical Range",
+    "Task Achievement",
+  ].map((label, index) => ({
+    label,
+    value: clampBandScore(
+      safeAverageBand + offsets[index] + seedAdjustments[(seed + index) % seedAdjustments.length] * 0.5,
+    ).toFixed(1),
+  }));
+}
 
 function getDefaultTestType(student) {
   const content = `${student.weakArea ?? ""} ${student.notes ?? ""}`.toLowerCase();
@@ -312,15 +359,15 @@ function getStudentTestTypeProfile(student, selectedTestType) {
     const focusArea = isWritingTask1Related(weakAreaLower)
       ? toTitleCase(weakArea)
       : ["Overview control", "Key feature selection", "Comparison language", "Trend grouping"][seed % 4];
-    const estimatedBand = safeBand !== null ? snapBandScore(Math.max(5.0, safeBand - 0.5)) : null;
+    const averageBand = safeBand !== null ? clampBandScore(Math.max(5.0, safeBand - 0.5)) : null;
 
     return {
-      snapshotItems: [
-        { label: "Weak Area", value: focusArea },
-        { label: "Estimated Band", value: estimatedBand?.toFixed(1) ?? "TBD" },
-        { label: "Common Errors", value: "weak overview, missed comparisons" },
-        { label: "Last Review", value: "Academic report draft" },
+      layout: "writing",
+      topItems: [
+        { label: "Average score", value: averageBand?.toFixed(1) ?? "TBD" },
+        { label: "Weak areas", value: buildWritingWeakAreas(selectedTestType, focusArea, seed) },
       ],
+      rubricItems: buildWritingRubricItems(selectedTestType, averageBand, seed),
       recommendations: [
         "AI suggests stronger overview writing before supporting data points are introduced.",
         "The next priority is choosing and grouping the most important features instead of listing everything.",
@@ -332,15 +379,15 @@ function getStudentTestTypeProfile(student, selectedTestType) {
   const focusArea = isWritingTask2Related(weakAreaLower)
     ? toTitleCase(weakArea)
     : ["Cohesion", "Idea support", "Conclusion strength", "Argument balance"][seed % 4];
-  const estimatedBand = safeBand !== null ? safeBand.toFixed(1) : "TBD";
+  const averageBand = safeBand !== null ? clampBandScore(safeBand) : null;
 
   return {
-    snapshotItems: [
-      { label: "Weak Area", value: focusArea },
-      { label: "Estimated Band", value: estimatedBand },
-      { label: "Common Errors", value: "thin support, repetitive linking" },
-      { label: "Last Review", value: "Essay structure review" },
+    layout: "writing",
+    topItems: [
+      { label: "Average score", value: averageBand?.toFixed(1) ?? "TBD" },
+      { label: "Weak areas", value: buildWritingWeakAreas(selectedTestType, focusArea, seed) },
     ],
+    rubricItems: buildWritingRubricItems(selectedTestType, averageBand, seed),
     recommendations: [
       `AI suggests improving ${focusArea.toLowerCase()} so arguments develop more clearly from point to support.`,
       "The next priority is adding deeper explanation after each main claim instead of moving on too early.",
@@ -446,18 +493,33 @@ function TeacherStudentDetailPage() {
   const { studentId } = useParams();
   const routedStudent = location.state?.studentData;
   const student = routedStudent ?? teacherStudents.find((item) => item.id === studentId) ?? teacherStudents[0];
-  const [selectedTestType, setSelectedTestType] = useState(() => getDefaultTestType(student));
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const defaultTestType = getDefaultTestType(student);
+  const [selectedTestTypes, setSelectedTestTypes] = useState(() => ({
+    [student.id]: defaultTestType,
+  }));
+  const [filterState, setFilterState] = useState(() => ({
+    studentId: student.id,
+    isOpen: false,
+  }));
+  const [messageDrafts, setMessageDrafts] = useState({});
+  const [lastSentMessages, setLastSentMessages] = useState({});
   const filterRef = useRef(null);
   const studentEmail = buildStudentEmail(student);
   const scoreMetrics = getStudentScoreMetrics(student);
   const studentPerformanceHistory = performanceHistoryOverrides[student.id] ?? getGeneratedPerformanceHistory(student);
+  const selectedTestType = selectedTestTypes[student.id] ?? defaultTestType;
+  const isFilterOpen = filterState.studentId === student.id ? filterState.isOpen : false;
+  const messageDraft = messageDrafts[student.id] ?? "";
+  const lastSentMessage = lastSentMessages[student.id] ?? "";
   const studentTestTypeProfile = getStudentTestTypeProfile(student, selectedTestType);
   const studentRecommendations = studentTestTypeProfile.recommendations;
   const studentInfoPanel = {
     eyebrow: "Info",
     title: "Performance snapshot",
-    items: studentTestTypeProfile.snapshotItems,
+    layout: studentTestTypeProfile.layout ?? "default",
+    items: studentTestTypeProfile.snapshotItems ?? [],
+    topItems: studentTestTypeProfile.topItems ?? [],
+    rubricItems: studentTestTypeProfile.rubricItems ?? [],
   };
 
   useEffect(() => {
@@ -467,7 +529,10 @@ function TeacherStudentDetailPage() {
 
     function handlePointerDown(event) {
       if (filterRef.current && !filterRef.current.contains(event.target)) {
-        setIsFilterOpen(false);
+        setFilterState({
+          studentId: student.id,
+          isOpen: false,
+        });
       }
     }
 
@@ -476,12 +541,31 @@ function TeacherStudentDetailPage() {
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [isFilterOpen]);
+  }, [isFilterOpen, student.id]);
 
-  useEffect(() => {
-    setSelectedTestType(getDefaultTestType(student));
-    setIsFilterOpen(false);
-  }, [student.id]);
+  const handleSendMessage = () => {
+    const trimmedMessage = messageDraft.trim();
+    if (!trimmedMessage) {
+      return;
+    }
+
+    const sentAtLabel = new Intl.DateTimeFormat("en-GB", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
+
+    setLastSentMessages((current) => ({
+      ...current,
+      [student.id]: `(${sentAtLabel}): ${trimmedMessage}`,
+    }));
+    setMessageDrafts((current) => ({
+      ...current,
+      [student.id]: "",
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -578,7 +662,11 @@ function TeacherStudentDetailPage() {
                 <div className="relative" ref={filterRef}>
                   <button
                     className="inline-flex min-w-[13rem] items-center justify-between gap-4 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-950 transition-colors"
-                    onClick={() => setIsFilterOpen((open) => !open)}
+                    onClick={() =>
+                      setFilterState((current) => ({
+                        studentId: student.id,
+                        isOpen: current.studentId === student.id ? !current.isOpen : true,
+                      }))}
                     type="button"
                   >
                     <span>{selectedTestType}</span>
@@ -595,8 +683,14 @@ function TeacherStudentDetailPage() {
                           className="flex w-full items-center justify-between bg-slate-950 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-slate-950"
                           key={option}
                           onClick={() => {
-                            setSelectedTestType(option);
-                            setIsFilterOpen(false);
+                            setSelectedTestTypes((current) => ({
+                              ...current,
+                              [student.id]: option,
+                            }));
+                            setFilterState({
+                              studentId: student.id,
+                              isOpen: false,
+                            });
                           }}
                           type="button"
                         >
@@ -608,13 +702,54 @@ function TeacherStudentDetailPage() {
                 </div>
               )}
             />
-            <div className="max-h-[30rem] space-y-3 overflow-y-auto px-5 pt-5">
-              {studentInfoPanel.items.map((item) => (
-                <div className="min-h-[5rem] border border-slate-200/80 bg-slate-50/70 p-4" key={item.label}>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.label}</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
+            <div className={`${
+              studentInfoPanel.layout === "writing"
+                ? "flex-1 overflow-hidden px-3 pb-3 pt-3"
+                : "max-h-[30rem] space-y-3 overflow-y-auto px-5 pt-5"
+            }`}>
+              {studentInfoPanel.layout === "writing" ? (
+                <div className="grid h-full gap-1.5 md:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+                  <div className="grid h-full gap-1.5 md:grid-rows-[minmax(0,1fr)_minmax(0,3fr)]">
+                    {studentInfoPanel.topItems.map((item) => (
+                      <div
+                        className={`flex flex-col gap-2 overflow-hidden border border-slate-200/80 bg-slate-50/70 p-2.5 ${
+                          item.label === "Average score"
+                            ? "h-[calc(100%-4px)] self-start"
+                            : item.label === "Weak areas"
+                              ? "h-[calc(100%+4px)] self-end"
+                              : "h-full"
+                        }`}
+                        key={item.label}
+                      >
+                        <p className="text-[10px] uppercase leading-tight tracking-[0.14em] text-slate-500">{item.label}</p>
+                        <p className={`font-semibold text-slate-900 ${
+                          item.label === "Average score"
+                            ? "text-[1.8rem] tracking-[-0.05em]"
+                            : "text-sm leading-5"
+                        }`}>
+                          {item.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid h-full gap-1.5 md:grid-rows-[repeat(4,minmax(0,1fr))]">
+                    {studentInfoPanel.rubricItems.map((item) => (
+                      <div className="flex h-full flex-col gap-1.5 overflow-hidden border border-slate-200/80 bg-slate-50/70 p-2.5" key={item.label}>
+                        <p className="text-[10px] uppercase leading-tight tracking-[0.14em] text-slate-500">{item.label}</p>
+                        <p className="text-[1.45rem] font-semibold tracking-[-0.04em] text-slate-900">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              ) : (
+                studentInfoPanel.items.map((item) => (
+                  <div className="min-h-[5rem] border border-slate-200/80 bg-slate-50/70 p-4" key={item.label}>
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.label}</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
+                  </div>
+                ))
+              )}
             </div>
           </PanelShell>
         </div>
@@ -636,6 +771,46 @@ function TeacherStudentDetailPage() {
                 <p className="text-sm leading-7 text-slate-700">{recommendation}</p>
               </div>
             ))}
+          </div>
+        </PanelShell>
+      </div>
+
+      <div className="space-y-3">
+        <p className="px-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          Messaging
+        </p>
+        <PanelShell>
+          <div className="border-b border-slate-950 bg-slate-950 px-5 py-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white">
+              Send message to student
+            </p>
+          </div>
+
+          <div className="space-y-4 p-5">
+            <textarea
+              className="min-h-32 w-full resize-none border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white"
+              onChange={(event) =>
+                setMessageDrafts((current) => ({
+                  ...current,
+                  [student.id]: event.target.value,
+                }))}
+              placeholder={`Type a message for ${student.name}.`}
+              value={messageDraft}
+            />
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-slate-500">
+                {lastSentMessage ? `Last message ${lastSentMessage}` : "No student message sent yet."}
+              </div>
+              <button
+                className="inline-flex items-center justify-center gap-2 border border-slate-950 bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
+                onClick={handleSendMessage}
+                type="button"
+              >
+                <Send className="h-4 w-4" />
+                Send message
+              </button>
+            </div>
           </div>
         </PanelShell>
       </div>

@@ -3,11 +3,15 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   BellRing,
+  BookOpenText,
   ChevronRight,
   Clock3,
+  FileText,
+  Headphones,
   LockKeyhole,
   PauseCircle,
   PenSquare,
+  PenLine,
   PlayCircle,
   Plus,
   Radio,
@@ -37,6 +41,7 @@ import {
   PanelShell,
   StatusBadge,
 } from "../../components/teacher/TeacherPanelPrimitives";
+import { TimePickerField } from "../../components/ui/StyledFormControls";
 import { teacherStudents } from "../../data/teacherPanel";
 import {
   getAllTeacherClasses,
@@ -129,6 +134,87 @@ function buildInferredEmail(student) {
   }
 
   return `${student.name.toLowerCase().trim().replace(/\s+/g, ".").replace(/[^a-z.]/g, "")}@ieltsai.app`;
+}
+
+const CLASS_SKILL_AREAS = [
+  {
+    key: "listening",
+    label: "Listening",
+    icon: Headphones,
+    accent: "bg-blue-50 text-blue-700",
+  },
+  {
+    key: "reading",
+    label: "Reading",
+    icon: BookOpenText,
+    accent: "bg-emerald-50 text-emerald-700",
+  },
+  {
+    key: "writingTask1",
+    label: "Writing Task 1",
+    icon: FileText,
+    accent: "bg-amber-50 text-amber-700",
+  },
+  {
+    key: "writingTask2",
+    label: "Writing Task 2",
+    icon: PenLine,
+    accent: "bg-rose-50 text-rose-700",
+  },
+];
+
+function classifyClassSkillArea(weakArea) {
+  const normalizedValue = String(weakArea || "").toLowerCase();
+
+  if (!normalizedValue || normalizedValue.includes("behavior anomaly") || normalizedValue.includes("placement pending")) {
+    return null;
+  }
+
+  if (
+    normalizedValue.includes("reading")
+    || normalizedValue.includes("headings")
+    || normalizedValue.includes("true-false")
+    || normalizedValue.includes("detail trap")
+    || normalizedValue.includes("inference")
+    || normalizedValue.includes("pacing")
+    || normalizedValue.includes("timing")
+  ) {
+    return "reading";
+  }
+
+  if (
+    normalizedValue.includes("task 1")
+    || normalizedValue.includes("overview")
+    || normalizedValue.includes("data grouping")
+    || normalizedValue.includes("report")
+  ) {
+    return "writingTask1";
+  }
+
+  if (
+    normalizedValue.includes("essay")
+    || normalizedValue.includes("cohesion")
+    || normalizedValue.includes("coherence")
+    || normalizedValue.includes("task response")
+    || normalizedValue.includes("conclusion")
+    || normalizedValue.includes("planning")
+  ) {
+    return "writingTask2";
+  }
+
+  if (
+    normalizedValue.includes("listening")
+    || normalizedValue.includes("map")
+    || normalizedValue.includes("multiple choice")
+    || normalizedValue.includes("note")
+    || normalizedValue.includes("form")
+    || normalizedValue.includes("sentence completion")
+    || normalizedValue.includes("distractor")
+  ) {
+    return "listening";
+  }
+
+  return null;
 }
 
 function getPaymentStatus(student) {
@@ -264,6 +350,7 @@ function buildGenericSessionStudent(student, index) {
     id: student.id,
     name: student.name,
     email: buildInferredEmail(student),
+    weakArea: student.weakArea,
     lastWeekHours: buildLastWeekHours(student, index),
     status,
     progress: [28, 44, 61, 75, 94][index % 5],
@@ -298,6 +385,7 @@ function buildBlueCohortSessionStudent(student, index) {
     id: student.id,
     name: student.name,
     email: buildInferredEmail(student),
+    weakArea: student.weakArea,
     lastWeekHours: buildLastWeekHours(student, index),
     status: session.riskLevel === "High"
       ? "Suspicious"
@@ -393,7 +481,7 @@ function SummaryChip({ icon: Icon, label, value, tone = "slate" }) {
   };
 
   return (
-    <div className={`inline-flex items-center gap-3 border px-4 py-3 ${toneClasses[tone]}`}>
+    <div className={`inline-flex h-[80px] items-center gap-3 border px-4 ${toneClasses[tone]}`}>
       <span className="flex h-9 w-9 items-center justify-center border border-current/15 bg-white/80">
         <Icon className="h-4 w-4" />
       </span>
@@ -407,6 +495,8 @@ function SummaryChip({ icon: Icon, label, value, tone = "slate" }) {
 
 function HeaderPanel({
   classroom,
+  note,
+  onOpenNoteModal,
   onOpenEditModal,
   onOpenInviteModal,
   totalStudents,
@@ -424,13 +514,17 @@ function HeaderPanel({
               <h2 className="text-3xl font-semibold tracking-[-0.05em] text-slate-950">
                 {classroom.name}
               </h2>
-              <div className="flex flex-wrap gap-3">
-                <SummaryChip icon={Clock3} label="Lesson time" value={classroom.startTime} />
-                <SummaryChip icon={Users2} label="Total students" value={String(totalStudents)} tone="emerald" />
-              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <button
+                className="inline-flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-slate-300 hover:bg-slate-50"
+                onClick={onOpenNoteModal}
+                type="button"
+              >
+                <FileText className="h-4 w-4" />
+                Note
+              </button>
               <button
                 className="inline-flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-slate-300 hover:bg-slate-50"
                 onClick={onOpenEditModal}
@@ -449,9 +543,83 @@ function HeaderPanel({
               </button>
             </div>
           </div>
+
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <SummaryChip icon={Clock3} label="Lesson time" value={classroom.startTime} />
+              <SummaryChip icon={Users2} label="Total students" value={String(totalStudents)} tone="emerald" />
+            </div>
+
+            {note ? (
+              <div className="h-[80px] w-full overflow-hidden border border-slate-200/80 bg-slate-50/70 px-4 py-3 xl:ml-6 xl:max-w-md xl:flex-shrink-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Note
+                </p>
+                <div className="mt-1 max-h-[calc(75px-34px)] overflow-y-auto pr-1">
+                  <p className="text-sm leading-5 text-slate-700">{note}</p>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </PanelShell>
+  );
+}
+
+function ClassNoteModal({ isOpen, noteDraft, onChange, onClose, onSubmit }) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
+      <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-2xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+          <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
+            <div className="flex min-h-11 items-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                Class note
+              </p>
+            </div>
+            <button
+              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="space-y-5 p-6">
+            <textarea
+              className="min-h-40 w-full resize-none border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
+              onChange={onChange}
+              placeholder="Write a note for this class."
+              value={noteDraft}
+            />
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                className="inline-flex items-center gap-2 border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white"
+                onClick={onSubmit}
+                type="button"
+              >
+                Save note
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -494,11 +662,10 @@ function EditClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               </label>
               <label className="space-y-2 text-sm text-slate-600">
                 <span className="font-medium text-slate-900">Lesson time</span>
-                <input
-                  className="w-full border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
+                <TimePickerField
+                  className=""
                   name="startTime"
                   onChange={onChange}
-                  type="time"
                   value={form.startTime}
                 />
               </label>
@@ -556,7 +723,7 @@ function InviteStudentModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-5xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-5xl overflow-visible bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="-mx-px flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
@@ -1064,6 +1231,99 @@ function MonitoringPanel({ students, feed }) {
   );
 }
 
+function ClassStrengthPanel({ students }) {
+  const metrics = CLASS_SKILL_AREAS.map((area) => ({
+    ...area,
+    strugglingCount: 0,
+  }));
+
+  const areaByKey = new Map(metrics.map((area) => [area.key, area]));
+  const denominator = students.filter((student) => classifyClassSkillArea(student.weakArea)).length || 1;
+
+  students.forEach((student) => {
+    const area = areaByKey.get(classifyClassSkillArea(student.weakArea));
+    if (area) {
+      area.strugglingCount += 1;
+    }
+  });
+
+  const rankedMetrics = metrics.map((area) => {
+    const pressureShare = area.strugglingCount / denominator;
+    return {
+      ...area,
+      pressureShare,
+      strengthScore: Math.max(8, Math.round((1 - pressureShare) * 100)),
+    };
+  });
+
+  const strongestArea = [...rankedMetrics].sort((left, right) => right.strengthScore - left.strengthScore)[0] ?? null;
+  const weakestArea = [...rankedMetrics].sort((left, right) => left.strengthScore - right.strengthScore)[0] ?? null;
+
+  return (
+    <div className="space-y-2">
+      <p className="px-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+        Class Strength Chart
+      </p>
+
+      <PanelShell>
+        <div className="space-y-4 p-5">
+          {rankedMetrics.map((area) => {
+            const Icon = area.icon;
+            const isStrongest = strongestArea?.key === area.key;
+            const isWeakest = weakestArea?.key === area.key;
+
+            return (
+              <article className="border border-slate-200/80 bg-white p-4" key={area.key}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-9 w-9 items-center justify-center border border-slate-900/20 bg-white text-slate-500/80">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-950">{area.label}</p>
+                          {isStrongest ? <StatusBadge tone="emerald">Strongest</StatusBadge> : null}
+                          {isWeakest ? <StatusBadge tone="rose">Weakest</StatusBadge> : null}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {area.strugglingCount} students flag this as a weak area
+                        </p>
+                      </div>
+                    </div>
+
+                  <div className="min-w-[7rem] text-left lg:text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Confidence
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+                      {area.strengthScore}%
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={`h-full ${
+                        isStrongest
+                          ? "emerald-gradient-fill"
+                          : isWeakest
+                            ? "bg-rose-500"
+                            : "bg-slate-900"
+                      }`}
+                      style={{ width: `${area.strengthScore}%` }}
+                    />
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </PanelShell>
+    </div>
+  );
+}
+
 function TaskControlPanel({
   sessionLive,
   answersLocked,
@@ -1404,7 +1664,7 @@ function CommunicationPanel({ message, lastSentMessage, onChange, onSend, onQuic
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-slate-500">
-              {lastSentMessage ? `Last message: ${lastSentMessage}` : "No classroom message sent yet."}
+              {lastSentMessage ? `Last message ${lastSentMessage}` : "No classroom message sent yet."}
             </div>
             <button
               className="inline-flex items-center justify-center gap-2 border border-slate-950 bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
@@ -1449,6 +1709,7 @@ function TeacherClassOverviewPage() {
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [studentPendingRemoval, setStudentPendingRemoval] = useState(null);
   const [inviteSearch, setInviteSearch] = useState("");
   const [studentRosterSearch, setStudentRosterSearch] = useState("");
@@ -1508,9 +1769,12 @@ function TeacherClassOverviewPage() {
   const [answersLocked, setAnswersLocked] = useState(false);
   const [message, setMessage] = useState("");
   const [lastSentMessage, setLastSentMessage] = useState("");
+  const [classNote, setClassNote] = useState(() => String(classroom.note || "").trim());
+  const [classNoteDraft, setClassNoteDraft] = useState(() => String(classroom.note || "").trim());
   const displayClassroom = {
     ...classroom,
     ...classDetails,
+    note: classNote,
   };
   const totalStudentsCount = rosterStudents.length;
 
@@ -1530,7 +1794,10 @@ function TeacherClassOverviewPage() {
 
     setClassDetails(nextClassDetails);
     setClassEditForm(nextClassDetails);
-  }, [classroom.id, classroom.name, classroom.startTime]);
+    const nextClassNote = String(classroom.note || "").trim();
+    setClassNote(nextClassNote);
+    setClassNoteDraft(nextClassNote);
+  }, [classroom.id, classroom.name, classroom.note, classroom.startTime]);
 
   useEffect(() => {
     try {
@@ -1541,7 +1808,7 @@ function TeacherClassOverviewPage() {
   }, [classOverrides]);
 
   useEffect(() => {
-    if (!isAddStudentModalOpen && !isInviteModalOpen && !isEditClassModalOpen && !studentPendingRemoval) {
+    if (!isAddStudentModalOpen && !isInviteModalOpen && !isEditClassModalOpen && !isNoteModalOpen && !studentPendingRemoval) {
       setStudentSearch("");
       document.body.style.overflow = "";
       return undefined;
@@ -1553,7 +1820,7 @@ function TeacherClassOverviewPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isAddStudentModalOpen, isEditClassModalOpen, isInviteModalOpen, studentPendingRemoval]);
+  }, [isAddStudentModalOpen, isEditClassModalOpen, isInviteModalOpen, isNoteModalOpen, studentPendingRemoval]);
 
   useEffect(() => {
     if (!sessionLive || remainingSeconds <= 0) {
@@ -1604,12 +1871,28 @@ function TeacherClassOverviewPage() {
       return;
     }
 
-    setLastSentMessage(message.trim());
+    const sentAtLabel = new Intl.DateTimeFormat("en-GB", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
+
+    setLastSentMessage(`(${sentAtLabel}): ${message.trim()}`);
     setMessage("");
   };
 
   const handleQuickAlert = (alert) => {
-    setLastSentMessage(alert);
+    const sentAtLabel = new Intl.DateTimeFormat("en-GB", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
+
+    setLastSentMessage(`(${sentAtLabel}): ${alert}`);
     setMessage("");
   };
 
@@ -1621,6 +1904,16 @@ function TeacherClassOverviewPage() {
   const handleCloseEditClassModal = () => {
     setClassEditForm(classDetails);
     setIsEditClassModalOpen(false);
+  };
+
+  const handleOpenNoteModal = () => {
+    setClassNoteDraft(classNote);
+    setIsNoteModalOpen(true);
+  };
+
+  const handleCloseNoteModal = () => {
+    setClassNoteDraft(classNote);
+    setIsNoteModalOpen(false);
   };
 
   const handleEditClassFormChange = (event) => {
@@ -1653,6 +1946,20 @@ function TeacherClassOverviewPage() {
       },
     }));
     setIsEditClassModalOpen(false);
+  };
+
+  const handleSaveClassNote = () => {
+    const trimmedNote = classNoteDraft.trim();
+
+    setClassNote(trimmedNote);
+    setClassOverrides((current) => ({
+      ...current,
+      [classroom.id]: {
+        ...(current[classroom.id] ?? {}),
+        note: trimmedNote,
+      },
+    }));
+    setIsNoteModalOpen(false);
   };
 
   const resetInviteForm = () => {
@@ -1804,8 +2111,18 @@ function TeacherClassOverviewPage() {
         onSubmit={handleSaveClassDetails}
       />
 
+      <ClassNoteModal
+        isOpen={isNoteModalOpen}
+        noteDraft={classNoteDraft}
+        onChange={(event) => setClassNoteDraft(event.target.value)}
+        onClose={handleCloseNoteModal}
+        onSubmit={handleSaveClassNote}
+      />
+
       <HeaderPanel
         classroom={displayClassroom}
+        note={classNote}
+        onOpenNoteModal={handleOpenNoteModal}
         onOpenEditModal={handleOpenEditClassModal}
         onOpenInviteModal={() => setIsInviteModalOpen(true)}
         totalStudents={totalStudentsCount}
@@ -1826,7 +2143,9 @@ function TeacherClassOverviewPage() {
         />
       </section>
 
-      <section>
+      <section className="grid gap-6 xl:grid-cols-2">
+        <ClassStrengthPanel classroomName={displayClassroom.name} students={students} />
+
         <CommunicationPanel
           lastSentMessage={lastSentMessage}
           message={message}
