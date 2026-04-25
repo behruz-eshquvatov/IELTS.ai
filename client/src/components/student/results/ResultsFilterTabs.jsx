@@ -1,5 +1,4 @@
-import { LayoutGroup, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutGroup, motion as Motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 function RollingLabel({ label, active }) {
@@ -19,6 +18,8 @@ function RollingLabel({ label, active }) {
 
 function ResultsFilterTabs({ filters = [], activeKey = "all", onChange }) {
   const scrollRef = useRef(null);
+  const autoScrollFrameRef = useRef(null);
+  const autoScrollDirectionRef = useRef(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
@@ -35,25 +36,57 @@ function ResultsFilterTabs({ filters = [], activeKey = "all", onChange }) {
     setCanScrollRight(element.scrollLeft < maxScrollLeft - 2);
   }, []);
 
-  const handleArrowScroll = useCallback((direction) => {
-    const element = scrollRef.current;
-    if (!element) {
+  const stopAutoScroll = useCallback(() => {
+    autoScrollDirectionRef.current = 0;
+    if (autoScrollFrameRef.current) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+  }, []);
+
+  const startAutoScroll = useCallback((direction) => {
+    autoScrollDirectionRef.current = direction;
+
+    if (autoScrollFrameRef.current) {
       return;
     }
 
-    element.scrollBy({
-      left: direction * 280,
-      behavior: "smooth",
-    });
-  }, []);
+    const tick = () => {
+      const element = scrollRef.current;
+      const currentDirection = autoScrollDirectionRef.current;
+
+      if (!element || currentDirection === 0) {
+        autoScrollFrameRef.current = null;
+        return;
+      }
+
+      const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+      if (
+        (currentDirection < 0 && element.scrollLeft <= 0)
+        || (currentDirection > 0 && element.scrollLeft >= maxScrollLeft)
+      ) {
+        stopAutoScroll();
+        updateScrollState();
+        return;
+      }
+
+      element.scrollLeft += currentDirection * 7;
+      updateScrollState();
+      autoScrollFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    autoScrollFrameRef.current = window.requestAnimationFrame(tick);
+  }, [stopAutoScroll, updateScrollState]);
 
   useEffect(() => {
-    updateScrollState();
+    const frameId = window.requestAnimationFrame(updateScrollState);
     window.addEventListener("resize", updateScrollState);
     return () => {
+      window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", updateScrollState);
+      stopAutoScroll();
     };
-  }, [updateScrollState]);
+  }, [stopAutoScroll, updateScrollState]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -69,73 +102,67 @@ function ResultsFilterTabs({ filters = [], activeKey = "all", onChange }) {
         inline: "center",
       });
     }
-  }, [activeKey, filters]);
+
+    const frameId = window.requestAnimationFrame(updateScrollState);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [activeKey, filters, updateScrollState]);
 
   return (
     <LayoutGroup>
-      <div className="rounded-none border border-slate-200/90 bg-[#fbf8f2] p-3">
-        <div className="flex items-center gap-2">
-          <button
-            aria-label="Scroll filters left"
-            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center border text-slate-700 transition ${
-              canScrollLeft
-                ? "border-slate-300 bg-white hover:border-slate-400 hover:text-slate-900"
-                : "border-slate-200 bg-slate-100 text-slate-300"
-            }`}
-            disabled={!canScrollLeft}
-            onClick={() => handleArrowScroll(-1)}
-            type="button"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-
+      <div className="border-none bg-transparent p-0">
+        <div className="relative">
           <div
             ref={scrollRef}
             className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             onScroll={updateScrollState}
           >
             <div className="flex min-w-max items-center gap-2 pr-1">
-          {(Array.isArray(filters) ? filters : []).map((filter) => {
-            const isActive = activeKey === filter.key;
-            const label = `${filter?.label || String(filter?.key || "").toUpperCase()} (${Number(filter?.count || 0)})`;
+              {(Array.isArray(filters) ? filters : []).map((filter) => {
+                const isActive = activeKey === filter.key;
+                const label = filter?.label || String(filter?.key || "").toUpperCase();
 
-            return (
-              <button
-                className={`group/filter relative shrink-0 rounded-none px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-colors ${
-                  isActive ? "text-slate-950" : "text-slate-600 hover:text-slate-950"
-                }`}
-                data-filter-key={String(filter?.key || "")}
-                key={String(filter?.key || label)}
-                onClick={() => onChange?.(filter?.key || "all")}
-                type="button"
-              >
-                {isActive ? (
-                  <motion.span
-                    className="absolute inset-0 z-0 border border-slate-300 bg-white"
-                    layoutId="results-filter-active-pill"
-                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                  />
-                ) : null}
-                <RollingLabel active={isActive} label={label} />
-              </button>
-            );
-          })}
+                return (
+                  <button
+                    className={`group/filter relative shrink-0 rounded-none px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-colors ${
+                      isActive ? "text-slate-950" : "text-slate-600 hover:text-slate-950"
+                    }`}
+                    data-filter-key={String(filter?.key || "")}
+                    key={String(filter?.key || label)}
+                    onClick={() => onChange?.(filter?.key || "all")}
+                    type="button"
+                  >
+                    {isActive ? (
+                      <Motion.span
+                        className="absolute inset-0 z-0 border-b-2 border-slate-500 bg-transparent"
+                        layoutId="results-filter-active-underline"
+                        transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                      />
+                    ) : null}
+                    <RollingLabel active={isActive} label={label} />
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <button
-            aria-label="Scroll filters right"
-            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center border text-slate-700 transition ${
-              canScrollRight
-                ? "border-slate-300 bg-white hover:border-slate-400 hover:text-slate-900"
-                : "border-slate-200 bg-slate-100 text-slate-300"
+          <div
+            aria-hidden="true"
+            className={`absolute inset-y-0 left-0 w-14 bg-gradient-to-r from-[#fbf8f2]/80 to-transparent transition-opacity ${
+              canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
-            disabled={!canScrollRight}
-            onClick={() => handleArrowScroll(1)}
-            type="button"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+            onMouseEnter={() => startAutoScroll(-1)}
+            onMouseLeave={stopAutoScroll}
+          />
+          <div
+            aria-hidden="true"
+            className={`absolute inset-y-0 right-0 w-14 bg-gradient-to-l from-[#fbf8f2]/80 to-transparent transition-opacity ${
+              canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+            onMouseEnter={() => startAutoScroll(1)}
+            onMouseLeave={stopAutoScroll}
+          />
         </div>
       </div>
     </LayoutGroup>

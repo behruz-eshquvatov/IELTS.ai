@@ -260,7 +260,7 @@ const StudentMainContent = memo(function StudentMainContent() {
         </div>
       </header>
 
-      <div className="flex-1 p-4 lg:p-6">
+      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <div className="mx-auto max-w-6xl">
           <Outlet />
         </div>

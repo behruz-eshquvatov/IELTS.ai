@@ -6,6 +6,7 @@ import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
 import useTextHighlighting from "../../hooks/useTextHighlighting";
 import ExamLeaveWarningModal from "./exam/ExamLeaveWarningModal";
+import { SelectControl } from "../ui/StyledFormControls";
 
 const START_COUNTDOWN_SECONDS = 3;
 const DEFAULT_ATTEMPT_DURATION_SECONDS = 20 * 60;
@@ -805,11 +806,11 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
             </div>
 
             {answerContext?.showPromptSelect && promptQuestionStorageId ? (
-              <select
-                className={`h-9 min-w-30 border bg-white px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 outline-none transition ${
+              <SelectControl
+                className={`h-9 min-w-30 px-3 pr-10 text-xs font-semibold uppercase tracking-[0.12em] ${
                   answerContext?.isInputDisabled
                     ? "cursor-not-allowed border-slate-300 text-slate-400"
-                    : "border-slate-300 focus:border-emerald-500"
+                    : "border-slate-300"
                 }`}
                 disabled={answerContext?.isInputDisabled}
                 onChange={(event) => answerContext?.onSelect?.(promptQuestionStorageId, event.target.value)}
@@ -821,7 +822,7 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
                     {item.label}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             ) : null}
           </div>
         );
@@ -1761,8 +1762,13 @@ function ReadingPassageWithBlocks({
       return;
     }
 
-    setIsResultModalOpen(false);
-  }, [leaveProtection, shouldProceedAfterResult]);
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/student/tests/reading");
+  }, [leaveProtection, navigate, shouldProceedAfterResult]);
 
   useEffect(() => {
     const nowMs = Date.now();
@@ -2201,7 +2207,7 @@ function ReadingPassageWithBlocks({
       {isResultModalOpen && result ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
-          onClick={() => setIsResultModalOpen(false)}
+          onClick={(event) => event.stopPropagation()}
         >
           <div
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
@@ -2250,7 +2256,7 @@ function ReadingPassageWithBlocks({
                 onClick={handleResultPrimaryAction}
                 type="button"
               >
-                {shouldProceedAfterResult ? "Leave Page" : "Continue Review"}
+                Leave Page
               </button>
             </div>
           </div>

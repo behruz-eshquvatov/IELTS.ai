@@ -66,8 +66,8 @@ function RecentActivityCard({ task }) {
           </span>
           <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-500 transition-colors duration-300 group-hover:text-emerald-700" />
         </div>
-        <div className="flex items-start gap-3 pr-24">
-          <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition group-hover:bg-emerald-50 group-hover:text-emerald-700">
+        <div className="flex min-h-11 items-stretch gap-3 pr-24">
+          <span className="inline-flex w-10 shrink-0 items-center justify-center border border-slate-200 bg-slate-100 text-slate-700 transition group-hover:border-emerald-200 group-hover:bg-emerald-50 group-hover:text-emerald-700">
             <Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0 space-y-1">

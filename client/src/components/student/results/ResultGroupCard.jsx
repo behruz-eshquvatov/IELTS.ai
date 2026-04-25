@@ -1,62 +1,79 @@
-import { ArrowUpRight } from "lucide-react";
+import { BookOpenText, ClipboardList, Headphones, PenLine } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDateTime } from "./resultsUtils";
+
+function getGroupTypeMeta(group = {}) {
+  const category = String(group?.category || "").toLowerCase();
+  const taskType = String(group?.taskType || "").toLowerCase();
+  const source = `${category} ${taskType}`;
+
+  if (source.includes("listening")) {
+    return { Icon: Headphones };
+  }
+
+  if (source.includes("writing")) {
+    return { Icon: PenLine };
+  }
+
+  if (source.includes("reading")) {
+    return { Icon: BookOpenText };
+  }
+
+  return { Icon: ClipboardList };
+}
 
 function ResultGroupCard({ group }) {
   const latestAttempt = group?.latestAttempt || null;
   const openRoute = group?.navigation?.route || latestAttempt?.navigation?.route || "/student/results";
   const latestTimeLabel = latestAttempt?.totalTimeSpentLabel || "0m";
-  const latestAttemptNumber = Math.max(
-    1,
-    Number(latestAttempt?.groupAttemptNumber || latestAttempt?.attemptNumber || group?.attemptCount || 1),
-  );
+  const attemptsCount = Number(group?.attemptsCount ?? group?.attemptCount ?? 0);
+  const title = group?.readableTitle || group?.title || "Completed task";
+  const { Icon } = getGroupTypeMeta(group);
 
   return (
     <article className="rounded-none border border-slate-200/90 bg-white/95 p-5 shadow-[0_18px_40px_-36px_rgba(15,23,42,0.45)]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold leading-7 text-slate-900">
-            <span>{group?.readableTitle || "Completed task"}</span>
-            <span className="ml-3 inline-flex items-center border border-slate-300 bg-slate-50 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-600">
-              Attempt {latestAttemptNumber}
-            </span>
-          </h2>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-slate-500">
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="min-w-0 truncate text-lg font-semibold leading-7 text-slate-900">
+              {title}
+            </h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <p className="inline-flex items-center gap-1 border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em]">
+                <span className="text-slate-500">Attempts:</span>
+                <span className="font-bold text-slate-950">{attemptsCount}</span>
+              </p>
+              <p className="inline-flex items-center gap-1 border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em]">
+                <span className="text-slate-500">Latest Score:</span>
+                <span className="font-bold text-slate-950">{group?.latestScoreLabel || "Completed"}</span>
+              </p>
+              <p className="inline-flex items-center gap-1 border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em]">
+                <span className="text-slate-500">Time Spent:</span>
+                <span className="font-bold text-slate-950">{latestTimeLabel}</span>
+              </p>
+              <p className="inline-flex items-center gap-1 border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em]">
+                <span className="text-slate-500">Completed:</span>
+                <span className="font-bold text-slate-950">{formatDateTime(group?.latestSubmittedAt)}</span>
+              </p>
+            </div>
+          </div>
         </div>
         <Link
-          className="inline-flex items-center gap-2 border border-slate-300 bg-white px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800"
+          className="group/review inline-flex shrink-0 items-center gap-2.5 justify-self-end border-none bg-transparent px-1 py-2 text-xs font-bold uppercase tracking-[0.22em] text-emerald-700 transition-colors duration-300 hover:text-emerald-900"
           to={openRoute}
         >
-          Open
-          <ArrowUpRight className="h-3.5 w-3.5" />
+          <span className="relative block h-[1.1rem] overflow-hidden">
+            <span className="flex flex-col transition-transform duration-300 ease-out group-hover/review:-translate-y-1/2">
+              <span className="h-[1.1rem]">Review</span>
+              <span className="h-[1.1rem] text-emerald-900">Review</span>
+            </span>
+          </span>
         </Link>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        <div className="border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Attempts
-          </p>
-          <p className="mt-1 text-base font-semibold text-slate-900">{Number(group?.attemptCount || 0)}</p>
-        </div>
-        <div className="border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Latest Score
-          </p>
-          <p className="mt-1 text-base font-semibold text-slate-900">{group?.latestScoreLabel || "Completed"}</p>
-        </div>
-        <div className="border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Time Spent
-          </p>
-          <p className="mt-1 text-base font-semibold text-slate-900">{latestTimeLabel}</p>
-        </div>
-        <div className="border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Completed
-          </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">{formatDateTime(group?.latestSubmittedAt)}</p>
-        </div>
-      </div>
     </article>
   );
 }

@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronRight, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { CalendarDays, ChevronRight, Plus, Users } from "lucide-react";
+import MagneticButton from "../ui/MagneticButton";
 
 function RollingHoverLabel({ label, hoverClassName = "text-emerald-600" }) {
   return (
-    <span className="relative block h-[1.2rem] overflow-hidden">
+    <span className="relative block h-[1.2rem] overflow-hidden leading-none">
       <span className="flex translate-y-0 flex-col transition-transform duration-300 ease-out group-hover:-translate-y-1/2">
-        <span className="h-[1.2rem] text-slate-700">{label}</span>
-        <span className={`h-[1.2rem] ${hoverClassName}`}>{label}</span>
+        <span className="flex h-[1.2rem] items-center text-slate-700">{label}</span>
+        <span className={`flex h-[1.2rem] items-center ${hoverClassName}`}>{label}</span>
       </span>
     </span>
   );
@@ -126,101 +126,132 @@ function TeacherClassCard({
   return (
     <article
       ref={cardRef}
-      className={`group/class-card relative overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(242,247,245,0.96))] p-px shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-34px_rgba(16,185,129,0.24)] ${
-        viewMode === "grid" ? "aspect-square" : "min-h-[116px]"
-      }`}
+      className="group/class-card relative z-0 overflow-visible bg-slate-200 p-[1.5px] cursor-default transition-colors duration-600"
       style={{
         backgroundImage:
-          "radial-gradient(360px circle at var(--card-x, 50%) var(--card-y, 50%), rgba(16,185,129,0.28), transparent 62%), radial-gradient(620px circle at var(--card-x, 50%) var(--card-y, 50%), rgba(16,185,129,0.08), transparent 58%)",
+          "radial-gradient(480px circle at var(--card-x, 50%) var(--card-y, 50%), rgba(16,185,129,1), transparent 68%), radial-gradient(760px circle at var(--card-x, 50%) var(--card-y, 50%), rgba(16,185,129,0.14), transparent 62%)",
       }}
     >
       <div
-        className={`relative flex h-full bg-white p-5 ${
-          viewMode === "grid" ? "flex-col" : "flex-col gap-3 lg:flex-row lg:items-center lg:px-5 lg:py-3"
+        className={`relative flex h-full overflow-hidden ${
+          viewMode === "grid"
+            ? "justify-center bg-[#f7f4ef] aspect-square flex-col p-6"
+            : "justify-center bg-[#f7f4ef] min-h-[140px] flex-col px-6 py-4"
         }`}
       >
-        <div
-          className="pointer-events-none absolute h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.18),rgba(255,255,255,0)_72%)] opacity-0 transition-opacity duration-200 group-hover/class-card:opacity-100"
-          style={{ left: "var(--card-x, 50%)", top: "var(--card-y, 50%)", willChange: "left, top, opacity" }}
-        />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/45 to-transparent opacity-0 transition-opacity duration-500 group-hover/class-card:opacity-100" />
 
-        <div className={`relative z-10 ${viewMode === "grid" ? "" : "flex-1"}`}>
-          <div className="space-y-1">
-            <EditableField
-              classId={classroom.id}
-              className={`cursor-text text-left font-semibold leading-none tracking-[-0.04em] text-slate-950 ${
-                viewMode === "grid" ? "text-[2rem]" : "text-[1.45rem]"
-              }`}
-              draftValue={draftValue}
-              editingField={editingField}
-              extraWidth={30}
-              field="name"
-              inputClassName={`border border-emerald-200 bg-white px-2 py-1 font-semibold leading-none tracking-[-0.04em] text-slate-950 outline-none ring-2 ring-emerald-100 ${
-                viewMode === "grid" ? "text-[2rem]" : "text-[1.45rem]"
-              }`}
-              minWidth={200}
-              onCancel={onCancel}
-              onCommit={onCommit}
-              onDraftChange={onDraftChange}
-              onStartEditing={() => onStartEditing(classroom.id, "name", classroom.name)}
-              value={classroom.name}
-            />
-          </div>
+        {viewMode === "grid" ? (
+          <>
+            <div className="relative z-10 flex-1">
+              <div className="space-y-1">
+                <EditableField
+                  classId={classroom.id}
+                  className="cursor-text text-left text-[2rem] font-semibold leading-none tracking-[-0.04em] text-slate-950"
+                  draftValue={draftValue}
+                  editingField={editingField}
+                  extraWidth={30}
+                  field="name"
+                  inputClassName="border border-emerald-200 bg-white px-2 py-1 text-[2rem] font-semibold leading-none tracking-[-0.04em] text-slate-950 outline-none ring-2 ring-emerald-100"
+                  minWidth={200}
+                  onCancel={onCancel}
+                  onCommit={onCommit}
+                  onDraftChange={onDraftChange}
+                  onStartEditing={() => onStartEditing(classroom.id, "name", classroom.name)}
+                  value={classroom.name}
+                />
+              </div>
 
-          <div
-            className={`text-slate-700 ${
-              viewMode === "grid"
-                ? "mt-6 space-y-3 text-sm"
-                : "mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[0.92rem] lg:mt-2"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <CalendarDays className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover/class-card:text-emerald-500" />
-              <EditableField
-                classId={classroom.id}
-                className="cursor-text text-left"
-                draftValue={draftValue}
-                editingField={editingField}
-                extraWidth={18}
-                field="startTime"
-                inputClassName="border border-emerald-200 bg-white px-2 py-1 text-[0.92rem] text-slate-700 outline-none ring-2 ring-emerald-100"
-                minWidth={74}
-                onCancel={onCancel}
-                onCommit={onCommit}
-                onDraftChange={onDraftChange}
-                onStartEditing={() => onStartEditing(classroom.id, "startTime", classroom.startTime)}
-                value={classroom.startTime}
-              />
+              <div className="mt-6 space-y-3 text-sm text-slate-700">
+                <div className="flex items-center gap-3">
+                  <CalendarDays className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover/class-card:text-emerald-500" />
+                  <span>{classroom.startTime}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Users className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover/class-card:text-emerald-500" />
+                  <button
+                    className="group inline-flex cursor-pointer items-center gap-2 text-left"
+                    onClick={() => onOpenStudents(classroom.id)}
+                    type="button"
+                  >
+                    <RollingHoverLabel hoverClassName="text-emerald-600" label={`${classroom.students} students`} />
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200/70 bg-emerald-50/60 text-emerald-600 transition-all duration-200 group-hover:scale-110 group-hover:border-emerald-300 group-hover:bg-emerald-50 group-hover:text-emerald-700">
+                      <Plus className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-90" />
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Users className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover/class-card:text-emerald-500" />
-              <button
-                className="group inline-flex cursor-pointer text-left"
-                onClick={() => onOpenStudents(classroom.id)}
-                type="button"
+
+            <div className="relative z-10 mt-8 border-t border-slate-200/80 pt-4">
+              <div className="flex justify-end">
+              <MagneticButton
+                className="rounded-full"
+                disableGlow
+                innerClassName="emerald-gradient-fill inline-flex min-w-32 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
+                to={`/teacher/classes/${classroom.id}`}
               >
-                <RollingHoverLabel hoverClassName="text-emerald-600" label={`${classroom.students} students`} />
-              </button>
+                Enter to classroom
+                <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover/class-card:translate-x-1" />
+              </MagneticButton>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="relative z-10 flex w-full items-center gap-6">
+            <div className="w-full max-w-[75%]">
+              <div className="space-y-1">
+                <EditableField
+                  classId={classroom.id}
+                  className="cursor-text text-left text-[1.45rem] font-semibold leading-none tracking-[-0.04em] text-slate-950"
+                  draftValue={draftValue}
+                  editingField={editingField}
+                  extraWidth={30}
+                  field="name"
+                  inputClassName="border border-emerald-200 bg-white px-2 py-1 text-[1.45rem] font-semibold leading-none tracking-[-0.04em] text-slate-950 outline-none ring-2 ring-emerald-100"
+                  minWidth={200}
+                  onCancel={onCancel}
+                  onCommit={onCommit}
+                  onDraftChange={onDraftChange}
+                  onStartEditing={() => onStartEditing(classroom.id, "name", classroom.name)}
+                  value={classroom.name}
+                />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[0.92rem] text-slate-700">
+                <div className="flex items-center gap-3">
+                  <CalendarDays className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover/class-card:text-emerald-500" />
+                  <span>{classroom.startTime}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Users className="h-4 w-4 text-slate-400 transition-colors duration-300 group-hover/class-card:text-emerald-500" />
+                  <button
+                    className="group inline-flex cursor-pointer items-center gap-2 text-left"
+                    onClick={() => onOpenStudents(classroom.id)}
+                    type="button"
+                  >
+                    <RollingHoverLabel hoverClassName="text-emerald-600" label={`${classroom.students} students`} />
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200/70 bg-emerald-50/60 text-emerald-600 transition-all duration-200 group-hover:scale-110 group-hover:border-emerald-300 group-hover:bg-emerald-50 group-hover:text-emerald-700">
+                      <Plus className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-90" />
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="ml-auto flex w-full max-w-[25%] items-center justify-end">
+              <MagneticButton
+                className="rounded-full"
+                disableGlow
+                innerClassName="emerald-gradient-fill inline-flex min-w-32 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
+                to={`/teacher/classes/${classroom.id}`}
+              >
+                Enter to classroom
+                <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover/class-card:translate-x-1" />
+              </MagneticButton>
             </div>
           </div>
-        </div>
-
-        <div
-          className={`relative z-10 flex justify-end ${
-            viewMode === "grid"
-              ? "mt-auto border-t border-slate-200/80 pt-4"
-              : "border-t border-slate-200/80 pt-4 lg:ml-auto lg:self-center lg:border-t-0 lg:pt-0"
-          }`}
-        >
-          <Link
-            className="emerald-gradient-fill inline-flex min-w-32 items-center justify-center gap-2 rounded-full border border-emerald-300/20 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition-transform duration-200 hover:-translate-y-0.5"
-            to={`/teacher/classes/${classroom.id}`}
-          >
-            Enter to classroom
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
+        )}
       </div>
     </article>
   );
