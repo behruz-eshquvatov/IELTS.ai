@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
@@ -16,7 +16,11 @@ function decodeValue(value) {
 
 function StudentReadingFullPassagesPage() {
   const { testId: testIdParam = "" } = useParams();
+  const [searchParams] = useSearchParams();
   const testId = decodeValue(testIdParam);
+  const isDailyMode = String(searchParams.get("mode") || "").trim().toLowerCase() === "daily";
+  const attemptCategory = isDailyMode ? "daily" : "additional";
+  const sourceType = isDailyMode ? "daily_unit" : "reading_full";
 
   const [test, setTest] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,14 +41,22 @@ function StudentReadingFullPassagesPage() {
       setError("");
 
       try {
-        const response = await apiRequest(`/reading/full-tests/${encodeURIComponent(testId)}?status=published`, {
-          auth: false,
-        });
+        const response = await apiRequest(`/reading/full-tests/${encodeURIComponent(testId)}?status=published`);
         if (!isMounted) {
           return;
         }
 
-        setTest(response?.test || null);
+        const nextTest = response?.test || null;
+        const progressStatus = String(nextTest?.progressStatus || nextTest?.progression?.status || "available")
+          .trim()
+          .toLowerCase();
+        if (!isDailyMode && progressStatus === "locked") {
+          setTest(null);
+          setError("This full test is locked. Complete the previous additional task first.");
+          return;
+        }
+
+        setTest(nextTest);
         setActivePassageIndex(0);
       } catch (nextError) {
         if (!isMounted) {
@@ -64,7 +76,7 @@ function StudentReadingFullPassagesPage() {
     return () => {
       isMounted = false;
     };
-  }, [testId]);
+  }, [isDailyMode, testId]);
 
   const testPassages = useMemo(() => (Array.isArray(test?.passages) ? test.passages : []), [test?.passages]);
   const normalizedPassageCount = testPassages.length;
@@ -116,6 +128,8 @@ function StudentReadingFullPassagesPage() {
       await apiRequest(`/reading/full-tests/${encodeURIComponent(resolvedTestId)}/submit`, {
         method: "POST",
         body: {
+          attemptCategory,
+          sourceType,
           submitReason: String(attemptPayload?.submitReason || "manual"),
           forceReason: String(attemptPayload?.forceReason || ""),
           evaluation: attemptPayload?.evaluation || {},
@@ -123,7 +137,7 @@ function StudentReadingFullPassagesPage() {
         },
       });
     },
-    [test?._id, testId],
+    [attemptCategory, sourceType, test?._id, testId],
   );
 
   return (

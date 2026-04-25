@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Headphones } from "lucide-react";
+import { ChevronLeft, Headphones, Lock } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
 
@@ -36,7 +36,7 @@ function StudentListeningFullTestsPage() {
       setError("");
 
       try {
-        const response = await apiRequest("/listening-tests?status=published&limit=100", { auth: false });
+        const response = await apiRequest("/listening-tests?status=published&limit=100");
         if (!isMounted) {
           return;
         }
@@ -81,32 +81,65 @@ function StudentListeningFullTestsPage() {
 
       {!isLoading && !error ? (
         <section className="space-y-3">
-          {tests.map((test) => (
-            <Link
-              key={test._id}
-              to={`/student/tests/listening/full/${encodeURIComponent(test._id)}`}
-              className="group flex min-h-[104px] items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 transition hover:border-emerald-200/80 hover:bg-white"
-            >
-              <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-600 shadow-sm transition group-hover:text-emerald-600">
-                <Headphones className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-semibold text-slate-900">{test.title || test._id}</p>
-                <p className="mt-1 truncate text-xs text-slate-500">
-                  {toReadableLabel(test.module)} | {test.totalQuestions || 0} questions | {test.partsCount || 0} parts
-                </p>
-                <p className="mt-1 truncate text-xs text-slate-500">
-                  Status: {toReadableLabel(test.status)} | Blocks: {test.totalBlocks || 0}
-                </p>
-              </div>
-              <span className="relative h-[1.1rem] min-w-[6.5rem] overflow-hidden text-center text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
-                <span className="flex flex-col transition-transform duration-300 ease-out group-hover:-translate-y-1/2">
-                  <span>Open</span>
-                  <span>Open</span>
+          {tests.map((test) => {
+            const progressStatus = String(test?.progressStatus || test?.progression?.status || "available")
+              .trim()
+              .toLowerCase();
+            const isLocked = progressStatus === "locked";
+
+            if (isLocked) {
+              return (
+                <div
+                  key={test._id}
+                  className="flex min-h-[104px] cursor-not-allowed items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 opacity-80"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-500 shadow-sm">
+                    <Headphones className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-slate-900">{test.title || test._id}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {toReadableLabel(test.module)} | {test.totalQuestions || 0} questions | {test.partsCount || 0} parts
+                    </p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      Status: {toReadableLabel(test.status)} | Blocks: {test.totalBlocks || 0}
+                    </p>
+                  </div>
+                  <span className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <Lock className="h-3.5 w-3.5" />
+                    Locked
+                  </span>
+                </div>
+              );
+            }
+
+            return (
+              <Link
+                key={test._id}
+                to={`/student/tests/listening/full/${encodeURIComponent(test._id)}`}
+                className="group flex min-h-[104px] items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 transition hover:border-emerald-200/80 hover:bg-white"
+              >
+                <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-600 shadow-sm transition group-hover:text-emerald-600">
+                  <Headphones className="h-4 w-4" />
                 </span>
-              </span>
-            </Link>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-semibold text-slate-900">{test.title || test._id}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">
+                    {toReadableLabel(test.module)} | {test.totalQuestions || 0} questions | {test.partsCount || 0} parts
+                  </p>
+                  <p className="mt-1 truncate text-xs text-slate-500">
+                    Status: {toReadableLabel(test.status)} | Blocks: {test.totalBlocks || 0}
+                  </p>
+                </div>
+                <span className="relative h-[1.1rem] min-w-[6.5rem] overflow-hidden text-center text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
+                  <span className="flex flex-col transition-transform duration-300 ease-out group-hover:-translate-y-1/2">
+                    <span>Open</span>
+                    <span>Open</span>
+                  </span>
+                </span>
+              </Link>
+            );
+          })}
           {tests.length === 0 ? <p className="text-sm text-slate-600">No published full tests found.</p> : null}
         </section>
       ) : null}

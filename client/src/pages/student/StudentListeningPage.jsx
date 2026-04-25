@@ -105,8 +105,8 @@ function StudentListeningPage() {
 
       try {
         const [testsResponse, partGroupsResponse] = await Promise.all([
-          apiRequest("/listening-tests?status=published&limit=1", { auth: false }),
-          apiRequest("/listening-tests/part-groups?status=published", { auth: false }),
+          apiRequest("/listening-tests?status=published&limit=1"),
+          apiRequest("/listening-tests/part-groups?status=published"),
         ]);
 
         if (!isMounted) {

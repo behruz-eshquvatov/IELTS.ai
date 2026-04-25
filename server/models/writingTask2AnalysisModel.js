@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const detectionSchema = new mongoose.Schema(
   {
+    category: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     label: {
       type: String,
       trim: true,
@@ -13,6 +18,11 @@ const detectionSchema = new mongoose.Schema(
       default: "",
     },
     issue: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    whyItHurtsBand: {
       type: String,
       trim: true,
       default: "",
@@ -38,6 +48,36 @@ const detectionSchema = new mongoose.Schema(
 
 const writingTask2AnalysisSchema = new mongoose.Schema(
   {
+    studentUserId: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
+    studentEmail: {
+      type: String,
+      trim: true,
+      default: "",
+      lowercase: true,
+      index: true,
+    },
+    taskType: {
+      type: String,
+      trim: true,
+      default: "writing_task2",
+      index: true,
+    },
+    taskRefId: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
+    taskLabel: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     setId: {
       type: String,
       trim: true,
@@ -46,7 +86,7 @@ const writingTask2AnalysisSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "auto", "focus-lost"],
+      enum: ["manual", "auto", "focus-lost", "page-hide", "leave-page", "before-unload"],
       default: "manual",
     },
     submittedAt: {
@@ -58,6 +98,11 @@ const writingTask2AnalysisSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    questionTopic: {
+      type: String,
+      trim: true,
+      default: "",
     },
     questionMeta: {
       type: [String],
@@ -111,6 +156,12 @@ const writingTask2AnalysisSchema = new mongoose.Schema(
       lexicalResource: { type: Number, min: 0, max: 9, default: null },
       grammaticalRangeAccuracy: { type: Number, min: 0, max: 9, default: null },
     },
+    criteriaFeedback: {
+      taskResponse: { type: String, trim: true, default: "" },
+      coherenceCohesion: { type: String, trim: true, default: "" },
+      lexicalResource: { type: String, trim: true, default: "" },
+      grammaticalRangeAccuracy: { type: String, trim: true, default: "" },
+    },
     summary: {
       type: String,
       trim: true,
@@ -124,9 +175,23 @@ const writingTask2AnalysisSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    suggestions: {
+      type: [String],
+      default: [],
+    },
+    diagnosis: {
+      taskIssues: { type: [String], default: [] },
+      coherenceIssues: { type: [String], default: [] },
+      lexicalIssues: { type: [String], default: [] },
+      grammarIssues: { type: [String], default: [] },
+    },
     detections: {
       type: [detectionSchema],
       default: [],
+    },
+    rawAiPayload: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
     failureReason: {
       type: String,
@@ -138,6 +203,11 @@ const writingTask2AnalysisSchema = new mongoose.Schema(
     timestamps: true,
     collection: "writing_task2_analyses",
   },
+);
+
+writingTask2AnalysisSchema.index(
+  { studentUserId: 1, taskRefId: 1, submittedAt: -1 },
+  { name: "student_writing_task2_analyses_lookup" },
 );
 
 module.exports = mongoose.model("WritingTask2Analysis", writingTask2AnalysisSchema);

@@ -42,6 +42,29 @@ async function protect(req, res, next) {
   }
 }
 
+async function optionalProtect(req, _res, next) {
+  try {
+    const token = getBearerToken(req.headers.authorization || "");
+    if (!token) {
+      return next();
+    }
+
+    const payload = verifyAccessToken(token);
+    const user = await User.findById(payload.sub).lean();
+    if (user && user.isActive) {
+      req.auth = {
+        userId: String(user._id),
+        role: user.role,
+        email: user.email,
+      };
+    }
+
+    return next();
+  } catch {
+    return next();
+  }
+}
+
 function authorizeRoles(...roles) {
   return (req, res, next) => {
     if (!req.auth || !roles.includes(req.auth.role)) {
@@ -76,6 +99,7 @@ function authorizeSelfOrTeacher(paramKey = "studentId") {
 
 module.exports = {
   protect,
+  optionalProtect,
   authorizeRoles,
   authorizeSelfOrTeacher,
 };

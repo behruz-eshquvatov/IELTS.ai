@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
@@ -41,7 +41,7 @@ function StudentReadingPracticeTaskPage() {
 
       try {
         const params = buildReadingPracticeQueryParams(practiceConfig, { passageId });
-        const response = await apiRequest(`/reading/practice?${params.toString()}`, { auth: false });
+        const response = await apiRequest(`/reading/practice?${params.toString()}`);
         if (!isMounted) {
           return;
         }
@@ -50,6 +50,15 @@ function StudentReadingPracticeTaskPage() {
         if (!nextGroup) {
           setGroup(null);
           setError("This reading task was not found.");
+          return;
+        }
+
+        const progressStatus = String(nextGroup?.progressStatus || nextGroup?.progression?.status || "available")
+          .trim()
+          .toLowerCase();
+        if (progressStatus === "locked") {
+          setGroup(null);
+          setError("This task is locked. Complete the previous additional task first.");
           return;
         }
 
@@ -74,6 +83,52 @@ function StudentReadingPracticeTaskPage() {
     };
   }, [passageId, practiceConfig]);
 
+  const handleAttemptSubmit = useCallback(
+    async (attemptPayload = {}) => {
+      if (!passageId) {
+        return;
+      }
+
+      const passageTiming = Array.isArray(attemptPayload?.passageTiming) ? attemptPayload.passageTiming : [];
+      const totalTimeSpentSeconds = passageTiming.reduce(
+        (sum, item) => sum + Math.max(0, Number(item?.timeSpentSeconds) || 0),
+        0,
+      );
+
+      await apiRequest("/students/me/daily-tasks/attempts", {
+        method: "POST",
+        body: {
+          taskType: "reading",
+          taskRefId: passageId,
+          attemptCategory: "additional",
+          sourceType: "reading_question_family",
+          taskLabel: String(group?.passage?.title || group?.passageId || passageId).trim(),
+          submitReason: String(attemptPayload?.submitReason || "manual"),
+          forceReason: String(attemptPayload?.forceReason || ""),
+          isAutoSubmitted: String(attemptPayload?.submitReason || "manual") !== "manual",
+          submittedAt: new Date().toISOString(),
+          totalTimeSpentSeconds: Math.round(totalTimeSpentSeconds),
+          score: {
+            percentage: Number(attemptPayload?.evaluation?.percentage || 0),
+            correctCount: Number(attemptPayload?.evaluation?.correctCount || 0),
+            incorrectCount: Number(attemptPayload?.evaluation?.incorrectCount || 0),
+            totalQuestions: Number(attemptPayload?.evaluation?.totalQuestions || 0),
+          },
+          payload: {
+            route: `/student/tests/reading/${encodeURIComponent(practiceKey)}/${encodeURIComponent(passageId)}`,
+            submission: {
+              practiceKey,
+              passageId,
+              evaluation: attemptPayload?.evaluation || {},
+              passageTiming,
+            },
+          },
+        },
+      });
+    },
+    [group?.passage?.title, group?.passageId, passageId, practiceKey],
+  );
+
   return (
     <div className="space-y-8 pt-2 sm:pt-4">
       <header>
@@ -93,6 +148,7 @@ function StudentReadingPracticeTaskPage() {
         <ReadingPassageWithBlocks
           blocks={Array.isArray(group?.blocks) ? group.blocks : []}
           passage={group.passage}
+          onAttemptSubmit={handleAttemptSubmit}
           sectionTitle={practiceConfig?.title || "Reading Task"}
         />
       ) : null}

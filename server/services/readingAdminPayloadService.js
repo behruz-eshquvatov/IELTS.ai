@@ -123,6 +123,98 @@ function toNormalizedAnswerArray(value) {
   return safe ? [safe] : [];
 }
 
+function isBinaryJudgementBlock(questionFamily, blockType) {
+  const safeFamily = normalizeEnum(questionFamily);
+  const safeBlockType = normalizeEnum(blockType);
+  return (
+    safeFamily === "binary_judgement"
+    || safeBlockType === "true_false_not_given"
+    || safeBlockType === "yes_no_not_given"
+  );
+}
+
+function getCanonicalBinaryOptions(blockType) {
+  return normalizeEnum(blockType) === "yes_no_not_given"
+    ? ["YES", "NO", "NOT GIVEN"]
+    : ["TRUE", "FALSE", "NOT GIVEN"];
+}
+
+function normalizeBinaryPromptItem(rawPrompt, promptIndex, normalizedQuestions = []) {
+  const source = rawPrompt && typeof rawPrompt === "object"
+    ? rawPrompt
+    : { text: normalizeText(rawPrompt) };
+  const questionByIndex = normalizedQuestions[promptIndex] || null;
+  const explicitPromptId = normalizeText(source.qid || source.id);
+  const explicitPromptNumber = normalizeNumericValue(source.number);
+  const questionById = explicitPromptId
+    ? normalizedQuestions.find((question) => normalizeText(question?.id) === explicitPromptId)
+    : null;
+  const questionByNumber = Number.isFinite(explicitPromptNumber)
+    ? normalizedQuestions.find((question) => normalizeNumericValue(question?.number) === explicitPromptNumber)
+    : null;
+  const mappedQuestion = questionById || questionByNumber || questionByIndex;
+  const number = Number.isFinite(explicitPromptNumber)
+    ? explicitPromptNumber
+    : normalizeNumericValue(mappedQuestion?.number) || promptIndex + 1;
+  const qid = explicitPromptId || normalizeText(mappedQuestion?.id) || `q${number}`;
+  const textSource = (() => {
+    const directCandidates = [source.text, source.statement, source.prompt];
+    for (const candidate of directCandidates) {
+      if (typeof candidate === "string" || typeof candidate === "number") {
+        const normalizedCandidate = normalizeText(candidate);
+        if (normalizedCandidate) {
+          return normalizedCandidate;
+        }
+      }
+
+      if (candidate && typeof candidate === "object") {
+        const nestedText = normalizeText(
+          candidate.text
+          || candidate.statement
+          || candidate.prompt
+          || candidate.value
+          || candidate.label
+          || candidate.content,
+        );
+        if (nestedText) {
+          return nestedText;
+        }
+      }
+    }
+
+    return "";
+  })();
+  const text = normalizeText(textSource);
+
+  return {
+    qid,
+    number,
+    text,
+  };
+}
+
+function normalizeBinaryJudgementDisplay(rawDisplay, normalizedQuestions = [], blockType = "") {
+  const source = rawDisplay && typeof rawDisplay === "object" ? { ...rawDisplay } : {};
+  const rawPrompts = Array.isArray(source.prompts) ? source.prompts : [];
+  const rawStatements = Array.isArray(source.statements) ? source.statements : [];
+  const promptSource = rawPrompts.length > 0
+    ? rawPrompts
+    : rawStatements.map((statement) => (
+      statement && typeof statement === "object"
+        ? statement
+        : { text: normalizeText(statement) }
+    ));
+  const prompts = promptSource.map((item, index) =>
+    normalizeBinaryPromptItem(item, index, normalizedQuestions));
+  const canonicalOptions = getCanonicalBinaryOptions(blockType);
+
+  source.options = canonicalOptions;
+  source.prompts = prompts;
+  delete source.statements;
+
+  return source;
+}
+
 function normalizeReadingPassageContentBlock(rawContentBlock = {}) {
   const source = rawContentBlock && typeof rawContentBlock === "object" ? rawContentBlock : {};
   const normalized = { ...source };
@@ -254,6 +346,11 @@ function normalizeReadingBlockPayload(rawBlock = {}) {
   const source = rawBlock && typeof rawBlock === "object" ? rawBlock : {};
   const rawInstruction = source.instruction && typeof source.instruction === "object" ? source.instruction : {};
   const rawPassageScope = source.passageScope && typeof source.passageScope === "object" ? source.passageScope : {};
+  const normalizedQuestionFamily = normalizeEnum(source.questionFamily);
+  const normalizedBlockType = normalizeEnum(source.blockType);
+  const normalizedQuestions = Array.isArray(source.questions)
+    ? source.questions.map((item, index) => normalizeReadingQuestionItem(item, index))
+    : [];
   const normalizedInstruction = { ...rawInstruction, text: normalizeText(rawInstruction.text) };
 
   const maxWords = normalizeNumericValue(rawInstruction.maxWords);
@@ -270,21 +367,28 @@ function normalizeReadingBlockPayload(rawBlock = {}) {
     delete normalizedInstruction.correctCount;
   }
 
+  const normalizedDisplay = (() => {
+    const baseDisplay = source.display && typeof source.display === "object" ? source.display : {};
+    if (!isBinaryJudgementBlock(normalizedQuestionFamily, normalizedBlockType)) {
+      return baseDisplay;
+    }
+
+    return normalizeBinaryJudgementDisplay(baseDisplay, normalizedQuestions, normalizedBlockType);
+  })();
+
   return {
     _id: normalizeText(source._id),
     passageId: normalizeText(source.passageId),
-    questionFamily: normalizeEnum(source.questionFamily),
-    blockType: normalizeEnum(source.blockType),
+    questionFamily: normalizedQuestionFamily,
+    blockType: normalizedBlockType,
     instruction: normalizedInstruction,
     passageScope: {
       ...rawPassageScope,
       type: normalizeEnum(rawPassageScope.type),
       targets: normalizeStringArray(rawPassageScope.targets, (item) => item.toUpperCase()),
     },
-    display: source.display && typeof source.display === "object" ? source.display : {},
-    questions: Array.isArray(source.questions)
-      ? source.questions.map((item, index) => normalizeReadingQuestionItem(item, index))
-      : [],
+    display: normalizedDisplay,
+    questions: normalizedQuestions,
     status: normalizeEnum(source.status) || "draft",
   };
 }
@@ -329,6 +433,50 @@ function validateReadingBlockPayload(block) {
     errors.push("`display` object is required.");
   }
 
+  if (isBinaryJudgementBlock(safeBlock.questionFamily, safeBlock.blockType)) {
+    const expectedOptions = getCanonicalBinaryOptions(safeBlock.blockType);
+    const displayOptions = Array.isArray(safeBlock?.display?.options)
+      ? safeBlock.display.options.map((item) => normalizeText(item).toUpperCase())
+      : [];
+    const hasExpectedOptions = (
+      displayOptions.length === expectedOptions.length
+      && expectedOptions.every((item, index) => displayOptions[index] === item)
+    );
+    if (!hasExpectedOptions) {
+      errors.push(
+        `binary_judgement display.options must be exactly: ${expectedOptions.join(", ")}.`,
+      );
+    }
+
+    const prompts = Array.isArray(safeBlock?.display?.prompts) ? safeBlock.display.prompts : [];
+    if (prompts.length === 0) {
+      errors.push("binary_judgement display.prompts must be a non-empty array.");
+    } else {
+      const seenPromptIds = new Set();
+      prompts.forEach((prompt, index) => {
+        const promptId = normalizeText(prompt?.qid || prompt?.id);
+        const promptNumber = normalizeNumericValue(prompt?.number);
+        const promptText = normalizeText(prompt?.text || prompt?.statement);
+
+        if (!promptId) {
+          errors.push(`display.prompts[${index}].qid is required for binary_judgement.`);
+        } else if (seenPromptIds.has(promptId)) {
+          errors.push(`display.prompts[${index}].qid '${promptId}' is duplicated.`);
+        } else {
+          seenPromptIds.add(promptId);
+        }
+
+        if (!Number.isFinite(promptNumber)) {
+          errors.push(`display.prompts[${index}].number must be numeric for binary_judgement.`);
+        }
+
+        if (!promptText) {
+          errors.push(`display.prompts[${index}].text is required for binary_judgement.`);
+        }
+      });
+    }
+  }
+
   if (!Array.isArray(safeBlock.questions) || safeBlock.questions.length === 0) {
     errors.push("`questions` must be a non-empty array.");
   } else {
@@ -358,6 +506,35 @@ function validateReadingBlockPayload(block) {
         errors.push(`questions[${index}].answers must include at least one accepted answer.`);
       }
     });
+  }
+
+  if (isBinaryJudgementBlock(safeBlock.questionFamily, safeBlock.blockType)) {
+    const prompts = Array.isArray(safeBlock?.display?.prompts) ? safeBlock.display.prompts : [];
+    if (prompts.length > 0 && Array.isArray(safeBlock.questions) && safeBlock.questions.length > 0) {
+      const promptIdSet = new Set(
+        prompts.map((prompt) => normalizeText(prompt?.qid || prompt?.id)).filter(Boolean),
+      );
+      const promptNumberSet = new Set(
+        prompts
+          .map((prompt) => normalizeNumericValue(prompt?.number))
+          .filter((value) => Number.isFinite(value))
+          .map((value) => String(value)),
+      );
+
+      safeBlock.questions.forEach((question, index) => {
+        const questionId = normalizeText(question?.id || question?.qid);
+        const questionNumber = normalizeNumericValue(question?.number);
+        const hasPromptById = questionId ? promptIdSet.has(questionId) : false;
+        const hasPromptByNumber = Number.isFinite(questionNumber)
+          ? promptNumberSet.has(String(questionNumber))
+          : false;
+        if (!hasPromptById && !hasPromptByNumber) {
+          errors.push(
+            `questions[${index}] must map to display.prompts by qid or number for binary_judgement.`,
+          );
+        }
+      });
+    }
   }
 
   const normalizedStatus = normalizeEnum(safeBlock.status);
@@ -624,7 +801,11 @@ function buildReadingBlockExtractionPrompt() {
     "- store prompts and options separately",
     "",
     "true_false_not_given / yes_no_not_given:",
-    "- store statements list",
+    "- use ONE canonical binary_judgement display schema:",
+    '{ "display": { "options": ["TRUE","FALSE","NOT GIVEN"], "prompts": [ { "qid":"q1", "number":1, "text":"..." } ] } }',
+    "- yes_no_not_given must use options: [\"YES\", \"NO\", \"NOT GIVEN\"]",
+    "- true_false_not_given must use options: [\"TRUE\", \"FALSE\", \"NOT GIVEN\"]",
+    "- NEVER use display.statements as a plain string array",
     "",
     "short_answer_questions:",
     "- display must contain:",

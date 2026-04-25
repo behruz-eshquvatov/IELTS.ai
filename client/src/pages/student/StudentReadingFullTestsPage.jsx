@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, BookOpenText } from "lucide-react";
+import { ChevronLeft, BookOpenText, Lock } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
 
@@ -36,7 +36,7 @@ function StudentReadingFullTestsPage() {
       setError("");
 
       try {
-        const response = await apiRequest("/reading/full-tests?status=published", { auth: false });
+        const response = await apiRequest("/reading/full-tests?status=published");
         if (!isMounted) {
           return;
         }
@@ -83,6 +83,39 @@ function StudentReadingFullTestsPage() {
         <section className="space-y-3">
           {tests.map((test) => {
             const passages = Array.isArray(test?.passages) ? test.passages : [];
+            const progressStatus = String(test?.progressStatus || test?.progression?.status || "available")
+              .trim()
+              .toLowerCase();
+            const isLocked = progressStatus === "locked";
+
+            if (isLocked) {
+              return (
+                <div
+                  className="flex min-h-[104px] cursor-not-allowed items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 opacity-80"
+                  key={test?._id || test?.title}
+                >
+                  <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-500 shadow-sm">
+                    <BookOpenText className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-slate-900">
+                      {String(test?.title || test?._id || "Reading Test").trim()}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {toReadableLabel(test?.module || "academic")} | {toReadableLabel(test?.status || "published")}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {Number(test?.totalQuestions) || 0} questions | {passages.length} passage(s)
+                    </p>
+                  </div>
+                  <span className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <Lock className="h-3.5 w-3.5" />
+                    Locked
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <Link
                 className="group flex min-h-[104px] items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 transition hover:border-emerald-200/80 hover:bg-white"

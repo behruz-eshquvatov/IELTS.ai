@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { AlertTriangle, ChevronLeft } from "lucide-react";
-import { motion } from "framer-motion";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { AlertTriangle, ChevronLeft, X } from "lucide-react";
+import { motion as Motion } from "framer-motion";
 import { apiRequest, API_BASE_URL } from "../../lib/apiClient";
 import { getListeningPracticeConfig } from "../../data/listeningPractice";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
+import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
+import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
+import useTextHighlighting from "../../hooks/useTextHighlighting";
+import ExamLeaveWarningModal from "../../components/student/exam/ExamLeaveWarningModal";
 
 const START_COUNTDOWN_SECONDS = 3;
 const AUTO_COMPLETE_KEY_PREFIX = "student:listening:auto-complete:";
@@ -65,34 +70,6 @@ function persistAutoCompleteState(storageKey, reason) {
       timestamp: new Date().toISOString(),
     }),
   );
-}
-
-function getNodeElement(node) {
-  if (!node) {
-    return null;
-  }
-
-  return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-}
-
-function unwrapHighlightNode(node) {
-  const parent = node?.parentNode;
-  if (!parent) {
-    return;
-  }
-
-  while (node.firstChild) {
-    parent.insertBefore(node.firstChild, node);
-  }
-
-  parent.removeChild(node);
-  parent.normalize();
-}
-
-function normalizeSelectedText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function normalizeAnswerText(value) {
@@ -770,9 +747,11 @@ function renderTaskContent(display, context) {
 }
 
 function StudentListeningBlockPage() {
+  const navigate = useNavigate();
   const { practiceKey: practiceKeyParam = "", blockId: blockIdParam = "" } = useParams();
   const practiceKey = decodeValue(practiceKeyParam);
   const blockId = decodeValue(blockIdParam);
+  const attemptCategory = "additional";
 
   const [block, setBlock] = useState(null);
   const [audio, setAudio] = useState(null);
@@ -793,8 +772,9 @@ function StudentListeningBlockPage() {
   const [submitError, setSubmitError] = useState("");
   const [selectedAnswersById, setSelectedAnswersById] = useState({});
   const [submissionResult, setSubmissionResult] = useState(null);
-  const [previousAttemptResult, setPreviousAttemptResult] = useState(null);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+  const [isRouteLeaveSubmitting, setIsRouteLeaveSubmitting] = useState(false);
+  const [shouldProceedAfterResult, setShouldProceedAfterResult] = useState(false);
 
   const audioRef = useRef(null);
   const gapInputRefs = useRef(new Map());
@@ -802,6 +782,10 @@ function StudentListeningBlockPage() {
   const instructionRef = useRef(null);
   const taskContentRef = useRef(null);
   const hasSubmittedAttemptRef = useRef(false);
+
+  const { clearHighlights, toggleSelectionHighlight } = useTextHighlighting({
+    dataAttribute: "data-listening-highlight",
+  });
 
   const autoCompleteStorageKey = useMemo(
     () => `${AUTO_COMPLETE_KEY_PREFIX}${encodeURIComponent(blockId)}`,
@@ -816,15 +800,29 @@ function StudentListeningBlockPage() {
       setError("");
 
       try {
-        const response = await apiRequest(`/listening-blocks/${encodeURIComponent(blockId)}`, {
-          auth: false,
-        });
+        const practiceQuery = resolvedPracticeConfig?.canonicalKey || practiceKey;
+        const response = await apiRequest(
+          `/listening-blocks/${encodeURIComponent(blockId)}${practiceQuery
+            ? `?practiceKey=${encodeURIComponent(practiceQuery)}`
+            : ""}`,
+        );
 
         if (!isMounted) {
           return;
         }
 
-        setBlock(response?.block || null);
+        const nextBlock = response?.block || null;
+        const progressStatus = String(nextBlock?.progressStatus || nextBlock?.progression?.status || "available")
+          .trim()
+          .toLowerCase();
+        if (progressStatus === "locked" && resolvedPracticeConfig) {
+          setBlock(null);
+          setAudio(null);
+          setError("This task is locked. Complete the previous additional task first.");
+          return;
+        }
+
+        setBlock(nextBlock);
         setAudio(response?.audio || null);
       } catch (nextError) {
         if (!isMounted) {
@@ -844,7 +842,7 @@ function StudentListeningBlockPage() {
     return () => {
       isMounted = false;
     };
-  }, [blockId]);
+  }, [blockId, practiceKey, resolvedPracticeConfig]);
 
   const audioUrl = useMemo(
     () => `${API_BASE_URL}/listening-blocks/${encodeURIComponent(blockId)}/audio`,
@@ -874,6 +872,7 @@ function StudentListeningBlockPage() {
     ? `/student/tests/listening/${encodeURIComponent(resolvedPracticeConfig.canonicalKey)}`
     : "/student/tests/listening/full";
   const backLabel = resolvedPracticeConfig?.title || "Full listening tests";
+  const sourceType = resolvedPracticeConfig ? "listening_question_family" : "listening_block";
 
   const orderedGapIds = useMemo(() => {
     const nextIds = [];
@@ -1034,69 +1033,13 @@ function StudentListeningBlockPage() {
     }
   }, []);
 
-  const clearAllHighlights = useCallback((rootElement) => {
-    if (!rootElement) {
-      return;
-    }
-
-    const highlightedNodes = rootElement.querySelectorAll("[data-listening-highlight='true']");
-    highlightedNodes.forEach((node) => unwrapHighlightNode(node));
-  }, []);
+  const clearAllHighlights = useCallback((containerRefOrElement) => {
+    clearHighlights(containerRefOrElement);
+  }, [clearHighlights]);
 
   const handleTextSelectionToggle = useCallback((containerRef) => {
-    const rootElement = containerRef?.current;
-    if (!rootElement) {
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      return;
-    }
-
-    const selectedText = selection.toString();
-    if (!selectedText || !selectedText.trim()) {
-      selection.removeAllRanges();
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    if (!rootElement.contains(range.commonAncestorContainer)) {
-      return;
-    }
-
-    const startElement = getNodeElement(selection.anchorNode);
-    const endElement = getNodeElement(selection.focusNode);
-    if (startElement?.closest?.("input, textarea") || endElement?.closest?.("input, textarea")) {
-      return;
-    }
-
-    const startHighlight = startElement?.closest?.("[data-listening-highlight='true']");
-    const endHighlight = endElement?.closest?.("[data-listening-highlight='true']");
-
-    if (startHighlight && startHighlight === endHighlight) {
-      const normalizedSelected = normalizeSelectedText(selectedText);
-      const normalizedHighlight = normalizeSelectedText(startHighlight.textContent);
-
-      if (normalizedSelected && normalizedSelected === normalizedHighlight) {
-        unwrapHighlightNode(startHighlight);
-        selection.removeAllRanges();
-        return;
-      }
-    }
-
-    const marker = document.createElement("mark");
-    marker.setAttribute("data-listening-highlight", "true");
-    marker.className = "bg-yellow-300/80 text-slate-900";
-
-    try {
-      range.surroundContents(marker);
-    } catch {
-      // Ignore invalid multi-node selections that cannot be wrapped safely.
-    }
-
-    selection.removeAllRanges();
-  }, []);
+    toggleSelectionHighlight(containerRef);
+  }, [toggleSelectionHighlight]);
 
   const collectSubmittedAnswers = useCallback(() => {
     const answers = [];
@@ -1148,7 +1091,7 @@ function StudentListeningBlockPage() {
   }, [block?.questions, orderedGapIds, selectedAnswersById]);
 
   const submitAttempt = useCallback(
-    async (submitReason) => {
+    async (submitReason, forceReason = "") => {
       if (!block || !blockId || hasSubmittedAttemptRef.current || isSubmittingAttempt) {
         return;
       }
@@ -1163,11 +1106,17 @@ function StudentListeningBlockPage() {
           body: {
             answers: collectSubmittedAnswers(),
             submitReason: String(submitReason || "audio-ended"),
+            forceReason: String(forceReason || ""),
+            attemptCategory,
+            sourceType,
+            practiceKey: resolvedPracticeConfig?.canonicalKey || practiceKey,
+            route: `/student/tests/listening/${encodeURIComponent(
+              resolvedPracticeConfig?.canonicalKey || practiceKey || "block",
+            )}/${encodeURIComponent(blockId)}`,
           },
         });
 
         const attempt = response?.attempt || null;
-        const previousAttempt = response?.previousAttempt || null;
 
         if (!attempt) {
           throw new Error("Submission response was empty.");
@@ -1186,7 +1135,6 @@ function StudentListeningBlockPage() {
         clearCountdownInterval();
 
         setSubmissionResult(attempt);
-        setPreviousAttemptResult(previousAttempt);
         setIsResultModalOpen(true);
       } catch (nextError) {
         hasSubmittedAttemptRef.current = false;
@@ -1195,7 +1143,17 @@ function StudentListeningBlockPage() {
         setIsSubmittingAttempt(false);
       }
     },
-    [block, blockId, clearCountdownInterval, collectSubmittedAnswers, isSubmittingAttempt],
+    [
+      attemptCategory,
+      block,
+      blockId,
+      clearCountdownInterval,
+      collectSubmittedAnswers,
+      isSubmittingAttempt,
+      practiceKey,
+      resolvedPracticeConfig?.canonicalKey,
+      sourceType,
+    ],
   );
 
   const autoCompleteAttempt = useCallback(
@@ -1217,10 +1175,29 @@ function StudentListeningBlockPage() {
         audioElement.pause();
       }
       setIsAudioPlaying(false);
-      void submitAttempt(submitReason);
+      void submitAttempt(submitReason, reason);
     },
     [autoCompleteStorageKey, clearCountdownInterval, isAutoCompleted, submitAttempt],
   );
+
+  const isExamSessionActive =
+    hasAttemptStarted && !isAutoCompleted && !isResultModalOpen && !isSubmittingAttempt;
+  useBodyScrollLock(isResultModalOpen || isStartModalOpen);
+  const persistBeforeUnloadState = useCallback(() => {
+    if (!isExamSessionActive) {
+      return;
+    }
+
+    persistAutoCompleteState(
+      autoCompleteStorageKey,
+      "You refreshed or left the page. This task was auto-completed.",
+    );
+  }, [autoCompleteStorageKey, isExamSessionActive]);
+  const leaveProtection = useExamLeaveProtection({
+    isEnabled: isExamSessionActive,
+    onBeforeUnload: persistBeforeUnloadState,
+  });
+  useExamCopyBlocker(isExamSessionActive);
 
   useEffect(() => {
     return () => {
@@ -1238,8 +1215,9 @@ function StudentListeningBlockPage() {
     setIsAudioPlaying(false);
     setSubmitError("");
     setSubmissionResult(null);
-    setPreviousAttemptResult(null);
     setIsResultModalOpen(false);
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
     setIsSubmittingAttempt(false);
     hasSubmittedAttemptRef.current = false;
     setIsCountdownRunning(false);
@@ -1265,7 +1243,6 @@ function StudentListeningBlockPage() {
           const latestAttempt = response?.attempt || null;
           if (latestAttempt) {
             setSubmissionResult(latestAttempt);
-            setPreviousAttemptResult(null);
             setIsResultModalOpen(true);
           }
         } catch {
@@ -1278,7 +1255,7 @@ function StudentListeningBlockPage() {
     setIsAutoCompleted(false);
     setAutoCompleteReason("");
     setIsStartModalOpen(true);
-  }, [autoCompleteStorageKey, block, clearAllHighlights, clearCountdownInterval, error, isLoading, orderedGapIds]);
+  }, [autoCompleteStorageKey, block, blockId, clearAllHighlights, clearCountdownInterval, error, isLoading, orderedGapIds]);
 
   useEffect(() => {
     if (!hasAttemptStarted || isAutoCompleted) {
@@ -1291,13 +1268,6 @@ function StudentListeningBlockPage() {
       }
     };
 
-    const handleBeforeUnload = () => {
-      persistAutoCompleteState(
-        autoCompleteStorageKey,
-        "You refreshed or left the page. This task was auto-completed.",
-      );
-    };
-
     const handlePageHide = () => {
       autoCompleteAttempt("You refreshed or left the page. This task was auto-completed.", "page-hide");
     };
@@ -1307,17 +1277,15 @@ function StudentListeningBlockPage() {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("blur", handleWindowBlur);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [autoCompleteAttempt, autoCompleteStorageKey, hasAttemptStarted, isAutoCompleted]);
+  }, [autoCompleteAttempt, hasAttemptStarted, isAutoCompleted]);
 
   const handleUnderstandStart = useCallback(() => {
     if (isCountdownRunning || isAutoCompleted || !audio?.exists) {
@@ -1373,6 +1341,15 @@ function StudentListeningBlockPage() {
       });
     }, 1000);
   }, [audio?.exists, clearCountdownInterval, isAutoCompleted, isCountdownRunning]);
+
+  const handleStartOverlayClose = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(backLink);
+  }, [backLink, navigate]);
 
   const handleAudioPause = useCallback(() => {
     if (!hasAttemptStarted || isAutoCompleted) {
@@ -1482,8 +1459,9 @@ function StudentListeningBlockPage() {
     setIsAudioPlaying(false);
     setSubmitError("");
     setSubmissionResult(null);
-    setPreviousAttemptResult(null);
     setIsResultModalOpen(false);
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
     setIsSubmittingAttempt(false);
     setSelectedAnswersById({});
     hasSubmittedAttemptRef.current = false;
@@ -1506,6 +1484,35 @@ function StudentListeningBlockPage() {
     clearAllHighlights(instructionRef.current);
     clearAllHighlights(taskContentRef.current);
   }, [autoCompleteStorageKey, clearAllHighlights, clearCountdownInterval]);
+
+  const handleStayOnExamPage = useCallback(() => {
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
+    leaveProtection.cancelNavigation();
+  }, [leaveProtection]);
+
+  const handleConfirmLeavePage = useCallback(async () => {
+    if (isRouteLeaveSubmitting) {
+      return;
+    }
+
+    setIsRouteLeaveSubmitting(true);
+    leaveProtection.hideWarning();
+    setShouldProceedAfterResult(true);
+    await submitAttempt("leave-page", "You chose to leave this page. This task was auto-completed.");
+    if (!hasSubmittedAttemptRef.current) {
+      setShouldProceedAfterResult(false);
+      leaveProtection.cancelNavigation();
+    }
+    setIsRouteLeaveSubmitting(false);
+  }, [isRouteLeaveSubmitting, leaveProtection, submitAttempt]);
+
+  const handleResultPrimaryAction = useCallback(() => {
+    if (shouldProceedAfterResult && leaveProtection.hasBlockedNavigation) {
+      leaveProtection.proceedNavigation();
+      return;
+    }
+  }, [leaveProtection, shouldProceedAfterResult]);
 
   const renderContext = useMemo(
     () => ({
@@ -1574,12 +1581,12 @@ function StudentListeningBlockPage() {
               Playing
             </span>
             <div className="flex h-4 items-end gap-1">
-              <motion.span
+              <Motion.span
                 animate={{ scaleY: [0.35, 1, 0.35] }}
                 className="h-3 w-1 origin-bottom bg-emerald-500"
                 transition={{ duration: 0.7, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
               />
-              <motion.span
+              <Motion.span
                 animate={{ scaleY: [0.35, 1, 0.35] }}
                 className="h-4 w-1 origin-bottom bg-emerald-500"
                 transition={{
@@ -1590,7 +1597,7 @@ function StudentListeningBlockPage() {
                   delay: 0.12,
                 }}
               />
-              <motion.span
+              <Motion.span
                 animate={{ scaleY: [0.35, 1, 0.35] }}
                 className="h-2.5 w-1 origin-bottom bg-emerald-500"
                 transition={{
@@ -1643,6 +1650,11 @@ function StudentListeningBlockPage() {
               {submitError}
             </p>
           ) : null}
+          {isAutoCompleted && autoCompleteReason && !isResultModalOpen ? (
+            <p className="rounded-none border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">
+              {autoCompleteReason}
+            </p>
+          ) : null}
 
           <section
             className="rounded-none border border-slate-800 bg-slate-950 p-6 text-slate-100 select-text"
@@ -1667,16 +1679,19 @@ function StudentListeningBlockPage() {
       ) : null}
 
       {isResultModalOpen && submissionResult ? (
-        <motion.div
+        <Motion.div
           animate={{ opacity: 1 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
           initial={{ opacity: 0 }}
+          onClick={() => setIsResultModalOpen(false)}
+          role="presentation"
           transition={{ duration: 0.26, ease: "easeOut" }}
         >
-          <motion.div
+          <Motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
             initial={{ opacity: 0, scale: 0.96, y: 14 }}
+            onClick={(event) => event.stopPropagation()}
             transition={{ duration: 0.32, ease: "easeOut", delay: 0.04 }}
           >
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Task Submitted</p>
@@ -1699,37 +1714,60 @@ function StudentListeningBlockPage() {
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <button
-                className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
-                onClick={handleRestartTask}
-                type="button"
-              >
-                Try Again
-              </button>
-              <Link
-                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
-                to={backLink}
-              >
-                Leave
-              </Link>
+              {shouldProceedAfterResult ? null : (
+                <button
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
+                  onClick={handleRestartTask}
+                  type="button"
+                >
+                  Try Again
+                </button>
+              )}
+              {shouldProceedAfterResult ? (
+                <button
+                  className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
+                  onClick={handleResultPrimaryAction}
+                  type="button"
+                >
+                  Leave Page
+                </button>
+              ) : (
+                <Link
+                  className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
+                  to={backLink}
+                >
+                  Leave
+                </Link>
+              )}
             </div>
-          </motion.div>
-        </motion.div>
+          </Motion.div>
+        </Motion.div>
       ) : null}
 
       {isStartModalOpen ? (
-        <motion.div
+        <Motion.div
           animate={{ opacity: 1 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
           initial={{ opacity: 0 }}
+          onClick={handleStartOverlayClose}
+          role="presentation"
           transition={{ duration: 0.28, ease: "easeOut" }}
         >
-          <motion.div
+          <Motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
+            className="relative w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
             initial={{ opacity: 0, scale: 0.96, y: 18 }}
+            onClick={(event) => event.stopPropagation()}
             transition={{ duration: 0.34, ease: "easeOut", delay: 0.05 }}
           >
+            <button
+              aria-label="Close and go back"
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              onClick={handleStartOverlayClose}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
             <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
               <AlertTriangle className="h-5 w-5" />
             </div>
@@ -1758,11 +1796,19 @@ function StudentListeningBlockPage() {
                 : "I Understand"}
             </button>
 
-          </motion.div>
-        </motion.div>
+          </Motion.div>
+        </Motion.div>
       ) : null}
+
+      <ExamLeaveWarningModal
+        isOpen={leaveProtection.isWarningOpen}
+        isSubmitting={isRouteLeaveSubmitting}
+        onLeave={handleConfirmLeavePage}
+        onStay={handleStayOnExamPage}
+      />
     </div>
   );
 }
 
 export default StudentListeningBlockPage;
+

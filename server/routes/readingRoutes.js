@@ -6,14 +6,14 @@ const {
   listReadingPracticeGroups,
   submitFullReadingTestAttempt,
 } = require("../controllers/readingController");
-const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+const { protect, optionalProtect, authorizeRoles } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.get("/full-tests", listFullReadingTests);
-router.get("/full-tests/:testId", getFullReadingTestById);
+router.get("/full-tests", optionalProtect, listFullReadingTests);
+router.get("/full-tests/:testId", optionalProtect, getFullReadingTestById);
 router.post("/full-tests/:testId/submit", protect, authorizeRoles("student"), submitFullReadingTestAttempt);
-router.get("/passages-with-blocks", listReadingPassagesWithBlocks);
-router.get("/practice", listReadingPracticeGroups);
+router.get("/passages-with-blocks", optionalProtect, listReadingPassagesWithBlocks);
+router.get("/practice", optionalProtect, listReadingPracticeGroups);
 
 module.exports = router;

@@ -82,6 +82,10 @@ function getListeningPracticeConfig(practiceKey) {
 
 function buildListeningPracticeQueryParams(practiceConfig, extras = {}) {
   const params = new URLSearchParams();
+  const canonicalKey = normalizeKey(practiceConfig?.canonicalKey || practiceConfig?.routeKey);
+  if (canonicalKey) {
+    params.set("practiceKey", canonicalKey);
+  }
   const blockTypes = Array.isArray(practiceConfig?.blockTypes) ? practiceConfig.blockTypes : [];
   if (blockTypes.length > 0) {
     params.set("blockTypes", blockTypes.join(","));

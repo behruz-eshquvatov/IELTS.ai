@@ -1,8 +1,11 @@
+const dns = require("node:dns");
+const path = require("node:path");
+dns.setServers(["8.8.8.8", "1.1.1.1"]); // Prefer public DNS resolvers for upstream lookups.
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
-require("dotenv").config();
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const connectDB = require("./config/db");
 const apiRoutes = require("./routes");
 

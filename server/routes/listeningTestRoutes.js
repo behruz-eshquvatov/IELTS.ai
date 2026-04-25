@@ -4,13 +4,16 @@ const {
   getListeningTestById,
   listListeningPartGroups,
   getListeningTestPartById,
+  submitListeningTestAttempt,
 } = require("../controllers/listeningTestController");
+const { protect, optionalProtect, authorizeRoles } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.get("/", listListeningTests);
-router.get("/part-groups", listListeningPartGroups);
-router.get("/:testId/parts/:partNumber", getListeningTestPartById);
-router.get("/:testId", getListeningTestById);
+router.get("/", optionalProtect, listListeningTests);
+router.get("/part-groups", optionalProtect, listListeningPartGroups);
+router.post("/:testId/submit", protect, authorizeRoles("student"), submitListeningTestAttempt);
+router.get("/:testId/parts/:partNumber", optionalProtect, getListeningTestPartById);
+router.get("/:testId", optionalProtect, getListeningTestById);
 
 module.exports = router;

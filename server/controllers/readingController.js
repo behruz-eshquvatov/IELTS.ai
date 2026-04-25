@@ -1,9 +1,20 @@
 const mongoose = require("mongoose");
 const ReadingFullTestAttempt = require("../models/readingFullTestAttemptModel");
+const { normalizeReadingBlockPayload } = require("../services/readingAdminPayloadService");
+const { recordStudentTaskAttempt } = require("../services/dailyTaskProgressService");
+const {
+  normalizeReadingPracticeKey,
+  toProgressPayload,
+  listPublishedReadingFullTaskRefs,
+  listPublishedReadingPassageTaskRefs,
+  buildAdditionalProgressMap,
+  assertAdditionalTaskUnlocked,
+} = require("../services/additionalTaskProgressService");
 
 const READING_PASSAGES_COLLECTION = "reading_passages";
 const READING_BLOCKS_COLLECTION = "reading_blocks";
 const READING_TESTS_COLLECTION = "reading_tests";
+const ATTEMPT_CATEGORIES = ["daily", "additional"];
 
 function normalizeValue(value) {
   return String(value || "").trim();
@@ -11,6 +22,15 @@ function normalizeValue(value) {
 
 function normalizeEnum(value) {
   return normalizeValue(value).toLowerCase();
+}
+
+function normalizeAttemptCategory(value) {
+  const safe = normalizeEnum(value);
+  return ATTEMPT_CATEGORIES.includes(safe) ? safe : "";
+}
+
+function normalizeSourceType(value) {
+  return normalizeEnum(value).replace(/\s+/g, "_");
 }
 
 function parseCsvValues(value) {
@@ -193,7 +213,8 @@ async function fetchBlocksByIds(db, blockIds = [], statusFilter = "") {
     query.status = statusFilter;
   }
 
-  return db.collection(READING_BLOCKS_COLLECTION).find(query).toArray();
+  const blocks = await db.collection(READING_BLOCKS_COLLECTION).find(query).toArray();
+  return blocks.map((block) => normalizeReadingBlockPayload(block));
 }
 
 function enrichTestPassages(test, passagesById, blocksById) {
@@ -292,13 +313,33 @@ async function listFullReadingTests(req, res) {
     ...test,
     passages: enrichTestPassages(test, passagesById, blocksById),
   }));
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedReadingFullTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "reading",
+      sourceType: "reading_full",
+      orderedTaskRefs,
+    })
+    : new Map();
 
   return res.json({
     count: enrichedTests.length,
     filters: {
       status: statusFilter || "all",
     },
-    tests: enrichedTests,
+    tests: enrichedTests.map((test, index) => {
+      const taskRefId = normalizeValue(test?._id);
+      const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1 || index + 1);
+      const progress = toProgressPayload(progressMap.get(taskRefId), sequenceOrder);
+      return {
+        ...test,
+        progressStatus: progress.status,
+        accessStatus: progress.accessStatus,
+        progression: progress,
+      };
+    }),
     sourceCollections: {
       tests: READING_TESTS_COLLECTION,
       passages: READING_PASSAGES_COLLECTION,
@@ -337,11 +378,26 @@ async function getFullReadingTestById(req, res) {
 
   const passagesById = buildLookupById(passages);
   const blocksById = buildLookupById(blocks);
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedReadingFullTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "reading",
+      sourceType: "reading_full",
+      orderedTaskRefs,
+    })
+    : new Map();
+  const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(testId) + 1);
+  const progress = toProgressPayload(progressMap.get(testId), sequenceOrder);
 
   return res.json({
     test: {
       ...test,
       passages: enrichTestPassages(test, passagesById, blocksById),
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
     },
     filters: {
       status: statusFilter || "all",
@@ -451,9 +507,10 @@ async function listReadingPassagesWithBlocks(req, res) {
     db.collection(READING_PASSAGES_COLLECTION).find(passagesQuery).toArray(),
     db.collection(READING_BLOCKS_COLLECTION).find(blocksQuery).toArray(),
   ]);
+  const normalizedBlocks = blocks.map((block) => normalizeReadingBlockPayload(block));
 
   const blocksByPassageId = new Map();
-  blocks.forEach((block) => {
+  normalizedBlocks.forEach((block) => {
     const passageId = normalizeValue(block?.passageId);
     if (!passageId) {
       return;
@@ -474,15 +531,36 @@ async function listReadingPassagesWithBlocks(req, res) {
   const filteredGrouped = passageIdFilter
     ? grouped.filter((group) => String(group?.passageId || "") === passageIdFilter)
     : grouped;
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedReadingPassageTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "reading",
+      sourceType: "reading_passage",
+      orderedTaskRefs,
+    })
+    : new Map();
+  const enrichedGroups = filteredGrouped.map((group, index) => {
+    const taskRefId = normalizeValue(group?.passageId);
+    const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1 || index + 1);
+    const progress = toProgressPayload(progressMap.get(taskRefId), sequenceOrder);
+    return {
+      ...group,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
+    };
+  });
 
   return res.json({
-    count: filteredGrouped.length,
+    count: enrichedGroups.length,
     filters: {
       status: statusFilter || "all",
       testId: null,
       passageId: passageIdFilter || null,
     },
-    passages: filteredGrouped,
+    passages: enrichedGroups,
     sourceCollections: {
       passages: READING_PASSAGES_COLLECTION,
       blocks: READING_BLOCKS_COLLECTION,
@@ -494,6 +572,7 @@ async function listReadingPracticeGroups(req, res) {
   const db = mongoose.connection.db;
   const statusFilter = getStatusFilter(req.query.status, "published");
   const passageIdFilter = normalizeValue(req.query.passageId);
+  const practiceKey = normalizeReadingPracticeKey(req.query.practiceKey);
   const questionFamilies = Array.from(
     new Set([
       ...parseCsvValues(req.query.questionFamily),
@@ -518,7 +597,8 @@ async function listReadingPracticeGroups(req, res) {
     blocksQuery.blockType = { $in: blockTypes };
   }
 
-  const matchedBlocks = await db.collection(READING_BLOCKS_COLLECTION).find(blocksQuery).toArray();
+  const matchedBlocks = (await db.collection(READING_BLOCKS_COLLECTION).find(blocksQuery).toArray())
+    .map((block) => normalizeReadingBlockPayload(block));
   const passageIds = Array.from(
     new Set(matchedBlocks.map((block) => normalizeValue(block?.passageId)).filter(Boolean)),
   );
@@ -552,9 +632,31 @@ async function listReadingPracticeGroups(req, res) {
   const filteredGroups = passageIdFilter
     ? groups.filter((group) => String(group?.passageId || "") === passageIdFilter)
     : groups;
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedReadingPassageTaskRefs({ practiceKey });
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "reading",
+      sourceType: "reading_question_family",
+      practiceKey,
+      orderedTaskRefs,
+    })
+    : new Map();
+  const enrichedGroups = filteredGroups.map((group, index) => {
+    const taskRefId = normalizeValue(group?.passageId);
+    const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1 || index + 1);
+    const progress = toProgressPayload(progressMap.get(taskRefId), sequenceOrder);
+    return {
+      ...group,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
+    };
+  });
 
   return res.json({
-    count: filteredGroups.length,
+    count: enrichedGroups.length,
     totalBlocksMatched: matchedBlocks.length,
     skippedBlocksWithoutPassage,
     filters: {
@@ -562,8 +664,9 @@ async function listReadingPracticeGroups(req, res) {
       questionFamilies,
       blockTypes,
       passageId: passageIdFilter || null,
+      practiceKey: practiceKey || null,
     },
-    groups: filteredGroups,
+    groups: enrichedGroups,
     sourceCollections: {
       passages: READING_PASSAGES_COLLECTION,
       blocks: READING_BLOCKS_COLLECTION,
@@ -607,8 +710,27 @@ async function submitFullReadingTestAttempt(req, res) {
 
   const submitReason = normalizeValue(req.body?.submitReason) || "manual";
   const forceReason = normalizeValue(req.body?.forceReason);
+  const attemptCategory = normalizeAttemptCategory(req.body?.attemptCategory);
+  const sourceType = normalizeSourceType(req.body?.sourceType);
+  const resolvedAttemptCategory = attemptCategory || (sourceType === "daily_unit" ? "daily" : "additional");
   const evaluation = sanitizeEvaluationPayload(req.body?.evaluation);
   const passageTiming = sanitizePassageTiming(req.body?.passageTiming, testDoc?.passages);
+
+  if (resolvedAttemptCategory === "additional") {
+    try {
+      await assertAdditionalTaskUnlocked({
+        studentUserId: studentId,
+        taskType: "reading",
+        taskRefId: testId,
+        sourceType: "reading_full",
+      });
+    } catch (error) {
+      const statusCode = Number(error?.httpStatus) || 403;
+      return res.status(statusCode).json({
+        message: error?.message || "This additional task is locked.",
+      });
+    }
+  }
 
   const previousAttempt = await ReadingFullTestAttempt.findOne({ studentId, testId })
     .sort({ submittedAt: -1, createdAt: -1 })
@@ -633,6 +755,42 @@ async function submitFullReadingTestAttempt(req, res) {
     },
     submittedAt: new Date(),
   });
+
+  try {
+    const totalTimeSpentSeconds = passageTiming.reduce(
+      (sum, entry) => sum + Math.max(0, Math.round(Number(entry?.timeSpentSeconds) || 0)),
+      0,
+    );
+    await recordStudentTaskAttempt({
+      studentUserId: studentId,
+      studentEmail: String(req.auth?.email || "").trim().toLowerCase(),
+      attemptCategory: resolvedAttemptCategory,
+      sourceType,
+      taskType: "reading",
+      taskRefId: testId,
+      taskLabel: normalizeValue(testDoc?.title) || testId,
+      submitReason,
+      forceReason,
+      isAutoSubmitted: submitReason !== "manual",
+      submittedAt: savedAttempt?.submittedAt || new Date(),
+      totalTimeSpentSeconds,
+      score: {
+        percentage: evaluation.percentage,
+        correctCount: evaluation.correctCount,
+        incorrectCount: evaluation.incorrectCount,
+        totalQuestions: evaluation.totalQuestions,
+      },
+      payload: {
+        evaluation,
+        passageTiming,
+      },
+      sourceRefs: {
+        readingFullTestAttemptId: String(savedAttempt?._id || ""),
+      },
+    });
+  } catch (error) {
+    // Do not fail reading submit response when daily-task tracking sync fails.
+  }
 
   return res.status(201).json({
     message: "Full reading test submitted successfully.",

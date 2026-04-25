@@ -1,9 +1,20 @@
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
+
 function ConfirmLeaveModal({ isOpen, onCancel, onConfirm }) {
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4">
-      <div className="w-full max-w-sm rounded-none border border-slate-200/80 bg-white/95 p-6 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.35)]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4"
+      onClick={onCancel}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-sm rounded-none border border-slate-200/80 bg-white/95 p-6 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.35)]"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h3 className="text-lg font-semibold text-slate-900">Leave workspace?</h3>
         <p className="mt-2 text-sm text-slate-600">
           Your session will end and you will return to the landing page.

@@ -1,9 +1,14 @@
-
+﻿
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { AlertTriangle, ChevronLeft } from "lucide-react";
-import { motion } from "framer-motion";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AlertTriangle, ChevronLeft, X } from "lucide-react";
+import { motion as Motion } from "framer-motion";
 import { apiRequest, API_BASE_URL } from "../../lib/apiClient";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
+import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
+import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
+import useTextHighlighting from "../../hooks/useTextHighlighting";
+import ExamLeaveWarningModal from "../../components/student/exam/ExamLeaveWarningModal";
 
 const START_COUNTDOWN_SECONDS = 3;
 const GOOD_SCORE_THRESHOLD_PERCENT = 70;
@@ -67,6 +72,44 @@ function resolveQuestionRangeFromBlockEntry(block = {}) {
 }
 
 function compareBlocksByQuestionRange(left, right) {
+  const leftPartNumber = Number(left?.partNumber);
+  const rightPartNumber = Number(right?.partNumber);
+  const leftPartNumberIsFinite = Number.isFinite(leftPartNumber);
+  const rightPartNumberIsFinite = Number.isFinite(rightPartNumber);
+  if (leftPartNumberIsFinite || rightPartNumberIsFinite) {
+    if (leftPartNumberIsFinite && !rightPartNumberIsFinite) {
+      return -1;
+    }
+
+    if (!leftPartNumberIsFinite && rightPartNumberIsFinite) {
+      return 1;
+    }
+
+    const partDiff = leftPartNumber - rightPartNumber;
+    if (partDiff !== 0) {
+      return partDiff;
+    }
+  }
+
+  const leftOrder = Number(left?.blockOrder);
+  const rightOrder = Number(right?.blockOrder);
+  const leftOrderIsFinite = Number.isFinite(leftOrder);
+  const rightOrderIsFinite = Number.isFinite(rightOrder);
+  if (leftOrderIsFinite || rightOrderIsFinite) {
+    if (leftOrderIsFinite && !rightOrderIsFinite) {
+      return -1;
+    }
+
+    if (!leftOrderIsFinite && rightOrderIsFinite) {
+      return 1;
+    }
+
+    const orderDiff = leftOrder - rightOrder;
+    if (orderDiff !== 0) {
+      return orderDiff;
+    }
+  }
+
   const leftStart = toFiniteNumber(left?.questionRange?.start);
   const rightStart = toFiniteNumber(right?.questionRange?.start);
   const leftStartIsFinite = Number.isFinite(leftStart);
@@ -103,11 +146,6 @@ function compareBlocksByQuestionRange(left, right) {
     if (endDiff !== 0) {
       return endDiff;
     }
-  }
-
-  const partDiff = Number(left?.partNumber || 0) - Number(right?.partNumber || 0);
-  if (partDiff !== 0) {
-    return partDiff;
   }
 
   return String(left?.blockId || "").localeCompare(String(right?.blockId || ""));
@@ -255,34 +293,6 @@ function areSetsEqual(left, right) {
   }
 
   return true;
-}
-
-function getNodeElement(node) {
-  if (!node) {
-    return null;
-  }
-
-  return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-}
-
-function unwrapHighlightNode(node) {
-  const parent = node?.parentNode;
-  if (!parent) {
-    return;
-  }
-
-  while (node.firstChild) {
-    parent.insertBefore(node.firstChild, node);
-  }
-
-  parent.removeChild(node);
-  parent.normalize();
-}
-
-function normalizeSelectedText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function resolveQuestionIdForDisplay(question, context, fallbackIndex = 0) {
@@ -869,12 +879,23 @@ function renderTaskContent(display, context) {
 }
 
 function StudentListeningFullTestDetailPage() {
+  const navigate = useNavigate();
   const { testId: testIdParam = "", partNumber: partNumberParam = "" } = useParams();
+  const [searchParams] = useSearchParams();
   const testId = decodeValue(testIdParam);
   const parsedPartNumber = Number.parseInt(decodeValue(partNumberParam), 10);
   const activePartNumber =
     Number.isFinite(parsedPartNumber) && parsedPartNumber > 0 ? parsedPartNumber : null;
   const isPartMode = Number.isFinite(activePartNumber);
+  const isDailyMode = String(searchParams.get("mode") || "").trim().toLowerCase() === "daily";
+  const finalAttemptCategory = isDailyMode ? "daily" : "additional";
+  const finalSourceType = isDailyMode
+    ? "daily_unit"
+    : isPartMode
+      ? "listening_part"
+      : "listening_full";
+  const blockAttemptCategory = "additional";
+  const blockSourceType = isPartMode ? "listening_part_block" : "listening_full_block";
   const backLink = isPartMode ? "/student/tests/listening/by-part" : "/student/tests/listening/full";
   const backLabel = isPartMode ? "Part-by-part listening" : "Full listening tests";
   const runTypeLabel = isPartMode ? `Part ${activePartNumber}` : "full listening test";
@@ -897,6 +918,8 @@ function StudentListeningFullTestDetailPage() {
 
   const [isFinalModalOpen, setIsFinalModalOpen] = useState(false);
   const [finalResult, setFinalResult] = useState(null);
+  const [isRouteLeaveSubmitting, setIsRouteLeaveSubmitting] = useState(false);
+  const [shouldProceedAfterResult, setShouldProceedAfterResult] = useState(false);
 
   const audioRef = useRef(null);
   const instructionRef = useRef(null);
@@ -905,11 +928,16 @@ function StudentListeningFullTestDetailPage() {
   const countdownIntervalRef = useRef(null);
   const submittedBlockIdsRef = useRef(new Set());
   const resultByBlockIdRef = useRef(new Map());
+  const serverAttemptIdByBlockIdRef = useRef(new Map());
   const pendingSubmitPromisesRef = useRef([]);
+  const examStartedAtRef = useRef(0);
   const allowManualPauseRef = useRef(false);
   const isFinalizingRef = useRef(false);
   const shouldAutoPlayRef = useRef(false);
   const pauseGuardUntilRef = useRef(0);
+  const { clearHighlights, toggleSelectionHighlight } = useTextHighlighting({
+    dataAttribute: "data-listening-highlight",
+  });
   useEffect(() => {
     let isMounted = true;
 
@@ -923,6 +951,8 @@ function StudentListeningFullTestDetailPage() {
       setSubmitError("");
       setIsFinalModalOpen(false);
       setFinalResult(null);
+      setIsRouteLeaveSubmitting(false);
+      setShouldProceedAfterResult(false);
       setIsStartModalOpen(false);
       setIsCountdownRunning(false);
       setCountdownValue(null);
@@ -931,7 +961,9 @@ function StudentListeningFullTestDetailPage() {
 
       submittedBlockIdsRef.current.clear();
       resultByBlockIdRef.current.clear();
+      serverAttemptIdByBlockIdRef.current.clear();
       pendingSubmitPromisesRef.current = [];
+      examStartedAtRef.current = 0;
       isFinalizingRef.current = false;
       shouldAutoPlayRef.current = false;
       pauseGuardUntilRef.current = 0;
@@ -942,14 +974,22 @@ function StudentListeningFullTestDetailPage() {
       }
 
       try {
-        const response = await apiRequest(`/listening-tests/${encodeURIComponent(testId)}`, {
-          auth: false,
-        });
+        const response = await apiRequest(`/listening-tests/${encodeURIComponent(testId)}`);
         if (!isMounted) {
           return;
         }
 
-        setTest(response?.test || null);
+        const nextTest = response?.test || null;
+        const progressStatus = String(nextTest?.progressStatus || nextTest?.progression?.status || "available")
+          .trim()
+          .toLowerCase();
+        if (!isDailyMode && !isPartMode && progressStatus === "locked") {
+          setTest(null);
+          setError("This task is locked. Complete the previous additional task first.");
+          return;
+        }
+
+        setTest(nextTest);
       } catch (nextError) {
         if (!isMounted) {
           return;
@@ -968,7 +1008,7 @@ function StudentListeningFullTestDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [activePartNumber, testId]);
+  }, [activePartNumber, isDailyMode, isPartMode, testId]);
 
   const orderedBlocks = useMemo(() => {
     const parts = Array.isArray(test?.parts) ? test.parts : [];
@@ -989,6 +1029,8 @@ function StudentListeningFullTestDetailPage() {
 
         flattened.push({
           blockId,
+          audioRef: String(block?.audioRef || blockId).trim() || blockId,
+          blockOrder: Number.isFinite(Number(block?.order)) ? Number(block.order) : null,
           partNumber: part?.partNumber,
           questionRange: resolveQuestionRangeFromBlockEntry(block),
           questionFamily: block?.questionFamily || "",
@@ -1018,7 +1060,7 @@ function StudentListeningFullTestDetailPage() {
       try {
         const responses = await Promise.all(
           orderedBlocks.map(({ blockId }) =>
-            apiRequest(`/listening-blocks/${encodeURIComponent(blockId)}`, { auth: false }),
+            apiRequest(`/listening-blocks/${encodeURIComponent(blockId)}`),
           ),
         );
 
@@ -1064,6 +1106,7 @@ function StudentListeningFullTestDetailPage() {
 
   const currentEntry = orderedBlocks[currentBlockIndex] || null;
   const currentBlockId = currentEntry?.blockId || "";
+  const currentAudioRef = String(currentEntry?.audioRef || currentBlockId).trim() || currentBlockId;
   const currentBlockPayload = currentBlockId ? blocksById[currentBlockId] : null;
   const currentBlock = currentBlockPayload?.block || null;
   const currentAudio = currentBlockPayload?.audio || null;
@@ -1077,10 +1120,10 @@ function StudentListeningFullTestDetailPage() {
 
   const currentAudioUrl = useMemo(
     () =>
-      currentBlockId
-        ? `${API_BASE_URL}/listening-blocks/${encodeURIComponent(currentBlockId)}/audio`
+      currentAudioRef
+        ? `${API_BASE_URL}/listening-blocks/${encodeURIComponent(currentAudioRef)}/audio`
         : "",
-    [currentBlockId],
+    [currentAudioRef],
   );
 
   const orderedQuestions = useMemo(() => {
@@ -1206,69 +1249,13 @@ function StudentListeningFullTestDetailPage() {
       .map((question) => question.id);
   }, [hasInlineChoiceQuestions, inlineQuestionIdSet, orderedQuestions]);
 
-  const clearHighlights = useCallback((rootElement) => {
-    if (!rootElement) {
-      return;
-    }
-
-    const highlightedNodes = rootElement.querySelectorAll("[data-listening-highlight='true']");
-    highlightedNodes.forEach((node) => unwrapHighlightNode(node));
-  }, []);
+  const clearHighlightsInContainer = useCallback((containerRefOrElement) => {
+    clearHighlights(containerRefOrElement);
+  }, [clearHighlights]);
 
   const handleTextSelectionToggle = useCallback((containerRef) => {
-    const rootElement = containerRef?.current;
-    if (!rootElement) {
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      return;
-    }
-
-    const selectedText = selection.toString();
-    if (!selectedText || !selectedText.trim()) {
-      selection.removeAllRanges();
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    if (!rootElement.contains(range.commonAncestorContainer)) {
-      return;
-    }
-
-    const startElement = getNodeElement(selection.anchorNode);
-    const endElement = getNodeElement(selection.focusNode);
-    if (startElement?.closest?.("input, textarea") || endElement?.closest?.("input, textarea")) {
-      return;
-    }
-
-    const startHighlight = startElement?.closest?.("[data-listening-highlight='true']");
-    const endHighlight = endElement?.closest?.("[data-listening-highlight='true']");
-
-    if (startHighlight && startHighlight === endHighlight) {
-      const normalizedSelected = normalizeSelectedText(selectedText);
-      const normalizedHighlight = normalizeSelectedText(startHighlight.textContent);
-
-      if (normalizedSelected && normalizedSelected === normalizedHighlight) {
-        unwrapHighlightNode(startHighlight);
-        selection.removeAllRanges();
-        return;
-      }
-    }
-
-    const marker = document.createElement("mark");
-    marker.setAttribute("data-listening-highlight", "true");
-    marker.className = "bg-yellow-300/80 text-slate-900";
-
-    try {
-      range.surroundContents(marker);
-    } catch {
-      // Ignore invalid multi-node selections that cannot be wrapped safely.
-    }
-
-    selection.removeAllRanges();
-  }, []);
+    toggleSelectionHighlight(containerRef);
+  }, [toggleSelectionHighlight]);
 
   const registerAnswerInputRef = useCallback((questionId, node) => {
     const safeQuestionId = String(questionId || "").trim();
@@ -1473,7 +1460,7 @@ function StudentListeningFullTestDetailPage() {
   ]);
 
   const summarizeAndOpenFinalModal = useCallback(
-    async (forceReason = "") => {
+    async (submitReason = "manual", forceReason = "") => {
       if (isFinalizingRef.current) {
         return;
       }
@@ -1507,17 +1494,103 @@ function StudentListeningFullTestDetailPage() {
       const incorrectItems = allBlockResults.flatMap((result) =>
         Array.isArray(result.incorrectItems) ? result.incorrectItems : [],
       );
+      const blockResultsPayload = allBlockResults.map((result) => ({
+        blockId: String(result?.blockId || ""),
+        correctCount: Math.max(0, Number(result?.correctCount) || 0),
+        totalQuestions: Math.max(0, Number(result?.totalQuestions) || 0),
+        percentage: Math.max(0, Number(result?.percentage) || 0),
+        incorrectItems: Array.isArray(result?.incorrectItems) ? result.incorrectItems : [],
+        blockAttemptId: String(serverAttemptIdByBlockIdRef.current.get(result?.blockId) || ""),
+      }));
+      const submitStartedAt = examStartedAtRef.current > 0 ? examStartedAtRef.current : Date.now();
+      const totalTimeSpentSeconds = Math.max(0, Math.round((Date.now() - submitStartedAt) / 1000));
+      const finalSubmitReason = forceReason ? String(submitReason || "auto-complete") : "manual";
+      const finalForceReason = String(forceReason || "").trim();
+
+      if (!isPartMode) {
+        try {
+          await apiRequest(`/listening-tests/${encodeURIComponent(testId)}/submit`, {
+            method: "POST",
+            body: {
+              submitReason: finalSubmitReason,
+              forceReason: finalForceReason,
+              attemptCategory: finalAttemptCategory,
+              sourceType: finalSourceType,
+              submittedAt: new Date().toISOString(),
+              timeSpentSeconds: totalTimeSpentSeconds,
+              evaluation: {
+                totalQuestions,
+                correctCount: totalCorrect,
+                incorrectCount: Math.max(0, totalQuestions - totalCorrect),
+                percentage,
+                incorrectItems,
+              },
+              blockResults: blockResultsPayload,
+            },
+          });
+        } catch (nextError) {
+          setSubmitError(nextError?.message || "Listening full test result could not be saved.");
+        }
+      } else {
+        try {
+          const resolvedPartNumber = Number.isFinite(Number(activePartNumber)) ? Number(activePartNumber) : 0;
+          const partTaskRefId = `${testId}::part:${resolvedPartNumber || 0}`;
+          await apiRequest("/students/me/daily-tasks/attempts", {
+            method: "POST",
+            body: {
+              taskType: "listening",
+              taskRefId: partTaskRefId,
+              taskLabel: `${String(test?.title || testId).trim() || testId} Part ${resolvedPartNumber || "?"}`,
+              attemptCategory: finalAttemptCategory,
+              sourceType: finalSourceType,
+              submitReason: finalSubmitReason,
+              forceReason: finalForceReason,
+              isAutoSubmitted: finalSubmitReason !== "manual",
+              submittedAt: new Date().toISOString(),
+              totalTimeSpentSeconds,
+              score: {
+                percentage,
+                correctCount: totalCorrect,
+                incorrectCount: Math.max(0, totalQuestions - totalCorrect),
+                totalQuestions,
+              },
+              payload: {
+                route: `/student/tests/listening/by-part/${encodeURIComponent(testId)}/${resolvedPartNumber}`,
+                submission: {
+                  testId,
+                  partNumber: resolvedPartNumber,
+                  evaluation: {
+                    totalQuestions,
+                    correctCount: totalCorrect,
+                    incorrectCount: Math.max(0, totalQuestions - totalCorrect),
+                    percentage,
+                    incorrectItems,
+                  },
+                  blockResults: blockResultsPayload,
+                },
+              },
+              sourceRefs: {
+                listeningBlockAttemptIds: blockResultsPayload
+                  .map((entry) => String(entry?.blockAttemptId || "").trim())
+                  .filter(Boolean),
+              },
+            },
+          });
+        } catch (nextError) {
+          setSubmitError(nextError?.message || "Listening part result could not be saved.");
+        }
+      }
 
       setFinalResult({
         totalCorrect,
         totalQuestions,
         percentage,
         incorrectItems,
-        forceReason: forceReason || "",
+        forceReason: finalForceReason,
       });
       setIsFinalModalOpen(true);
     },
-    [orderedBlocks],
+    [activePartNumber, finalAttemptCategory, finalSourceType, isPartMode, orderedBlocks, test?.title, testId],
   );
 
   const submitCurrentBlock = useCallback(
@@ -1539,14 +1612,36 @@ function StudentListeningFullTestDetailPage() {
         body: {
           answers: localResult.answersPayload,
           submitReason: String(submitReason || "audio-ended"),
+          attemptCategory: blockAttemptCategory,
+          sourceType: blockSourceType,
+          status: "partial",
+          route: isPartMode
+            ? `/student/tests/listening/by-part/${encodeURIComponent(testId)}/${Number(activePartNumber || 0)}`
+            : `/student/tests/listening/full/${encodeURIComponent(testId)}`,
         },
-      }).catch((nextError) => {
-        setSubmitError(nextError.message || "Some blocks could not be saved to history.");
-      });
+      })
+        .then((response) => {
+          const attemptId = String(response?.attempt?.id || "").trim();
+          if (attemptId) {
+            serverAttemptIdByBlockIdRef.current.set(currentBlockId, attemptId);
+          }
+        })
+        .catch((nextError) => {
+          setSubmitError(nextError.message || "Some blocks could not be saved to history.");
+        });
 
       pendingSubmitPromisesRef.current.push(submitPromise);
     },
-    [currentBlock, currentBlockId, evaluateCurrentBlockLocally],
+    [
+      activePartNumber,
+      blockAttemptCategory,
+      blockSourceType,
+      currentBlock,
+      currentBlockId,
+      evaluateCurrentBlockLocally,
+      isPartMode,
+      testId,
+    ],
   );
 
   const completeCurrentBlockAndMoveNext = useCallback(
@@ -1558,7 +1653,7 @@ function StudentListeningFullTestDetailPage() {
       submitCurrentBlock(submitReason);
 
       if (forceFinishReason) {
-        await summarizeAndOpenFinalModal(forceFinishReason);
+        await summarizeAndOpenFinalModal(submitReason, forceFinishReason);
         return;
       }
 
@@ -1567,7 +1662,7 @@ function StudentListeningFullTestDetailPage() {
         : currentBlockIndex;
       const isLastBlock = resolvedCurrentIndex >= orderedBlocks.length - 1;
       if (isLastBlock) {
-        await summarizeAndOpenFinalModal("");
+        await summarizeAndOpenFinalModal(submitReason, "");
         return;
       }
 
@@ -1601,11 +1696,42 @@ function StudentListeningFullTestDetailPage() {
     [completeCurrentBlockAndMoveNext, isFinalModalOpen, runTypeLabel],
   );
 
+  const isExamSessionActive = hasExamStarted && !isFinalModalOpen && !isFinalizingRef.current;
+  useBodyScrollLock(isFinalModalOpen || isStartModalOpen);
+  const leaveProtection = useExamLeaveProtection({
+    isEnabled: isExamSessionActive,
+  });
+  useExamCopyBlocker(isExamSessionActive);
+
+  const handleStayOnExamPage = useCallback(() => {
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
+    leaveProtection.cancelNavigation();
+  }, [leaveProtection]);
+
+  const handleConfirmLeavePage = useCallback(async () => {
+    if (isRouteLeaveSubmitting) {
+      return;
+    }
+
+    setIsRouteLeaveSubmitting(true);
+    leaveProtection.hideWarning();
+    setShouldProceedAfterResult(true);
+    forceCompleteExam("You left this page. This test was auto-submitted.", "leave-page");
+    setIsRouteLeaveSubmitting(false);
+  }, [forceCompleteExam, isRouteLeaveSubmitting, leaveProtection]);
+
+  const handleFinalModalPrimaryAction = useCallback(() => {
+    if (shouldProceedAfterResult && leaveProtection.hasBlockedNavigation) {
+      leaveProtection.proceedNavigation();
+    }
+  }, [leaveProtection, shouldProceedAfterResult]);
+
   useEffect(() => {
     answerInputRefs.current.clear();
-    clearHighlights(instructionRef.current);
-    clearHighlights(taskContentRef.current);
-  }, [clearHighlights, currentBlockId]);
+    clearHighlightsInContainer(instructionRef.current);
+    clearHighlightsInContainer(taskContentRef.current);
+  }, [clearHighlightsInContainer, currentBlockId]);
 
   useEffect(() => {
     if (!hasExamStarted || isStartModalOpen || isFinalModalOpen || isFinalizingRef.current) {
@@ -1705,6 +1831,7 @@ function StudentListeningFullTestDetailPage() {
 
           setIsCountdownRunning(false);
           setIsStartModalOpen(false);
+          examStartedAtRef.current = Date.now();
           setHasExamStarted(true);
           return null;
         }
@@ -1713,6 +1840,15 @@ function StudentListeningFullTestDetailPage() {
       });
     }, 1000);
   }, [isCountdownRunning, isFinalModalOpen, orderedBlocks.length]);
+
+  const handleStartOverlayClose = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(backLink);
+  }, [backLink, navigate]);
 
   const handleTryAgain = useCallback(() => {
     shouldAutoPlayRef.current = false;
@@ -1734,6 +1870,8 @@ function StudentListeningFullTestDetailPage() {
     setSubmitError("");
     setIsFinalModalOpen(false);
     setFinalResult(null);
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
     setIsCountdownRunning(false);
     setCountdownValue(null);
     setHasExamStarted(false);
@@ -1741,14 +1879,16 @@ function StudentListeningFullTestDetailPage() {
 
     submittedBlockIdsRef.current.clear();
     resultByBlockIdRef.current.clear();
+    serverAttemptIdByBlockIdRef.current.clear();
     pendingSubmitPromisesRef.current = [];
+    examStartedAtRef.current = 0;
     isFinalizingRef.current = false;
 
-    clearHighlights(instructionRef.current);
-    clearHighlights(taskContentRef.current);
+    clearHighlightsInContainer(instructionRef.current);
+    clearHighlightsInContainer(taskContentRef.current);
 
     setIsStartModalOpen(true);
-  }, [clearHighlights]);
+  }, [clearHighlightsInContainer]);
 
   const isInputDisabled = !hasExamStarted || isFinalModalOpen;
   const showAudioPlayingEffect =
@@ -1847,8 +1987,30 @@ function StudentListeningFullTestDetailPage() {
     ],
   );
 
-  const finalPercentage = Number(finalResult?.percentage || 0);
-  const isGoodFinalScore = finalPercentage >= GOOD_SCORE_THRESHOLD_PERCENT;
+  const displayTotalQuestions = useMemo(() => {
+    if (isPartMode) {
+      const parts = Array.isArray(test?.parts) ? test.parts : [];
+      const activePart = parts.find(
+        (part) => Number(part?.partNumber) === Number(activePartNumber),
+      );
+      const start = Number(activePart?.questionRange?.start);
+      const end = Number(activePart?.questionRange?.end);
+      if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+        return end - start + 1;
+      }
+
+      return 10;
+    }
+
+    const fullQuestions = Number(test?.totalQuestions);
+    return Number.isFinite(fullQuestions) && fullQuestions > 0 ? fullQuestions : 40;
+  }, [activePartNumber, isPartMode, test?.parts, test?.totalQuestions]);
+  const displayCorrectCount = Math.max(0, Number(finalResult?.totalCorrect) || 0);
+  const cappedDisplayCorrectCount = Math.min(displayCorrectCount, Math.max(0, displayTotalQuestions));
+  const resultPercentage = displayTotalQuestions > 0
+    ? Math.round((cappedDisplayCorrectCount / displayTotalQuestions) * 100)
+    : 0;
+  const isGoodFinalScore = resultPercentage >= GOOD_SCORE_THRESHOLD_PERCENT;
 
   return (
     <div className="space-y-8 pt-2 sm:pt-4">
@@ -1867,12 +2029,12 @@ function StudentListeningFullTestDetailPage() {
               Playing
             </span>
             <div className="flex h-4 items-end gap-1">
-              <motion.span
+              <Motion.span
                 animate={{ scaleY: [0.35, 1, 0.35] }}
                 className="h-3 w-1 origin-bottom bg-emerald-500"
                 transition={{ duration: 0.7, ease: "easeInOut", repeat: Infinity, repeatType: "loop" }}
               />
-              <motion.span
+              <Motion.span
                 animate={{ scaleY: [0.35, 1, 0.35] }}
                 className="h-4 w-1 origin-bottom bg-emerald-500"
                 transition={{
@@ -1883,7 +2045,7 @@ function StudentListeningFullTestDetailPage() {
                   delay: 0.12,
                 }}
               />
-              <motion.span
+              <Motion.span
                 animate={{ scaleY: [0.35, 1, 0.35] }}
                 className="h-2.5 w-1 origin-bottom bg-emerald-500"
                 transition={{
@@ -1913,7 +2075,7 @@ function StudentListeningFullTestDetailPage() {
           {currentAudio?.exists ? (
             <audio
               className="hidden"
-              key={currentBlockId}
+              key={currentAudioRef}
               onCanPlay={() => {
                 if (!shouldAutoPlayRef.current) {
                   return;
@@ -2027,16 +2189,19 @@ function StudentListeningFullTestDetailPage() {
         </>
       ) : null}
       {isFinalModalOpen && finalResult ? (
-        <motion.div
+        <Motion.div
           animate={{ opacity: 1 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
           initial={{ opacity: 0 }}
+          onClick={() => setIsFinalModalOpen(false)}
+          role="presentation"
           transition={{ duration: 0.26, ease: "easeOut" }}
         >
-          <motion.div
+          <Motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
             initial={{ opacity: 0, scale: 0.96, y: 14 }}
+            onClick={(event) => event.stopPropagation()}
             transition={{ duration: 0.32, ease: "easeOut", delay: 0.04 }}
           >
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Task Submitted</p>
@@ -2045,11 +2210,11 @@ function StudentListeningFullTestDetailPage() {
               className="my-4 text-7xl font-black tracking-tight"
               style={{ color: isGoodFinalScore ? "#059669" : TOMATO_COLOR }}
             >
-              {finalResult.totalCorrect}/{finalResult.totalQuestions}
+              {cappedDisplayCorrectCount}/{displayTotalQuestions}
             </p>
 
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">
-              {finalResult.percentage}% correct answers
+              Score: {resultPercentage}%
             </p>
 
             <p className="mt-4 text-sm text-slate-600">
@@ -2094,37 +2259,60 @@ function StudentListeningFullTestDetailPage() {
             )}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <button
-                className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
-                onClick={handleTryAgain}
-                type="button"
-              >
-                Try Again
-              </button>
-              <Link
-                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
-                to={backLink}
-              >
-                Leave
-              </Link>
+              {shouldProceedAfterResult ? null : (
+                <button
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
+                  onClick={handleTryAgain}
+                  type="button"
+                >
+                  Try Again
+                </button>
+              )}
+              {shouldProceedAfterResult ? (
+                <button
+                  className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
+                  onClick={handleFinalModalPrimaryAction}
+                  type="button"
+                >
+                  Leave Page
+                </button>
+              ) : (
+                <Link
+                  className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
+                  to={backLink}
+                >
+                  Leave
+                </Link>
+              )}
             </div>
-          </motion.div>
-        </motion.div>
+          </Motion.div>
+        </Motion.div>
       ) : null}
 
       {isStartModalOpen ? (
-        <motion.div
+        <Motion.div
           animate={{ opacity: 1 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
           initial={{ opacity: 0 }}
+          onClick={handleStartOverlayClose}
+          role="presentation"
           transition={{ duration: 0.28, ease: "easeOut" }}
         >
-          <motion.div
+          <Motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
+            className="relative w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
             initial={{ opacity: 0, scale: 0.96, y: 18 }}
+            onClick={(event) => event.stopPropagation()}
             transition={{ duration: 0.34, ease: "easeOut", delay: 0.05 }}
           >
+            <button
+              aria-label="Close and go back"
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              onClick={handleStartOverlayClose}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
             <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
               <AlertTriangle className="h-5 w-5" />
             </div>
@@ -2150,11 +2338,19 @@ function StudentListeningFullTestDetailPage() {
                 ? `Starting in ${countdownValue}`
                 : "I Understand"}
             </button>
-          </motion.div>
-        </motion.div>
+          </Motion.div>
+        </Motion.div>
       ) : null}
+
+      <ExamLeaveWarningModal
+        isOpen={leaveProtection.isWarningOpen}
+        isSubmitting={isRouteLeaveSubmitting}
+        onLeave={handleConfirmLeavePage}
+        onStay={handleStayOnExamPage}
+      />
     </div>
   );
 }
 
 export default StudentListeningFullTestDetailPage;
+

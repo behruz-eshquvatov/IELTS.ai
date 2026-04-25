@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Headphones } from "lucide-react";
+import { ChevronLeft, Headphones, Lock } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
 
@@ -59,7 +59,6 @@ function StudentListeningByPartPage() {
 
       try {
         const response = await apiRequest("/listening-tests/part-groups?status=published", {
-          auth: false,
         });
         if (!isMounted) {
           return;
@@ -145,6 +144,35 @@ function StudentListeningByPartPage() {
               Number.isFinite(Number(range?.start)) && Number.isFinite(Number(range?.end));
             const rangeText = hasRange ? `Q${Number(range.start)}-${Number(range.end)}` : "Question range";
             const blocksCount = Number(group?.blocksCount) || 0;
+            const progressStatus = String(group?.progressStatus || group?.progression?.status || "available")
+              .trim()
+              .toLowerCase();
+            const isLocked = progressStatus === "locked";
+
+            if (isLocked) {
+              return (
+                <div
+                  className="flex min-h-[104px] cursor-not-allowed items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 opacity-80"
+                  key={group?.taskId || `${testId}-${partNumber}`}
+                >
+                  <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-500 shadow-sm">
+                    <Headphones className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-slate-900">
+                      {String(group?.testTitle || testId).trim()} - Part {partNumber}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {rangeText} | {blocksCount} block(s)
+                    </p>
+                  </div>
+                  <span className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <Lock className="h-3.5 w-3.5" />
+                    Locked
+                  </span>
+                </div>
+              );
+            }
 
             return (
               <Link

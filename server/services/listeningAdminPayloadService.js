@@ -1,4 +1,5 @@
 const LISTENING_STATUSES = new Set(["draft", "published"]);
+const LISTENING_MODULES = new Set(["academic", "general", "general_training"]);
 const ALLOWED_LISTENING_QUESTION_FAMILIES = new Set([
   "multiple_choice",
   "matching",
@@ -40,6 +41,49 @@ const EXAMPLE_LISTENING_BLOCK = {
   },
   questions: [{ id: "q31", number: 31, answer: ["gene"] }],
   status: "draft",
+};
+const BLOCK_RANGE_ID_PATTERN = /^(.*)_(\d+)-(\d+)$/;
+
+const EXAMPLE_LISTENING_TEST = {
+  _id: "lc_cmbr_10_1",
+  title: "Cambridge 10 Test 1 Listening",
+  section: "listening",
+  module: "academic",
+  totalQuestions: 40,
+  status: "draft",
+  parts: [
+    {
+      partNumber: 1,
+      questionRange: { start: 1, end: 10 },
+      blocks: [
+        { blockId: "lc_cmbr_10_1_1-6", audioRef: "lc_cmbr_10_1_1-6", order: 1 },
+        { blockId: "lc_cmbr_10_1_7-10", audioRef: "lc_cmbr_10_1_7-10", order: 2 },
+      ],
+    },
+    {
+      partNumber: 2,
+      questionRange: { start: 11, end: 20 },
+      blocks: [
+        { blockId: "lc_cmbr_10_1_11-12", audioRef: "lc_cmbr_10_1_11-12", order: 1 },
+        { blockId: "lc_cmbr_10_1_13-20", audioRef: "lc_cmbr_10_1_13-20", order: 2 },
+      ],
+    },
+    {
+      partNumber: 3,
+      questionRange: { start: 21, end: 30 },
+      blocks: [
+        { blockId: "lc_cmbr_10_1_21-25", audioRef: "lc_cmbr_10_1_21-25", order: 1 },
+        { blockId: "lc_cmbr_10_1_26-30", audioRef: "lc_cmbr_10_1_26-30", order: 2 },
+      ],
+    },
+    {
+      partNumber: 4,
+      questionRange: { start: 31, end: 40 },
+      blocks: [
+        { blockId: "lc_cmbr_10_1_31-40", audioRef: "lc_cmbr_10_1_31-40", order: 1 },
+      ],
+    },
+  ],
 };
 
 function normalizeText(value) {
@@ -156,6 +200,30 @@ function normalizeListeningQuestionItem(question, fallbackIndex) {
     id: safeId || `q${safeNumber}`,
     number: safeNumber,
     answer: toNormalizedAnswerArray(source.answer ?? source.answers),
+  };
+}
+
+function parseBlockRangeFromId(blockId) {
+  const safeBlockId = normalizeText(blockId);
+  if (!safeBlockId) {
+    return null;
+  }
+
+  const match = safeBlockId.match(BLOCK_RANGE_ID_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  const start = normalizeNumericValue(match[2]);
+  const end = normalizeNumericValue(match[3]);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+    return null;
+  }
+
+  return {
+    testPrefix: normalizeText(match[1]),
+    start,
+    end,
   };
 }
 
@@ -357,6 +425,193 @@ function validateListeningBlockPayload(block) {
   return errors;
 }
 
+function normalizeListeningTestPartBlockRef(rawBlockRef = {}, fallbackIndex = 0) {
+  const safeBlockId = normalizeText(rawBlockRef?.blockId);
+  const safeAudioRef = normalizeText(rawBlockRef?.audioRef) || safeBlockId;
+  return {
+    blockId: safeBlockId,
+    audioRef: safeAudioRef,
+    order: normalizeNumericValue(rawBlockRef?.order) || fallbackIndex + 1,
+  };
+}
+
+function normalizeListeningTestPartEntry(rawPart = {}, fallbackIndex = 0) {
+  const blocks = Array.isArray(rawPart?.blocks)
+    ? rawPart.blocks.map((blockRef, index) => normalizeListeningTestPartBlockRef(blockRef, index))
+    : [];
+
+  return {
+    partNumber: normalizeNumericValue(rawPart?.partNumber) || fallbackIndex + 1,
+    questionRange: {
+      start: normalizeNumericValue(rawPart?.questionRange?.start),
+      end: normalizeNumericValue(rawPart?.questionRange?.end),
+    },
+    blocks: blocks.sort((left, right) => Number(left?.order || 0) - Number(right?.order || 0)),
+  };
+}
+
+function normalizeListeningTestPayload(rawTest = {}) {
+  const source = rawTest && typeof rawTest === "object" ? rawTest : {};
+  const parts = Array.isArray(source?.parts)
+    ? source.parts.map((part, index) => normalizeListeningTestPartEntry(part, index))
+    : [];
+
+  const normalizedModule = normalizeEnum(source?.module) || "academic";
+  return {
+    _id: normalizeText(source?._id),
+    title: normalizeText(source?.title),
+    section: "listening",
+    module: LISTENING_MODULES.has(normalizedModule) ? normalizedModule : "academic",
+    totalQuestions: normalizeNumericValue(source?.totalQuestions),
+    status: normalizeEnum(source?.status) || "draft",
+    parts: parts.sort((left, right) => Number(left?.partNumber || 0) - Number(right?.partNumber || 0)),
+  };
+}
+
+function validateListeningTestPayload(test) {
+  const errors = [];
+  const safeTest = test && typeof test === "object" ? test : null;
+
+  if (!safeTest) {
+    return ["Test payload must be a JSON object."];
+  }
+
+  if (!normalizeText(safeTest._id)) {
+    errors.push("`_id` is required.");
+  }
+
+  if (!normalizeText(safeTest.title)) {
+    errors.push("`title` is required.");
+  }
+
+  if (normalizeEnum(safeTest.section) !== "listening") {
+    errors.push("`section` must be 'listening'.");
+  }
+
+  if (!normalizeText(safeTest.module)) {
+    errors.push("`module` is required.");
+  } else if (!LISTENING_MODULES.has(normalizeEnum(safeTest.module))) {
+    errors.push("`module` must be one of: academic, general, general_training.");
+  }
+
+  if (!Number.isFinite(Number(safeTest.totalQuestions))) {
+    errors.push("`totalQuestions` must be numeric.");
+  }
+
+  if (!LISTENING_STATUSES.has(normalizeEnum(safeTest.status))) {
+    errors.push("`status` must be one of: draft, published.");
+  }
+
+  if (!Array.isArray(safeTest.parts) || safeTest.parts.length === 0) {
+    errors.push("`parts` must be a non-empty array.");
+    return errors;
+  }
+
+  const seenPartNumbers = new Set();
+  const seenBlockIds = new Set();
+  const ranges = [];
+  let coveredQuestions = 0;
+
+  safeTest.parts.forEach((part, partIndex) => {
+    const partNumber = normalizeNumericValue(part?.partNumber);
+    const rangeStart = normalizeNumericValue(part?.questionRange?.start);
+    const rangeEnd = normalizeNumericValue(part?.questionRange?.end);
+    const blocks = Array.isArray(part?.blocks) ? part.blocks : [];
+    const seenOrders = new Set();
+
+    if (!Number.isFinite(partNumber)) {
+      errors.push(`parts[${partIndex}].partNumber must be numeric.`);
+    } else if (seenPartNumbers.has(partNumber)) {
+      errors.push(`parts[${partIndex}].partNumber '${partNumber}' is duplicated.`);
+    } else {
+      seenPartNumbers.add(partNumber);
+    }
+
+    if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd)) {
+      errors.push(`parts[${partIndex}].questionRange.start and .end must be numeric.`);
+    } else if (rangeStart > rangeEnd) {
+      errors.push(`parts[${partIndex}].questionRange.start must be <= end.`);
+    } else {
+      ranges.push({ start: rangeStart, end: rangeEnd, index: partIndex });
+      coveredQuestions += rangeEnd - rangeStart + 1;
+    }
+
+    if (!Array.isArray(blocks) || blocks.length === 0) {
+      errors.push(`parts[${partIndex}].blocks must be a non-empty array.`);
+      return;
+    }
+
+    blocks.forEach((blockRef, blockIndex) => {
+      const blockId = normalizeText(blockRef?.blockId);
+      const audioRef = normalizeText(blockRef?.audioRef);
+      const order = normalizeNumericValue(blockRef?.order);
+
+      if (!blockId) {
+        errors.push(`parts[${partIndex}].blocks[${blockIndex}].blockId is required.`);
+      } else {
+        if (seenBlockIds.has(blockId)) {
+          errors.push(`blockId '${blockId}' is used more than once in this listening test.`);
+        } else {
+          seenBlockIds.add(blockId);
+        }
+
+        const blockRange = parseBlockRangeFromId(blockId);
+        if (!blockRange) {
+          errors.push(
+            `parts[${partIndex}].blocks[${blockIndex}].blockId '${blockId}' must follow '<testId>_<start>-<end>'.`,
+          );
+        } else {
+          if (normalizeText(safeTest._id) && blockRange.testPrefix !== normalizeText(safeTest._id)) {
+            errors.push(
+              `blockId '${blockId}' must start with '${normalizeText(safeTest._id)}_' to match test id.`,
+            );
+          }
+
+          if (Number.isFinite(rangeStart) && Number.isFinite(rangeEnd)) {
+            if (blockRange.start < rangeStart || blockRange.end > rangeEnd) {
+              errors.push(
+                `blockId '${blockId}' range ${blockRange.start}-${blockRange.end} must stay within part range ${rangeStart}-${rangeEnd}.`,
+              );
+            }
+          }
+        }
+      }
+
+      if (!audioRef) {
+        errors.push(`parts[${partIndex}].blocks[${blockIndex}].audioRef is required.`);
+      } else if (blockId && audioRef !== blockId) {
+        errors.push(`audioRef '${audioRef}' must match blockId '${blockId}' for per-block audio linkage.`);
+      }
+
+      if (!Number.isFinite(order)) {
+        errors.push(`parts[${partIndex}].blocks[${blockIndex}].order must be numeric.`);
+      } else if (seenOrders.has(order)) {
+        errors.push(`parts[${partIndex}] has duplicated block order '${order}'.`);
+      } else {
+        seenOrders.add(order);
+      }
+    });
+  });
+
+  const sortedRanges = ranges.sort((left, right) => left.start - right.start);
+  for (let index = 1; index < sortedRanges.length; index += 1) {
+    const previous = sortedRanges[index - 1];
+    const current = sortedRanges[index];
+    if (current.start <= previous.end) {
+      errors.push(`questionRange overlap between parts[${previous.index}] and parts[${current.index}].`);
+    }
+  }
+
+  const totalQuestions = normalizeNumericValue(safeTest.totalQuestions);
+  if (Number.isFinite(totalQuestions) && totalQuestions !== coveredQuestions) {
+    errors.push(
+      `totalQuestions (${totalQuestions}) does not match covered question ranges (${coveredQuestions}).`,
+    );
+  }
+
+  return errors;
+}
+
 function buildListeningBlockExtractionPrompt() {
   return [
     "Digitize the attached IELTS listening question block image into JSON for `listening_blocks`.",
@@ -453,10 +708,15 @@ function buildListeningBlockExtractionPrompt() {
 }
 
 module.exports = {
+  LISTENING_STATUSES,
+  LISTENING_MODULES,
   ALLOWED_LISTENING_QUESTION_FAMILIES,
   ALLOWED_LISTENING_BLOCK_TYPES,
   EXAMPLE_LISTENING_BLOCK,
+  EXAMPLE_LISTENING_TEST,
   normalizeListeningBlockPayload,
   validateListeningBlockPayload,
+  normalizeListeningTestPayload,
+  validateListeningTestPayload,
   buildListeningBlockExtractionPrompt,
 };

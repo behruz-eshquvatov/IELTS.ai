@@ -39,6 +39,24 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: "results",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentResultsPage")).default,
+                }),
+              },
+              {
+                path: "results/:taskType/:taskMode/:taskRefId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentTaskResultHistoryPage")).default,
+                }),
+              },
+              {
+                path: "results/:taskType/:taskMode/:taskRefId/:attemptSlug",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentTaskResultHistoryPage")).default,
+                }),
+              },
+              {
                 path: "tests/listening",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentListeningPage")).default,
@@ -135,9 +153,39 @@ export const router = createBrowserRouter([
                 }),
               },
               {
+                path: "tests/writingTask1/type/:visualType",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentWritingTask1TypePage")).default,
+                }),
+              },
+              {
+                path: "tests/:testId/result",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentWritingTask2ResultPage")).default,
+                }),
+              },
+              {
+                path: "tests/writingTask1/:itemId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentWritingTask1TaskPage")).default,
+                }),
+              },
+              {
                 path: "tests/writingTask2",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentWritingTask2Page")).default,
+                }),
+              },
+              {
+                path: "tests/writingTask2/type/:essayType",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentWritingTask2TypePage")).default,
+                }),
+              },
+              {
+                path: "tests/writingTask2/:itemId",
+                lazy: async () => ({
+                  Component: (await import("../pages/student/StudentWritingTask2TaskPage")).default,
                 }),
               },
               {
@@ -150,12 +198,6 @@ export const router = createBrowserRouter([
                 path: "tests/:testId/start",
                 lazy: async () => ({
                   Component: (await import("../pages/student/StudentTestStartPage")).default,
-                }),
-              },
-              {
-                path: "tests/:testId/result",
-                lazy: async () => ({
-                  Component: (await import("../pages/student/StudentWritingTask2ResultPage")).default,
                 }),
               },
               {
@@ -308,9 +350,27 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: "/super-admin/:password/writing-task1",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminWritingTask1Page")).default,
+        }),
+      },
+      {
+        path: "/super-admin/:password/writing-task2",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminWritingTask2Page")).default,
+        }),
+      },
+      {
         path: "/super-admin/:password/reading",
         lazy: async () => ({
           Component: (await import("../pages/SuperAdminReadingPage")).default,
+        }),
+      },
+      {
+        path: "/super-admin/:password/daily-units",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminDailyUnitsPage")).default,
         }),
       },
       {

@@ -20,8 +20,26 @@ const studentProfileSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    fullName: { type: String, required: true, trim: true },
-    email: { type: String, required: true, trim: true, lowercase: true },
+    fullName: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 80,
+    },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 160,
+    },
+    bio: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 300,
+    },
     memberSince: { type: String, required: true },
     subscription: {
       planName: { type: String, required: true, default: "Student subscription" },

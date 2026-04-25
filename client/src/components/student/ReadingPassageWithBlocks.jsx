@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
+import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
+import useTextHighlighting from "../../hooks/useTextHighlighting";
+import ExamLeaveWarningModal from "./exam/ExamLeaveWarningModal";
 
 const START_COUNTDOWN_SECONDS = 3;
 const DEFAULT_ATTEMPT_DURATION_SECONDS = 20 * 60;
@@ -33,12 +39,6 @@ function normalizeAnswerText(value) {
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
-}
-
-function normalizeSelectedText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function toAnswerArray(value) {
@@ -116,28 +116,6 @@ function areSetsEqual(left, right) {
   return true;
 }
 
-function getNodeElement(node) {
-  if (!node) {
-    return null;
-  }
-
-  return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-}
-
-function unwrapHighlightNode(node) {
-  const parent = node?.parentNode;
-  if (!parent) {
-    return;
-  }
-
-  while (node.firstChild) {
-    parent.insertBefore(node.firstChild, node);
-  }
-
-  parent.removeChild(node);
-  parent.normalize();
-}
-
 function getOptionLabel(option, optionIndex) {
   if (typeof option === "string") {
     return String.fromCharCode(65 + optionIndex);
@@ -169,21 +147,69 @@ function getOptionText(option) {
     return option;
   }
 
-  return String(option?.text || option?.title || option?.value || option?.key || option?.label || "").trim() || "-";
+  const candidates = [
+    option?.text,
+    option?.title,
+    option?.statement,
+    option?.prompt,
+    option?.heading,
+    option?.ending,
+    option?.content,
+    option?.description,
+    option?.name,
+    option?.value,
+    option?.key,
+    option?.label,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || "").trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return "-";
 }
 
 function getDisplayPrompts(display = {}) {
-  const directPrompts = Array.isArray(display?.prompts) ? display.prompts : [];
-  if (directPrompts.length > 0) {
-    return directPrompts;
+  return Array.isArray(display?.prompts) ? display.prompts : [];
+}
+
+function getPromptText(prompt) {
+  const isInvalidObjectString = (value) => value.toLowerCase() === "[object object]";
+  const candidates = [
+    prompt?.text,
+    prompt?.statement,
+    prompt?.prompt,
+    prompt?.sentence,
+    prompt?.stem,
+    prompt?.question,
+    prompt?.line,
+    prompt?.item,
+    prompt?.clause,
+    prompt?.feature,
+    prompt?.name,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || "").trim();
+    if (normalized && !isInvalidObjectString(normalized)) {
+      return normalized;
+    }
   }
 
-  const statements = Array.isArray(display?.statements) ? display.statements : [];
-  if (statements.length > 0) {
-    return statements;
+  const paragraphId = String(prompt?.paragraphId || prompt?.paragraph || "").trim();
+  if (paragraphId) {
+    return `Paragraph ${paragraphId}`;
   }
 
-  return [];
+  const sectionId = String(prompt?.sectionId || prompt?.section || "").trim();
+  if (sectionId) {
+    return `Section ${sectionId}`;
+  }
+
+  return "";
 }
 
 function inferBinaryOptionItems(block) {
@@ -232,7 +258,57 @@ function inferBinaryOptionItems(block) {
   ];
 }
 
-function renderInlineToken(token, key) {
+function hasGapTokenInValue(value) {
+  if (Array.isArray(value)) {
+    return value.some((item) => hasGapTokenInValue(item));
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  if (String(value?.type || "").trim() === "gap") {
+    return true;
+  }
+
+  return Object.values(value).some((item) => hasGapTokenInValue(item));
+}
+
+function isGapFillLikeBlock(block) {
+  const source = `${String(block?.questionFamily || "")} ${String(block?.blockType || "")}`.toLowerCase();
+  return (
+    source.includes("gap_fill")
+    || source.includes("summary_completion")
+    || source.includes("note_completion")
+    || source.includes("table_completion")
+    || source.includes("flow_chart_completion")
+    || source.includes("sentence_completion")
+    || source.includes("diagram_label_completion")
+  );
+}
+
+function resolveStorageIdByToken(token, answerContext = null) {
+  const tokenId = String(token?.qid || token?.id || "").trim();
+  const tokenNumber = Number(token?.number);
+
+  if (tokenId && answerContext?.questionStorageIdById instanceof Map) {
+    const mappedById = String(answerContext.questionStorageIdById.get(tokenId) || "").trim();
+    if (mappedById) {
+      return mappedById;
+    }
+  }
+
+  if (Number.isFinite(tokenNumber) && answerContext?.questionStorageIdByNumber instanceof Map) {
+    const mappedByNumber = String(answerContext.questionStorageIdByNumber.get(tokenNumber) || "").trim();
+    if (mappedByNumber) {
+      return mappedByNumber;
+    }
+  }
+
+  return tokenId;
+}
+
+function renderInlineToken(token, key, answerContext = null) {
   if (typeof token === "string" || typeof token === "number") {
     return (
       <span className="whitespace-pre-wrap" key={key}>
@@ -247,6 +323,36 @@ function renderInlineToken(token, key) {
 
   if (token.type === "gap") {
     const label = Number.isFinite(Number(token.number)) ? Number(token.number) : token.qid || "?";
+    const questionStorageId = resolveStorageIdByToken(token, answerContext);
+    const inlineRawValue = questionStorageId ? answerContext?.selectedAnswersById?.[questionStorageId] : "";
+    const inlineValue = Array.isArray(inlineRawValue)
+      ? inlineRawValue.join(", ")
+      : String(inlineRawValue || "");
+
+    if (answerContext?.showInlineGapInputs && questionStorageId) {
+      return (
+        <span className="inline-flex items-center gap-1.5" key={key}>
+          <span className="text-[11px] font-semibold text-slate-500">{label}.</span>
+          <input
+            autoComplete="off"
+            aria-label={`Answer for question ${label}`}
+            className={`h-8 w-24 border bg-white px-2 text-xs font-semibold text-slate-700 outline-none transition ${
+              answerContext?.isInputDisabled
+                ? "cursor-not-allowed border-slate-200 text-slate-400"
+                : "border-emerald-300 focus:border-emerald-500"
+            }`}
+            disabled={answerContext?.isInputDisabled}
+            maxLength={64}
+            onChange={(event) => answerContext?.onAnswerChange?.(questionStorageId, event.target.value)}
+            placeholder={String(label)}
+            spellCheck={false}
+            type="text"
+            value={inlineValue}
+          />
+        </span>
+      );
+    }
+
     return (
       <span
         className="inline-flex items-center border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700"
@@ -280,30 +386,30 @@ function renderInlineToken(token, key) {
   );
 }
 
-function renderInlineContent(value, keyPrefix = "inline") {
+function renderInlineContent(value, keyPrefix = "inline", answerContext = null) {
   if (Array.isArray(value)) {
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5">
-        {value.map((token, index) => renderInlineToken(token, `${keyPrefix}-${index}`))}
+        {value.map((token, index) => renderInlineToken(token, `${keyPrefix}-${index}`, answerContext))}
       </span>
     );
   }
 
-  return renderInlineToken(value, `${keyPrefix}-single`);
+  return renderInlineToken(value, `${keyPrefix}-single`, answerContext);
 }
 
-function renderStructuredValue(value, keyPrefix = "structured") {
+function renderStructuredValue(value, keyPrefix = "structured", answerContext = null) {
   if (Array.isArray(value)) {
     const hasNestedArrays = value.some((entry) => Array.isArray(entry));
     if (!hasNestedArrays) {
-      return renderInlineContent(value, keyPrefix);
+      return renderInlineContent(value, keyPrefix, answerContext);
     }
 
     return (
       <div className="space-y-2">
         {value.map((entry, index) => (
           <div className="text-sm leading-7 text-slate-700" key={`${keyPrefix}-${index}`}>
-            {renderStructuredValue(entry, `${keyPrefix}-${index}`)}
+            {renderStructuredValue(entry, `${keyPrefix}-${index}`, answerContext)}
           </div>
         ))}
       </div>
@@ -311,7 +417,7 @@ function renderStructuredValue(value, keyPrefix = "structured") {
   }
 
   if (typeof value === "string" || typeof value === "number" || (value && typeof value === "object")) {
-    return renderInlineContent([value], keyPrefix);
+    return renderInlineContent([value], keyPrefix, answerContext);
   }
 
   return null;
@@ -339,16 +445,26 @@ function normalizeTableRows(rows) {
   });
 }
 
-function renderGenericTable(table, keyPrefix = "table") {
+function renderGenericTable(table, keyPrefix = "table", answerContext = null) {
   const columns = Array.isArray(table?.columns) ? table.columns : [];
   const rows = normalizeTableRows(table?.rows);
   if (columns.length === 0 && rows.length === 0) {
     return null;
   }
 
+  const maxColumnCount = Math.max(
+    columns.length,
+    ...rows.map((row) => (Array.isArray(row) ? row.length : 0)),
+    1,
+  );
+  const minTableWidthPx = Math.max(560, maxColumnCount * 170);
+
   return (
-    <div className="overflow-x-auto border border-slate-200">
-      <table className="min-w-full border-collapse text-sm text-slate-700">
+    <div className="max-w-full overflow-x-auto border border-slate-200">
+      <table
+        className="w-max border-collapse text-sm text-slate-700"
+        style={{ minWidth: `${minTableWidthPx}px` }}
+      >
         {columns.length > 0 ? (
           <thead className="bg-slate-50">
             <tr>
@@ -369,7 +485,7 @@ function renderGenericTable(table, keyPrefix = "table") {
             <tr className="align-top" key={`${keyPrefix}-row-${rowIndex}`}>
               {row.map((cell, cellIndex) => (
                 <td className="border border-slate-200 px-3 py-2 text-sm leading-7 text-slate-700" key={`${keyPrefix}-row-${rowIndex}-cell-${cellIndex}`}>
-                  {renderStructuredValue(cell, `${keyPrefix}-row-${rowIndex}-cell-${cellIndex}`) || "-"}
+                  {renderStructuredValue(cell, `${keyPrefix}-row-${rowIndex}-cell-${cellIndex}`, answerContext) || "-"}
                 </td>
               ))}
             </tr>
@@ -380,7 +496,7 @@ function renderGenericTable(table, keyPrefix = "table") {
   );
 }
 
-function renderDisplayElement(element, index, keyPrefix = "element") {
+function renderDisplayElement(element, index, keyPrefix = "element", answerContext = null) {
   const type = String(element?.type || "").trim();
   const key = `${keyPrefix}-${index}`;
 
@@ -395,7 +511,7 @@ function renderDisplayElement(element, index, keyPrefix = "element") {
   if (type === "bullet_row") {
     return (
       <li className="ml-5 list-disc text-sm leading-7 text-slate-700" key={key}>
-        {renderStructuredValue(element?.content, `${key}-content`) || "-"}
+        {renderStructuredValue(element?.content, `${key}-content`, answerContext) || "-"}
       </li>
     );
   }
@@ -404,7 +520,7 @@ function renderDisplayElement(element, index, keyPrefix = "element") {
     return (
       <div className="grid gap-2 border border-slate-200 bg-white px-4 py-3 sm:grid-cols-[220px_1fr]" key={key}>
         <p className="text-sm font-semibold text-slate-700">{String(element?.label || "").trim() || "-"}</p>
-        <div className="text-sm leading-7 text-slate-700">{renderStructuredValue(element?.content, `${key}-content`) || "-"}</div>
+        <div className="text-sm leading-7 text-slate-700">{renderStructuredValue(element?.content, `${key}-content`, answerContext) || "-"}</div>
       </div>
     );
   }
@@ -412,7 +528,7 @@ function renderDisplayElement(element, index, keyPrefix = "element") {
   return (
     <div className="border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-700" key={key}>
       {element?.label ? <p className="font-semibold text-slate-700">{String(element.label).trim()}</p> : null}
-      {renderStructuredValue(element?.content || element?.text || element, `${key}-fallback`) || "-"}
+      {renderStructuredValue(element?.content || element?.text || element, `${key}-fallback`, answerContext) || "-"}
     </div>
   );
 }
@@ -522,9 +638,60 @@ function renderPassageContentBlock(contentBlock, index) {
   );
 }
 
-function renderChoiceQuestion(question, questionIndex, keyPrefix = "choice-question") {
+function renderChoiceQuestion(
+  question,
+  questionIndex,
+  keyPrefix = "choice-question",
+  answerContext = null,
+) {
   const questionText = String(question?.text || question?.question || "").trim();
   const options = Array.isArray(question?.options) ? question.options : [];
+  const explicitQuestionId = String(question?.qid || question?.id || "").trim();
+  const questionNumber = Number(question?.number);
+  const answerStorageId = (() => {
+    if (explicitQuestionId && answerContext?.questionStorageIdById instanceof Map) {
+      const mapped = answerContext.questionStorageIdById.get(explicitQuestionId);
+      if (mapped) {
+        return mapped;
+      }
+    }
+
+    if (Number.isFinite(questionNumber) && answerContext?.questionStorageIdByNumber instanceof Map) {
+      const mapped = answerContext.questionStorageIdByNumber.get(questionNumber);
+      if (mapped) {
+        return mapped;
+      }
+    }
+
+    if (Array.isArray(answerContext?.orderedStorageIds)) {
+      return String(answerContext.orderedStorageIds[questionIndex] || "").trim();
+    }
+
+    return "";
+  })();
+  const inlineAnswerValueRaw = answerStorageId ? answerContext?.selectedAnswersById?.[answerStorageId] : "";
+  const inlineAnswerValue = Array.isArray(inlineAnswerValueRaw)
+    ? inlineAnswerValueRaw.join(", ")
+    : inlineAnswerValueRaw || "";
+  const selectedChoices = toChoiceArray(inlineAnswerValueRaw).map((item) => normalizeAnswerText(item));
+  const explicitSelectionLimit = Number(
+    question?.selectionLimit ?? question?.maxSelections ?? question?.maxAnswers,
+  );
+  const expectedAnswerCount = answerStorageId
+    ? Number(answerContext?.answerCountByStorageId?.get(answerStorageId) || 0)
+    : 0;
+  const inferredSelectionLimit = inferChoiceSelectionLimit(
+    questionText,
+    answerContext?.instructionText || "",
+    expectedAnswerCount > 1 ? expectedAnswerCount : 1,
+  );
+  const selectionLimit = Math.max(
+    1,
+    Number.isFinite(explicitSelectionLimit) && explicitSelectionLimit > 0
+      ? explicitSelectionLimit
+      : inferredSelectionLimit,
+  );
+
   return (
     <section className="space-y-2 border border-slate-200 bg-slate-50/70 px-4 py-3" key={`${keyPrefix}-${questionIndex}`}>
       <p className="text-sm font-semibold leading-7 text-slate-900">
@@ -534,12 +701,54 @@ function renderChoiceQuestion(question, questionIndex, keyPrefix = "choice-quest
       {options.length > 0 ? (
         <ul className="space-y-2">
           {options.map((option, optionIndex) => (
-            <li className="flex items-start gap-2 text-sm text-slate-700" key={`${keyPrefix}-${questionIndex}-option-${optionIndex}`}>
-              <span className="font-semibold text-slate-900">{getOptionLabel(option, optionIndex)}.</span>
-              <span>{getOptionText(option)}</span>
+            <li key={`${keyPrefix}-${questionIndex}-option-${optionIndex}`}>
+              {answerStorageId && typeof answerContext?.onChoiceSelect === "function" ? (
+                <button
+                  className={`flex w-full items-start gap-2 border px-3 py-2 text-left text-sm leading-6 transition ${
+                    selectedChoices.includes(normalizeAnswerText(getOptionValue(option, optionIndex)))
+                      ? "border-emerald-400 bg-emerald-50 text-slate-900"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200"
+                  } ${answerContext?.isInputDisabled ? "cursor-not-allowed opacity-75" : ""}`}
+                  disabled={answerContext?.isInputDisabled}
+                  onClick={() =>
+                    answerContext?.onChoiceSelect?.(
+                      answerStorageId,
+                      getOptionValue(option, optionIndex),
+                      selectionLimit,
+                    )
+                  }
+                  type="button"
+                >
+                  <span className="inline-flex min-w-6 font-semibold text-slate-900">
+                    {getOptionLabel(option, optionIndex)}.
+                  </span>
+                  <span>{getOptionText(option)}</span>
+                </button>
+              ) : (
+                <div className="flex items-start gap-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">{getOptionLabel(option, optionIndex)}.</span>
+                  <span>{getOptionText(option)}</span>
+                </div>
+              )}
             </li>
           ))}
         </ul>
+      ) : null}
+      {answerStorageId && options.length === 0 ? (
+        <input
+          autoComplete="off"
+          className={`h-10 w-full bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition ${
+            answerContext?.isInputDisabled
+              ? "cursor-not-allowed text-slate-400"
+              : "ring-1 ring-slate-300 focus:ring-emerald-500"
+          }`}
+          disabled={answerContext?.isInputDisabled}
+          maxLength={64}
+          onChange={(event) => answerContext?.onAnswerChange?.(answerStorageId, event.target.value)}
+          spellCheck={false}
+          type="text"
+          value={inlineAnswerValue}
+        />
       ) : null}
     </section>
   );
@@ -555,12 +764,33 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
       {prompts.map((prompt, index) => {
         const promptNumber = Number(prompt?.number);
         const promptId = String(prompt?.qid || prompt?.id || "").trim();
-        const promptQuestionId = promptId
-          || (Number.isFinite(promptNumber)
-            ? String(answerContext?.questionIdByNumber?.get(promptNumber) || "")
-            : "");
+        const promptQuestionStorageId = (() => {
+          if (promptId) {
+            const mappedById = String(
+              answerContext?.questionStorageIdById?.get(promptId)
+              || answerContext?.questionIdById?.get?.(promptId)
+              || "",
+            ).trim();
+            if (mappedById) {
+              return mappedById;
+            }
+          }
 
-        const selectedRaw = answerContext?.selectedAnswersById?.[promptQuestionId];
+          if (Number.isFinite(promptNumber)) {
+            const mappedByNumber = String(
+              answerContext?.questionStorageIdByNumber?.get(promptNumber)
+              || answerContext?.questionIdByNumber?.get(promptNumber)
+              || "",
+            ).trim();
+            if (mappedByNumber) {
+              return mappedByNumber;
+            }
+          }
+
+          return promptId;
+        })();
+
+        const selectedRaw = answerContext?.selectedAnswersById?.[promptQuestionStorageId];
         const selectedValue = Array.isArray(selectedRaw)
           ? String(selectedRaw[0] || "").trim()
           : String(selectedRaw || "").trim();
@@ -571,10 +801,10 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
               <span className="mr-2 font-semibold text-slate-900">
                 {Number.isFinite(promptNumber) ? `${promptNumber}.` : `${index + 1}.`}
               </span>
-              <span>{String(prompt?.text || prompt?.statement || "").trim() || "-"}</span>
+              <span>{getPromptText(prompt) || "-"}</span>
             </div>
 
-            {answerContext?.showPromptSelect && promptQuestionId ? (
+            {answerContext?.showPromptSelect && promptQuestionStorageId ? (
               <select
                 className={`h-9 min-w-30 border bg-white px-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 outline-none transition ${
                   answerContext?.isInputDisabled
@@ -582,12 +812,12 @@ function renderPromptList(prompts = [], keyPrefix = "prompt", answerContext = nu
                     : "border-slate-300 focus:border-emerald-500"
                 }`}
                 disabled={answerContext?.isInputDisabled}
-                onChange={(event) => answerContext?.onSelect?.(promptQuestionId, event.target.value)}
+                onChange={(event) => answerContext?.onSelect?.(promptQuestionStorageId, event.target.value)}
                 value={selectedValue}
               >
                 <option value="">Select</option>
                 {(Array.isArray(answerContext?.optionItems) ? answerContext.optionItems : []).map((item) => (
-                  <option key={`${promptQuestionId}-${item.value}`} value={item.value}>
+                  <option key={`${promptQuestionStorageId}-${item.value}`} value={item.value}>
                     {item.label}
                   </option>
                 ))}
@@ -643,14 +873,56 @@ function renderReadingBlockDisplay(block, answerContext = null) {
   const isBinaryJudgement = Boolean(answerContext?.isBinaryJudgement);
 
   if (directQuestion && directOptions.length > 0) {
+    const directQuestionStorageId = String(answerContext?.orderedStorageIds?.[0] || "").trim();
+    const directSelectedRaw = directQuestionStorageId
+      ? answerContext?.selectedAnswersById?.[directQuestionStorageId]
+      : "";
+    const directSelectedChoices = toChoiceArray(directSelectedRaw).map((item) => normalizeAnswerText(item));
+    const directExpectedAnswerCount = directQuestionStorageId
+      ? Number(answerContext?.answerCountByStorageId?.get(directQuestionStorageId) || 0)
+      : 0;
+    const directSelectionLimit = inferChoiceSelectionLimit(
+      directQuestion,
+      answerContext?.instructionText || "",
+      directExpectedAnswerCount > 1 ? directExpectedAnswerCount : 1,
+    );
+
     return (
       <section className="space-y-2 border border-slate-200 bg-slate-50/70 px-4 py-3">
         <p className="text-sm font-semibold leading-7 text-slate-900">{directQuestion}</p>
         <ul className="space-y-2">
           {directOptions.map((option, optionIndex) => (
-            <li className="flex items-start gap-2 text-sm text-slate-700" key={`direct-option-${optionIndex}`}>
-              <span className="font-semibold text-slate-900">{getOptionLabel(option, optionIndex)}.</span>
-              <span>{getOptionText(option)}</span>
+            <li key={`direct-option-${optionIndex}`}>
+              {answerContext?.showDirectQuestionOptions
+              && directQuestionStorageId
+              && typeof answerContext?.onChoiceSelect === "function" ? (
+                <button
+                  className={`flex w-full items-start gap-2 border px-3 py-2 text-left text-sm leading-6 transition ${
+                    directSelectedChoices.includes(normalizeAnswerText(getOptionValue(option, optionIndex)))
+                      ? "border-emerald-400 bg-emerald-50 text-slate-900"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200"
+                  } ${answerContext?.isInputDisabled ? "cursor-not-allowed opacity-75" : ""}`}
+                  disabled={answerContext?.isInputDisabled}
+                  onClick={() =>
+                    answerContext?.onChoiceSelect?.(
+                      directQuestionStorageId,
+                      getOptionValue(option, optionIndex),
+                      directSelectionLimit,
+                    )
+                  }
+                  type="button"
+                >
+                  <span className="inline-flex min-w-6 font-semibold text-slate-900">
+                    {getOptionLabel(option, optionIndex)}.
+                  </span>
+                  <span>{getOptionText(option)}</span>
+                </button>
+              ) : (
+                <div className="flex items-start gap-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">{getOptionLabel(option, optionIndex)}.</span>
+                  <span>{getOptionText(option)}</span>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -659,14 +931,19 @@ function renderReadingBlockDisplay(block, answerContext = null) {
   }
 
   if (displayQuestions.length > 0) {
-    return <div className="space-y-3">{displayQuestions.map((question, questionIndex) => renderChoiceQuestion(question, questionIndex))}</div>;
+    return (
+      <div className="space-y-3">
+        {displayQuestions.map((question, questionIndex) =>
+          renderChoiceQuestion(question, questionIndex, "choice-question", answerContext))}
+      </div>
+    );
   }
 
   if (displayPrompts.length > 0 || headingOptions.length > 0 || featureOptions.length > 0 || directOptions.length > 0) {
     return (
       <div className="space-y-3">
         {!isBinaryJudgement ? renderOptionList(directOptions, "Options", "display-options") : null}
-        {!isBinaryJudgement ? renderOptionList(headingOptions, "Heading Options", "heading-options", true, true) : null}
+        {!isBinaryJudgement ? renderOptionList(headingOptions, "Heading Options", "heading-options", true) : null}
         {!isBinaryJudgement ? renderOptionList(featureOptions, "Feature Options", "feature-options") : null}
         {renderPromptList(displayPrompts, "display-prompts", answerContext)}
       </div>
@@ -674,11 +951,16 @@ function renderReadingBlockDisplay(block, answerContext = null) {
   }
 
   if (display?.table && typeof display.table === "object") {
-    return renderGenericTable(display.table, "block-table");
+    return renderGenericTable(display.table, "block-table", answerContext);
   }
 
   if (Array.isArray(display?.elements) && display.elements.length > 0) {
-    return <div className="space-y-3">{display.elements.map((element, index) => renderDisplayElement(element, index, "display-element"))}</div>;
+    return (
+      <div className="space-y-3">
+        {display.elements.map((element, index) =>
+          renderDisplayElement(element, index, "display-element", answerContext))}
+      </div>
+    );
   }
 
   if (Array.isArray(display?.sections) && display.sections.length > 0) {
@@ -694,7 +976,7 @@ function renderReadingBlockDisplay(block, answerContext = null) {
             <ul className="ml-5 list-disc space-y-2 text-sm leading-7 text-slate-700">
               {(Array.isArray(section?.items) ? section.items : []).map((item, itemIndex) => (
                 <li key={`display-section-${sectionIndex}-item-${itemIndex}`}>
-                  {renderStructuredValue(item, `display-section-${sectionIndex}-item-${itemIndex}`) || "-"}
+                  {renderStructuredValue(item, `display-section-${sectionIndex}-item-${itemIndex}`, answerContext) || "-"}
                 </li>
               ))}
             </ul>
@@ -709,7 +991,7 @@ function renderReadingBlockDisplay(block, answerContext = null) {
       <ul className="ml-5 list-disc space-y-2 text-sm leading-7 text-slate-700">
         {display.items.map((item, itemIndex) => (
           <li key={`display-item-${itemIndex}`}>
-            {renderStructuredValue(item, `display-item-${itemIndex}`) || "-"}
+            {renderStructuredValue(item, `display-item-${itemIndex}`, answerContext) || "-"}
           </li>
         ))}
       </ul>
@@ -853,8 +1135,8 @@ function ReadingBlockPanel({ block, children, displayAnswerContext = null }) {
       : null;
 
   return (
-    <article className="overflow-hidden border border-slate-200 bg-white">
-      <header className="space-y-1 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
+    <article className="overflow-hidden bg-white">
+      <header className="space-y-1 border border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
           {toReadableLabel(block?.blockType || "reading_block")}
           {questionRange ? ` | ${questionRange}` : ""}
@@ -863,7 +1145,7 @@ function ReadingBlockPanel({ block, children, displayAnswerContext = null }) {
           <p className="text-sm font-semibold leading-7 text-slate-700">{String(block.instruction.text).trim()}</p>
         ) : null}
       </header>
-      <div className="space-y-3 px-4 py-4 sm:px-5">
+      <div className="space-y-3 py-4">
         {renderReadingBlockDisplay(block, displayAnswerContext)}
         {children}
       </div>
@@ -890,6 +1172,7 @@ function ReadingPassageWithBlocks({
   isPrimaryActionDisabled = null,
   isSecondaryActionDisabled = false,
 }) {
+  const navigate = useNavigate();
   const normalizedAttemptDuration = Math.max(1, Number(attemptDurationSeconds) || DEFAULT_ATTEMPT_DURATION_SECONDS);
   const attemptMinutesLabel = Math.max(1, Math.round(normalizedAttemptDuration / 60));
   const contentBlocks = Array.isArray(passage?.contentBlocks) ? passage.contentBlocks : [];
@@ -906,6 +1189,8 @@ function ReadingPassageWithBlocks({
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [isAutoCompleted, setIsAutoCompleted] = useState(false);
   const [autoCompleteReason, setAutoCompleteReason] = useState("");
+  const [isRouteLeaveSubmitting, setIsRouteLeaveSubmitting] = useState(false);
+  const [shouldProceedAfterResult, setShouldProceedAfterResult] = useState(false);
 
   const passageRef = useRef(null);
   const timerIntervalRef = useRef(null);
@@ -914,6 +1199,11 @@ function ReadingPassageWithBlocks({
   const passageTimingMsByNumberRef = useRef({});
   const activeTrackedPassageNumberRef = useRef(null);
   const activeTrackedStartedAtRef = useRef(null);
+  const latestActivePassageNumberRef = useRef(null);
+
+  const { clearHighlights, toggleSelectionHighlight } = useTextHighlighting({
+    dataAttribute: "data-reading-highlight",
+  });
 
   const defaultAutoCompleteStorageKey = useMemo(
     () =>
@@ -940,6 +1230,12 @@ function ReadingPassageWithBlocks({
 
     return Array.from(new Set(normalized)).sort((left, right) => left - right);
   }, [allPassageNumbers, normalizedActivePassageNumber]);
+
+  useEffect(() => {
+    latestActivePassageNumberRef.current = Number.isFinite(Number(normalizedActivePassageNumber))
+      ? Number(normalizedActivePassageNumber)
+      : null;
+  }, [normalizedActivePassageNumber]);
 
   const blocksWithQuestions = useMemo(() => {
     return blocks.map((block, index) => ({
@@ -974,13 +1270,8 @@ function ReadingPassageWithBlocks({
   }, []);
 
   const clearPassageHighlights = useCallback(() => {
-    if (!passageRef.current) {
-      return;
-    }
-
-    const highlightedNodes = passageRef.current.querySelectorAll("[data-reading-highlight='true']");
-    highlightedNodes.forEach((node) => unwrapHighlightNode(node));
-  }, []);
+    clearHighlights(passageRef);
+  }, [clearHighlights]);
 
   const initializePassageTimingState = useCallback(
     (timingEntries = []) => {
@@ -1001,17 +1292,21 @@ function ReadingPassageWithBlocks({
         });
       }
 
-      if (Number.isFinite(normalizedActivePassageNumber) && !Object.prototype.hasOwnProperty.call(nextMap, normalizedActivePassageNumber)) {
-        nextMap[normalizedActivePassageNumber] = 0;
+      const activePassageNumber = latestActivePassageNumberRef.current;
+      if (
+        Number.isFinite(Number(activePassageNumber))
+        && !Object.prototype.hasOwnProperty.call(nextMap, Number(activePassageNumber))
+      ) {
+        nextMap[Number(activePassageNumber)] = 0;
       }
 
       passageTimingMsByNumberRef.current = nextMap;
-      activeTrackedPassageNumberRef.current = Number.isFinite(normalizedActivePassageNumber)
-        ? normalizedActivePassageNumber
+      activeTrackedPassageNumberRef.current = Number.isFinite(Number(activePassageNumber))
+        ? Number(activePassageNumber)
         : null;
       activeTrackedStartedAtRef.current = null;
     },
-    [normalizedActivePassageNumber, normalizedPassageNumbers],
+    [normalizedPassageNumbers],
   );
 
   const commitActivePassageTiming = useCallback((nowMs = Date.now()) => {
@@ -1062,58 +1357,8 @@ function ReadingPassageWithBlocks({
   }, [normalizedPassageNumbers]);
 
   const handleTextSelectionToggle = useCallback(() => {
-    const rootElement = passageRef.current;
-    if (!rootElement) {
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      return;
-    }
-
-    const selectedText = selection.toString();
-    if (!selectedText || !selectedText.trim()) {
-      selection.removeAllRanges();
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    if (!rootElement.contains(range.commonAncestorContainer)) {
-      return;
-    }
-
-    const startElement = getNodeElement(selection.anchorNode);
-    const endElement = getNodeElement(selection.focusNode);
-    if (startElement?.closest?.("input, textarea") || endElement?.closest?.("input, textarea")) {
-      return;
-    }
-
-    const startHighlight = startElement?.closest?.("[data-reading-highlight='true']");
-    const endHighlight = endElement?.closest?.("[data-reading-highlight='true']");
-    if (startHighlight && startHighlight === endHighlight) {
-      const normalizedSelected = normalizeSelectedText(selectedText);
-      const normalizedHighlight = normalizeSelectedText(startHighlight.textContent);
-
-      if (normalizedSelected && normalizedSelected === normalizedHighlight) {
-        unwrapHighlightNode(startHighlight);
-        selection.removeAllRanges();
-        return;
-      }
-    }
-
-    const marker = document.createElement("mark");
-    marker.setAttribute("data-reading-highlight", "true");
-    marker.className = "bg-yellow-300/80 text-slate-900";
-
-    try {
-      range.surroundContents(marker);
-    } catch {
-      // Ignore invalid multi-node selections that cannot be wrapped safely.
-    }
-
-    selection.removeAllRanges();
-  }, []);
+    toggleSelectionHighlight(passageRef);
+  }, [toggleSelectionHighlight]);
 
   const evaluateAttempt = useCallback(() => {
     const blockResults = evaluationBlocksWithQuestions.map(({ block, index, questions }) => {
@@ -1367,6 +1612,15 @@ function ReadingPassageWithBlocks({
     normalizedAttemptDuration,
   ]);
 
+  const handleStartOverlayClose = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/student/tests/reading");
+  }, [navigate]);
+
   const handleTryAgain = useCallback(() => {
     clearAutoCompleteState(autoCompleteStorageKey);
     clearRunningIntervals();
@@ -1383,6 +1637,8 @@ function ReadingPassageWithBlocks({
     setCountdownValue(null);
     setIsAutoCompleted(false);
     setAutoCompleteReason("");
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
     setIsStartModalOpen(blocksWithQuestions.length > 0);
   }, [
     autoCompleteStorageKey,
@@ -1449,6 +1705,65 @@ function ReadingPassageWithBlocks({
     [hasAttemptStarted, isResultModalOpen],
   );
 
+  const isExamSessionActive = hasAttemptStarted && !isResultModalOpen && !isSubmittingAttempt;
+  useBodyScrollLock(isResultModalOpen || isStartModalOpen);
+
+  const persistBeforeUnloadSnapshot = useCallback(() => {
+    if (!isExamSessionActive) {
+      return;
+    }
+
+    const snapshot = evaluateAttempt();
+    const passageTiming = buildPassageTimingPayload();
+    persistAutoCompleteState(autoCompleteStorageKey, {
+      reason: "You refreshed or left the page. This reading task was auto-submitted.",
+      result: {
+        ...snapshot,
+        passageTiming,
+        submitReason: "before-unload",
+        forceReason: "You refreshed or left the page. This reading task was auto-submitted.",
+      },
+      submittedAt: new Date().toISOString(),
+    });
+  }, [autoCompleteStorageKey, buildPassageTimingPayload, evaluateAttempt, isExamSessionActive]);
+
+  const leaveProtection = useExamLeaveProtection({
+    isEnabled: isExamSessionActive,
+    onBeforeUnload: persistBeforeUnloadSnapshot,
+  });
+  useExamCopyBlocker(isExamSessionActive);
+
+  const handleStayOnExamPage = useCallback(() => {
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
+    leaveProtection.cancelNavigation();
+  }, [leaveProtection]);
+
+  const handleConfirmLeavePage = useCallback(async () => {
+    if (isRouteLeaveSubmitting) {
+      return;
+    }
+
+    setIsRouteLeaveSubmitting(true);
+    leaveProtection.hideWarning();
+    setShouldProceedAfterResult(true);
+    await completeAttempt("leave-page", "You left this page. This task was auto-submitted.");
+    if (!hasSubmittedAttemptRef.current) {
+      setShouldProceedAfterResult(false);
+      leaveProtection.cancelNavigation();
+    }
+    setIsRouteLeaveSubmitting(false);
+  }, [completeAttempt, isRouteLeaveSubmitting, leaveProtection]);
+
+  const handleResultPrimaryAction = useCallback(() => {
+    if (shouldProceedAfterResult && leaveProtection.hasBlockedNavigation) {
+      leaveProtection.proceedNavigation();
+      return;
+    }
+
+    setIsResultModalOpen(false);
+  }, [leaveProtection, shouldProceedAfterResult]);
+
   useEffect(() => {
     const nowMs = Date.now();
     const nextPassageNumber = Number.isFinite(normalizedActivePassageNumber) ? normalizedActivePassageNumber : null;
@@ -1508,6 +1823,8 @@ function ReadingPassageWithBlocks({
     hasSubmittedAttemptRef.current = false;
     setIsAutoCompleted(false);
     setAutoCompleteReason("");
+    setIsRouteLeaveSubmitting(false);
+    setShouldProceedAfterResult(false);
 
     const persisted = readAutoCompleteState(autoCompleteStorageKey);
     if (persisted?.result) {
@@ -1525,6 +1842,7 @@ function ReadingPassageWithBlocks({
   }, [
     attemptResetSignature,
     autoCompleteStorageKey,
+    blocksWithQuestions.length,
     clearPassageHighlights,
     clearRunningIntervals,
     initializePassageTimingState,
@@ -1583,37 +1901,17 @@ function ReadingPassageWithBlocks({
       autoCompleteAttempt("You switched focus away from this page. This reading task was auto-submitted.", "window-blur");
     };
 
-    const handleBeforeUnload = () => {
-      const snapshot = evaluateAttempt();
-      const passageTiming = buildPassageTimingPayload();
-      persistAutoCompleteState(autoCompleteStorageKey, {
-        reason: "You refreshed or left the page. This reading task was auto-submitted.",
-        result: {
-          ...snapshot,
-          passageTiming,
-          submitReason: "before-unload",
-          forceReason: "You refreshed or left the page. This reading task was auto-submitted.",
-        },
-        submittedAt: new Date().toISOString(),
-      });
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("blur", handleWindowBlur);
-    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("blur", handleWindowBlur);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [
     autoCompleteAttempt,
-    autoCompleteStorageKey,
-    buildPassageTimingPayload,
-    evaluateAttempt,
     hasAttemptStarted,
     isResultModalOpen,
   ]);
@@ -1701,10 +1999,18 @@ function ReadingPassageWithBlocks({
                     const displayPrompts = getDisplayPrompts(
                       display,
                     );
+                    const displayQuestions = Array.isArray(display?.questions) ? display.questions : [];
+                    const directQuestionText = String(display?.question || display?.stem || "").trim();
+                    const directOptions = Array.isArray(display?.options) ? display.options : [];
                     const questionIdByNumber = new Map(
                       questions
                         .map((question) => [Number(question?.number), String(question?.storageId || question?.id || "").trim()])
                         .filter(([number, questionId]) => Number.isFinite(number) && questionId),
+                    );
+                    const questionIdById = new Map(
+                      questions
+                        .map((question) => [String(question?.id || "").trim(), String(question?.storageId || question?.id || "").trim()])
+                        .filter(([questionId, storageId]) => questionId && storageId),
                     );
                     const binaryOptionItems = (
                       Array.isArray(display?.options) && display.options.length > 0
@@ -1741,28 +2047,59 @@ function ReadingPassageWithBlocks({
                       isBinaryJudgement
                       && displayPrompts.length > 0
                       && binaryOptionItems.length > 0;
+                    const hasInlineDisplayQuestions =
+                      !isBinaryJudgement
+                      && displayQuestions.length > 0;
+                    const hasInlineGapInputs =
+                      isGapFillLikeBlock(block)
+                      && hasGapTokenInValue(display);
+                    const hasInlineDirectQuestionOptions =
+                      !isBinaryJudgement
+                      && !hasInlineDisplayQuestions
+                      && Boolean(directQuestionText)
+                      && directOptions.length > 0
+                      && questions.length === 1;
                     const hasInlinePromptSelect = hasInlineBinaryPrompts || hasInlineHeadingPrompts;
                     const promptSelectItems = hasInlineBinaryPrompts ? binaryOptionItems : headingOptionItems;
+                    const answerCountByStorageId = new Map(
+                      questions.map((question) => [
+                        String(question?.storageId || question?.id || "").trim(),
+                        Array.isArray(question?.answers) ? question.answers.length : 0,
+                      ]),
+                    );
+                    const displayAnswerContext =
+                      hasInlinePromptSelect || hasInlineDisplayQuestions || hasInlineDirectQuestionOptions || hasInlineGapInputs
+                        ? {
+                          isBinaryJudgement,
+                          showPromptSelect: hasInlinePromptSelect,
+                          showDirectQuestionOptions: hasInlineDirectQuestionOptions,
+                          showInlineGapInputs: hasInlineGapInputs,
+                          isInputDisabled,
+                          onSelect: (questionId, value) => handleChoiceSelect(questionId, value, 1),
+                          onChoiceSelect: handleChoiceSelect,
+                          onAnswerChange: handleAnswerChange,
+                          optionItems: promptSelectItems,
+                          instructionText: String(block?.instruction?.text || ""),
+                          answerCountByStorageId,
+                          questionIdByNumber,
+                          questionStorageIdByNumber: questionIdByNumber,
+                          questionStorageIdById: questionIdById,
+                          orderedStorageIds: questions.map((question) => String(question?.storageId || question?.id || "").trim()),
+                          selectedAnswersById,
+                        }
+                        : null;
 
                     return (
                       <ReadingBlockPanel
                         block={block}
-                        displayAnswerContext={
-                          hasInlinePromptSelect
-                            ? {
-                              isBinaryJudgement,
-                              showPromptSelect: true,
-                              isInputDisabled,
-                              onSelect: (questionId, value) => handleChoiceSelect(questionId, value, 1),
-                              optionItems: promptSelectItems,
-                              questionIdByNumber,
-                              selectedAnswersById,
-                            }
-                            : null
-                        }
+                        displayAnswerContext={displayAnswerContext}
                         key={block?._id || `block-${index}`}
                       >
-                        {questions.length > 0 && !hasInlinePromptSelect ? (
+                        {questions.length > 0
+                        && !hasInlinePromptSelect
+                        && !hasInlineDisplayQuestions
+                        && !hasInlineDirectQuestionOptions
+                        && !hasInlineGapInputs ? (
                           <section className="space-y-3">
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Answers</p>
                         <div className="space-y-3">
@@ -1805,10 +2142,10 @@ function ReadingPassageWithBlocks({
                                       return (
                                         <li key={`${question.id}-option-${optionIndex}`}>
                                           <button
-                                            className={`flex w-full items-start gap-2 px-3 py-2 text-left text-sm leading-6 transition ${
+                                            className={`flex w-full items-start gap-2 border px-3 py-2 text-left text-sm leading-6 transition ${
                                               isSelected
-                                                ? "bg-emerald-50 text-slate-900"
-                                                : "bg-white text-slate-700 hover:bg-emerald-50/40"
+                                                ? "border-emerald-400 bg-emerald-50 text-slate-900"
+                                                : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200"
                                             } ${isInputDisabled ? "cursor-not-allowed opacity-75" : ""}`}
                                             disabled={isInputDisabled}
                                             onClick={() => handleChoiceSelect(answerStorageId, optionValue, selectionLimit)}
@@ -1864,9 +2201,11 @@ function ReadingPassageWithBlocks({
       {isResultModalOpen && result ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
+          onClick={() => setIsResultModalOpen(false)}
         >
           <div
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
+            onClick={(event) => event.stopPropagation()}
           >
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Task Submitted</p>
             <p
@@ -1897,19 +2236,21 @@ function ReadingPassageWithBlocks({
             ) : null}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <button
-                className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
-                onClick={handleTryAgain}
-                type="button"
-              >
-                Try Again
-              </button>
+              {shouldProceedAfterResult ? null : (
+                <button
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
+                  onClick={handleTryAgain}
+                  type="button"
+                >
+                  Try Again
+                </button>
+              )}
               <button
                 className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105"
-                onClick={() => setIsResultModalOpen(false)}
+                onClick={handleResultPrimaryAction}
                 type="button"
               >
-                Continue Review
+                {shouldProceedAfterResult ? "Leave Page" : "Continue Review"}
               </button>
             </div>
           </div>
@@ -1919,13 +2260,23 @@ function ReadingPassageWithBlocks({
       {isStartModalOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
+          onClick={handleStartOverlayClose}
         >
-          <div
-            className="w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
+        <div
+          className="relative w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            aria-label="Close and go back"
+            className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            onClick={handleStartOverlayClose}
+            type="button"
           >
-            <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
+            <X className="h-4 w-4" />
+          </button>
+          <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
             <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Before You Start</p>
             <h2 className="mt-3 text-2xl font-semibold text-slate-900"><b>PAY ATTENTION !!!</b></h2>
 
@@ -1950,6 +2301,13 @@ function ReadingPassageWithBlocks({
           </div>
         </div>
       ) : null}
+
+      <ExamLeaveWarningModal
+        isOpen={leaveProtection.isWarningOpen}
+        isSubmitting={isRouteLeaveSubmitting}
+        onLeave={handleConfirmLeavePage}
+        onStay={handleStayOnExamPage}
+      />
     </section>
   );
 }

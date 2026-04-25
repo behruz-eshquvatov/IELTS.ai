@@ -1,4 +1,4 @@
-import { LayoutGroup, motion } from "framer-motion";
+import { LayoutGroup } from "framer-motion";
 import { useEffect, useState } from "react";
 import StudentTodayTasks from "../../components/student/StudentTodayTasks";
 
@@ -62,11 +62,7 @@ function StudentDailyTasksPage() {
               >
                 <RollingLabel active={isActive} label={filter} />
                 {isActive ? (
-                  <motion.span
-                    layoutId="filter-active-line"
-                    className="absolute inset-x-3 bottom-0 h-px rounded-full bg-slate-950"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
-                  />
+                  <span className="absolute inset-x-3 bottom-0 h-px rounded-full bg-slate-950" />
                 ) : null}
               </button>
             );
@@ -75,7 +71,11 @@ function StudentDailyTasksPage() {
         </div>
       </LayoutGroup>
 
-      <StudentTodayTasks showHeader={false} showAllLink={false} />
+      <StudentTodayTasks
+        showHeader={false}
+        showAllLink={false}
+        activeFilter={activeFilter}
+      />
     </div>
   );
 }

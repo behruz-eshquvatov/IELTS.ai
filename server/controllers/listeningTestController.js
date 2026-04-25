@@ -1,13 +1,31 @@
 const mongoose = require("mongoose");
 const ListeningTest = require("../models/listeningTestModel");
 const ListeningAudio = require("../models/listeningAudioModel");
+const { recordStudentTaskAttempt } = require("../services/dailyTaskProgressService");
+const {
+  toProgressPayload,
+  listPublishedListeningFullTaskRefs,
+  listPublishedListeningPartTaskRefs,
+  buildAdditionalProgressMap,
+  assertAdditionalTaskUnlocked,
+} = require("../services/additionalTaskProgressService");
 
 const LEGACY_LISTENING_BLOCKS_COLLECTION = "listeninig_blocks";
 const DEFAULT_LISTENING_BLOCKS_COLLECTION = "listening_blocks";
 const BLOCK_RANGE_ID_PATTERN = /^(.*)_(\d+)-(\d+)$/;
+const ATTEMPT_CATEGORIES = ["daily", "additional"];
 
 function normalizeValue(value) {
   return String(value || "").trim();
+}
+
+function normalizeAttemptCategory(value) {
+  const safe = normalizeValue(value).toLowerCase();
+  return ATTEMPT_CATEGORIES.includes(safe) ? safe : "";
+}
+
+function normalizeSourceType(value) {
+  return normalizeValue(value).toLowerCase().replace(/\s+/g, "_");
 }
 
 function buildPaginationParams(query) {
@@ -119,7 +137,51 @@ function flattenBlockIds(parts = [], testId = "") {
   return Array.from(new Set(ids));
 }
 
+function flattenAudioRefs(parts = [], testId = "") {
+  const ids = [];
+  const safeTestId = normalizeValue(testId);
+  for (const part of parts || []) {
+    const blocks = Array.isArray(part?.blocks) ? part.blocks : [];
+    for (const block of blocks) {
+      const blockId = normalizeValue(block?.blockId);
+      if (!blockId) {
+        continue;
+      }
+
+      if (safeTestId && !belongsToTestPrefix(blockId, safeTestId)) {
+        continue;
+      }
+
+      const audioRef = normalizeValue(block?.audioRef || blockId);
+      if (audioRef) {
+        ids.push(audioRef);
+      }
+    }
+  }
+
+  return Array.from(new Set(ids));
+}
+
 function comparePartBlocks(left, right) {
+  const leftOrder = Number(left?.order);
+  const rightOrder = Number(right?.order);
+  const leftOrderIsFinite = Number.isFinite(leftOrder);
+  const rightOrderIsFinite = Number.isFinite(rightOrder);
+  if (leftOrderIsFinite || rightOrderIsFinite) {
+    if (leftOrderIsFinite && !rightOrderIsFinite) {
+      return -1;
+    }
+
+    if (!leftOrderIsFinite && rightOrderIsFinite) {
+      return 1;
+    }
+
+    const orderDiff = leftOrder - rightOrder;
+    if (orderDiff !== 0) {
+      return orderDiff;
+    }
+  }
+
   const leftStart = Number(left?.questionRange?.start);
   const rightStart = Number(right?.questionRange?.start);
   const leftStartIsFinite = Number.isFinite(leftStart);
@@ -162,6 +224,25 @@ function comparePartBlocks(left, right) {
 }
 
 function compareParts(left, right) {
+  const leftPartNumber = Number(left?.partNumber);
+  const rightPartNumber = Number(right?.partNumber);
+  const leftPartNumberIsFinite = Number.isFinite(leftPartNumber);
+  const rightPartNumberIsFinite = Number.isFinite(rightPartNumber);
+  if (leftPartNumberIsFinite || rightPartNumberIsFinite) {
+    if (leftPartNumberIsFinite && !rightPartNumberIsFinite) {
+      return -1;
+    }
+
+    if (!leftPartNumberIsFinite && rightPartNumberIsFinite) {
+      return 1;
+    }
+
+    const partDiff = leftPartNumber - rightPartNumber;
+    if (partDiff !== 0) {
+      return partDiff;
+    }
+  }
+
   const leftStart = Number(left?.__sortStart);
   const rightStart = Number(right?.__sortStart);
   const leftStartIsFinite = Number.isFinite(leftStart);
@@ -181,7 +262,7 @@ function compareParts(left, right) {
     }
   }
 
-  return Number(left?.partNumber || 0) - Number(right?.partNumber || 0);
+  return String(left?.partNumber || "").localeCompare(String(right?.partNumber || ""));
 }
 
 function enrichTestParts(parts = [], blocksById = new Map(), audioIds = new Set(), testId = "") {
@@ -194,22 +275,27 @@ function enrichTestParts(parts = [], blocksById = new Map(), audioIds = new Set(
           if (safeTestId && !belongsToTestPrefix(blockId, safeTestId)) {
             return null;
           }
+          const audioRef = normalizeValue(partBlock?.audioRef || blockId);
 
           const parsedRange = parseBlockQuestionRange(blockId);
           const blockMeta = blocksById.get(blockId);
           const questionsCount = Array.isArray(blockMeta?.questions) ? blockMeta.questions.length : 0;
+          const order = Number.isFinite(Number(partBlock?.order))
+            ? Number(partBlock.order)
+            : null;
 
           return {
             blockId,
-            audioId: blockId,
-            audioRef: blockId,
+            audioId: audioRef || blockId,
+            audioRef: audioRef || blockId,
+            order,
             questionRange: parsedRange
               ? {
                 start: parsedRange.start,
                 end: parsedRange.end,
               }
               : {},
-            hasAudio: audioIds.has(blockId),
+            hasAudio: audioIds.has(audioRef || blockId),
             blockType: blockMeta?.blockType || "",
             questionFamily: blockMeta?.questionFamily || "",
             displayTitle: blockMeta?.display?.title || "",
@@ -239,6 +325,30 @@ function enrichTestParts(parts = [], blocksById = new Map(), audioIds = new Set(
       delete nextPart.__sortStart;
       return nextPart;
     });
+}
+
+function sanitizeListeningEvaluationPayload(value) {
+  const safe = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const totalQuestions = Math.max(0, Math.round(Number(safe?.totalQuestions) || 0));
+  const correctCount = Math.max(0, Math.round(Number(safe?.correctCount) || 0));
+  const incorrectCountFromBody = Number(safe?.incorrectCount);
+  const incorrectCount = Number.isFinite(incorrectCountFromBody) && incorrectCountFromBody >= 0
+    ? Math.round(incorrectCountFromBody)
+    : Math.max(0, totalQuestions - correctCount);
+  const percentageFromBody = Number(safe?.percentage);
+  const percentage = Number.isFinite(percentageFromBody) && percentageFromBody >= 0
+    ? Math.round(percentageFromBody)
+    : totalQuestions > 0
+      ? Math.round((correctCount / totalQuestions) * 100)
+      : 0;
+
+  return {
+    totalQuestions,
+    correctCount,
+    incorrectCount,
+    percentage: Math.max(0, Math.min(percentage, 100)),
+    incorrectItems: Array.isArray(safe?.incorrectItems) ? safe.incorrectItems : [],
+  };
 }
 
 async function getListeningBlocksCollectionName() {
@@ -286,8 +396,21 @@ async function listListeningTests(req, res) {
     .skip(skip)
     .limit(limit)
     .lean();
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedListeningFullTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "listening",
+      sourceType: "listening_full",
+      orderedTaskRefs,
+    })
+    : new Map();
 
-  const list = tests.map((test) => {
+  const list = tests.map((test, index) => {
+    const taskRefId = normalizeValue(test?._id);
+    const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1 || index + 1);
+    const progress = toProgressPayload(progressMap.get(taskRefId), sequenceOrder);
     const summary = buildPartSummary(test.parts);
     return {
       _id: test._id,
@@ -298,6 +421,9 @@ async function listListeningTests(req, res) {
       status: test.status,
       createdAt: test.createdAt,
       updatedAt: test.updatedAt,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
       ...summary,
     };
   });
@@ -327,7 +453,7 @@ async function getListeningTestById(req, res) {
   }
 
   const blockIds = flattenBlockIds(test.parts, test._id);
-  const audioBlockIds = blockIds;
+  const audioBlockIds = flattenAudioRefs(test.parts, test._id);
   const blocksCollectionName = await getListeningBlocksCollectionName();
   const blocksCollection = mongoose.connection.db.collection(blocksCollectionName);
   const blocks = blockIds.length
@@ -355,11 +481,26 @@ async function getListeningTestById(req, res) {
   const audioIds = new Set(audioDocs.map((audio) => audio._id));
 
   const enrichedParts = enrichTestParts(test.parts, blocksById, audioIds, test._id);
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedListeningFullTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "listening",
+      sourceType: "listening_full",
+      orderedTaskRefs,
+    })
+    : new Map();
+  const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(testId) + 1);
+  const progress = toProgressPayload(progressMap.get(testId), sequenceOrder);
 
   return res.json({
     test: {
       ...test,
       parts: enrichedParts,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
     },
     sourceCollection: {
       listeningTests: "listening_tests",
@@ -381,7 +522,7 @@ async function listListeningPartGroups(req, res) {
     .lean();
 
   const allBlockIds = tests.flatMap((test) => flattenBlockIds(test?.parts, test?._id));
-  const allAudioBlockIds = allBlockIds;
+  const allAudioBlockIds = tests.flatMap((test) => flattenAudioRefs(test?.parts, test?._id));
   const blocksCollectionName = await getListeningBlocksCollectionName();
   const blocksCollection = mongoose.connection.db.collection(blocksCollectionName);
 
@@ -430,13 +571,35 @@ async function listListeningPartGroups(req, res) {
       createdAt: test.createdAt || null,
     }));
   });
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedListeningPartTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "listening",
+      sourceType: "listening_part",
+      orderedTaskRefs,
+    })
+    : new Map();
+  const enrichedGroups = groups.map((group, index) => {
+    const taskRefId = `${normalizeValue(group?.testId)}::part:${Number(group?.partNumber) || 0}`;
+    const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1 || index + 1);
+    const progress = toProgressPayload(progressMap.get(taskRefId), sequenceOrder);
+    return {
+      ...group,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
+      taskRefId,
+    };
+  });
 
   return res.json({
-    count: groups.length,
+    count: enrichedGroups.length,
     filters: {
       status: status || null,
     },
-    groups,
+    groups: enrichedGroups,
     sourceCollection: {
       listeningTests: "listening_tests",
       listeningBlocks: blocksCollectionName,
@@ -470,7 +633,7 @@ async function getListeningTestPartById(req, res) {
   const blocksCollectionName = await getListeningBlocksCollectionName();
   const blocksCollection = mongoose.connection.db.collection(blocksCollectionName);
   const blockIds = flattenBlockIds(test.parts, test._id);
-  const audioBlockIds = blockIds;
+  const audioBlockIds = flattenAudioRefs(test.parts, test._id);
   const blocks = blockIds.length
     ? await blocksCollection
       .find(
@@ -502,6 +665,18 @@ async function getListeningTestPartById(req, res) {
       message: `Part ${partNumber} was not found for listening test '${testId}'.`,
     });
   }
+  const studentUserId = normalizeValue(req.auth?.userId);
+  const taskRefId = `${testId}::part:${partNumber}`;
+  const orderedTaskRefs = await listPublishedListeningPartTaskRefs();
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "listening",
+      sourceType: "listening_part",
+      orderedTaskRefs,
+    })
+    : new Map();
+  const progress = toProgressPayload(progressMap.get(taskRefId), Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1));
 
   return res.json({
     test: {
@@ -516,6 +691,10 @@ async function getListeningTestPartById(req, res) {
       testId: test._id,
       testTitle: test.title || test._id,
       blocksCount: Array.isArray(part?.blocks) ? part.blocks.length : 0,
+      taskRefId,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
     },
     sourceCollection: {
       listeningTests: "listening_tests",
@@ -525,9 +704,114 @@ async function getListeningTestPartById(req, res) {
   });
 }
 
+async function submitListeningTestAttempt(req, res) {
+  const studentUserId = normalizeValue(req.auth?.userId);
+  if (!studentUserId) {
+    return res.status(401).json({
+      message: "Student authorization is required.",
+    });
+  }
+
+  const studentEmail = normalizeValue(req.auth?.email).toLowerCase();
+  const testId = normalizeValue(req.params.testId);
+  if (!testId) {
+    return res.status(400).json({
+      message: "Listening test id is required.",
+    });
+  }
+
+  const test = await ListeningTest.findById(testId).lean();
+  if (!test) {
+    return res.status(404).json({
+      message: `Listening test '${testId}' not found.`,
+    });
+  }
+
+  const submitReason = normalizeValue(req.body?.submitReason) || "manual";
+  const forceReason = normalizeValue(req.body?.forceReason);
+  const attemptCategory = normalizeAttemptCategory(req.body?.attemptCategory);
+  const sourceType = normalizeSourceType(req.body?.sourceType);
+  const resolvedAttemptCategory = attemptCategory || (sourceType === "daily_unit" ? "daily" : "additional");
+  const submittedAt = req.body?.submittedAt ? new Date(req.body.submittedAt) : new Date();
+  const safeSubmittedAt = Number.isNaN(submittedAt.valueOf()) ? new Date() : submittedAt;
+  const totalTimeSpentSeconds = Math.max(
+    0,
+    Math.round(Number(req.body?.timeSpentSeconds) || 0),
+  );
+  const evaluation = sanitizeListeningEvaluationPayload(req.body?.evaluation);
+  const blockResults = Array.isArray(req.body?.blockResults) ? req.body.blockResults : [];
+
+  if (resolvedAttemptCategory === "additional") {
+    try {
+      await assertAdditionalTaskUnlocked({
+        studentUserId,
+        taskType: "listening",
+        taskRefId: testId,
+        sourceType: "listening_full",
+      });
+    } catch (error) {
+      const statusCode = Number(error?.httpStatus) || 403;
+      return res.status(statusCode).json({
+        message: error?.message || "This additional task is locked.",
+      });
+    }
+  }
+
+  try {
+    const attempt = await recordStudentTaskAttempt({
+      studentUserId,
+      studentEmail,
+      attemptCategory: resolvedAttemptCategory,
+      sourceType,
+      taskType: "listening",
+      taskRefId: testId,
+      taskLabel: normalizeValue(test?.title) || testId,
+      submitReason,
+      forceReason,
+      isAutoSubmitted: submitReason !== "manual",
+      submittedAt: safeSubmittedAt,
+      totalTimeSpentSeconds,
+      score: {
+        percentage: evaluation.percentage,
+        correctCount: evaluation.correctCount,
+        incorrectCount: evaluation.incorrectCount,
+        totalQuestions: evaluation.totalQuestions,
+      },
+      payload: {
+        evaluation,
+        blockResults,
+        blockIds: flattenBlockIds(test?.parts, testId),
+      },
+      sourceRefs: {
+        listeningBlockAttemptIds: blockResults
+          .map((item) => normalizeValue(item?.blockAttemptId || item?.attemptId))
+          .filter(Boolean),
+      },
+    });
+
+    return res.status(201).json({
+      message: "Listening full test submitted successfully.",
+      attempt: {
+        id: String(attempt?._id || ""),
+        attemptNumber: Number(attempt?.attemptNumber || 0),
+        testId,
+        submittedAt: attempt?.submittedAt || safeSubmittedAt,
+        submitReason,
+        forceReason,
+        score: attempt?.score || {},
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: error?.message || "Listening full test submission failed.",
+    });
+  }
+}
+
 module.exports = {
   listListeningTests,
   getListeningTestById,
   listListeningPartGroups,
   getListeningTestPartById,
+  submitListeningTestAttempt,
 };

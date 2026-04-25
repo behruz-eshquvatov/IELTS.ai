@@ -45,6 +45,7 @@ function buildDefaultStudentProfile(userDoc) {
     studentId: String(userDoc.email).toLowerCase().trim(),
     fullName: userDoc.fullName,
     email: String(userDoc.email).toLowerCase().trim(),
+    bio: "",
     memberSince: new Date().toLocaleString("en-US", { month: "long", year: "numeric" }),
     subscription: {
       planName: "Student subscription",

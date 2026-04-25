@@ -71,7 +71,7 @@ const listeningTestSchema = new mongoose.Schema(
   },
 );
 
-listeningTestSchema.pre("validate", function validateListeningArchitecture(next) {
+listeningTestSchema.pre("validate", function validateListeningArchitecture() {
   const testId = normalizeValue(this._id);
   const seenBlockIds = new Set();
   const ranges = [];
@@ -165,7 +165,6 @@ listeningTestSchema.pre("validate", function validateListeningArchitecture(next)
     }
   }
 
-  next();
 });
 
 module.exports = mongoose.model("ListeningTest", listeningTestSchema);

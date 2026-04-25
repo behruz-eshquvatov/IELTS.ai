@@ -5,6 +5,7 @@ import { LayoutGrid, List, Plus, Search, Trash2 } from "lucide-react";
 import { teacherClasses, teacherStudents } from "../../data/teacherPanel";
 import TeacherClassCard from "../../components/teacher/TeacherClassCard";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 const MotionSpan = motion.span;
 
@@ -111,15 +112,23 @@ function StudentDirectoryPanel({
 
 function StudentDirectoryModal(props) {
   const { classroom, onClose } = props;
+  useBodyScrollLock(Boolean(classroom));
 
   if (!classroom) {
     return null;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
+    <div
+      className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]"
+      onClick={onClose}
+      role="presentation"
+    >
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-hidden border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)] sm:max-h-[calc(100vh-3rem)]">
+        <div
+          className="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-hidden border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)] sm:max-h-[calc(100vh-3rem)]"
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -196,20 +205,6 @@ function TeacherClassesPage() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!activeClassId) {
-      document.body.style.overflow = "";
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [activeClassId]);
 
   const handleStartEditing = (classId, field, value) => {
     setEditingField({ classId, field });

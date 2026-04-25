@@ -38,6 +38,7 @@ const navGroups = [
   {
     title: "Personal Info",
     items: [
+      { label: "Results", to: "/student/results", icon: NotebookPen },
       { label: "Analytics", to: "/student/analytics", icon: LineChart },
       { label: "Profile", to: "/student/profile", icon: UserCircle },
     ],
@@ -155,7 +156,7 @@ function StudentSidebar() {
           setIsLeaveOpen(false);
           try {
             await authApi.logout();
-          } catch (error) {
+          } catch {
             // Even if request fails, local logout should still proceed.
           } finally {
             clearAuthSession();
@@ -214,9 +215,12 @@ const StudentMainContent = memo(function StudentMainContent() {
             {navGroups
               .flatMap((group) => group.items)
               .find((item) => item.to === location.pathname)?.label ??
+              (location.pathname.startsWith("/student/results")
+                ? "Results"
+                :
               (location.pathname.startsWith("/student/analytics/assistant")
                 ? "AI Analysis"
-                : "Student Portal")}
+                : "Student Portal"))}
           </h1>
         </div>
         <div

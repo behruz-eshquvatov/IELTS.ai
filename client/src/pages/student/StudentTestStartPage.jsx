@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ShieldBan } from "lucide-react";
-import { motion } from "framer-motion";
+import { AlertTriangle, ShieldBan, X } from "lucide-react";
+import { motion as Motion } from "framer-motion";
 import WritingAttemptTimerCard from "../../components/student/WritingAttemptTimerCard";
 import { apiRequest } from "../../lib/apiClient";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 const DEFAULT_DURATION_SECONDS = 40 * 60;
 const MINIMUM_WORDS = 250;
+const START_COUNTDOWN_SECONDS = 3;
 
 function parseDurationFromSubText(subText) {
   if (!Array.isArray(subText)) {
@@ -90,7 +92,24 @@ function StudentTestStartPage() {
   const [isSubmissionHydrated, setIsSubmissionHydrated] = useState(false);
   const [isAttemptStarted, setIsAttemptStarted] = useState(false);
   const [isCheckingEssay, setIsCheckingEssay] = useState(false);
+  const [isCountdownRunning, setIsCountdownRunning] = useState(false);
+  const [countdownValue, setCountdownValue] = useState(null);
   const blockedNavigationAlertAtRef = useRef(0);
+  const countdownIntervalRef = useRef(null);
+
+  const clearCountdownInterval = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      window.clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(
+    () => () => {
+      clearCountdownInterval();
+    },
+    [clearCountdownInterval],
+  );
 
   useEffect(() => {
     if (testId !== "writingTask2-opinion") {
@@ -259,10 +278,9 @@ function StudentTestStartPage() {
       let analysisError = "";
 
       try {
-        const response = await apiRequest("/writing-task2-opinion/analyses", {
+        const response = await apiRequest("/writing-task2/analyses", {
           method: "POST",
           body: payload,
-          auth: false,
         });
         analysis = response?.analysis ?? null;
       } catch (error) {
@@ -315,10 +333,71 @@ function StudentTestStartPage() {
       return;
     }
 
+    clearCountdownInterval();
+    setIsCountdownRunning(false);
+    setCountdownValue(null);
     const startedAt = Date.now();
     localStorage.setItem(attemptStartStorageKey, String(startedAt));
     setIsAttemptStarted(true);
-  }, [attemptStartStorageKey, isAttemptStarted, isSubmitted, setId, testId]);
+  }, [
+    attemptStartStorageKey,
+    clearCountdownInterval,
+    isAttemptStarted,
+    isSubmitted,
+    setId,
+    testId,
+  ]);
+
+  const handleUnderstandStart = useCallback(() => {
+    if (
+      isCountdownRunning
+      || testId !== "writingTask2-opinion"
+      || !setId
+      || isSubmitted
+      || isAttemptStarted
+    ) {
+      return;
+    }
+
+    setIsCountdownRunning(true);
+    setCountdownValue(START_COUNTDOWN_SECONDS);
+
+    clearCountdownInterval();
+    countdownIntervalRef.current = window.setInterval(() => {
+      setCountdownValue((previousValue) => {
+        if (previousValue === null) {
+          return null;
+        }
+
+        if (previousValue <= 1) {
+          clearCountdownInterval();
+          setIsCountdownRunning(false);
+          setCountdownValue(null);
+          handleStartAttempt();
+          return null;
+        }
+
+        return previousValue - 1;
+      });
+    }, 1000);
+  }, [
+    clearCountdownInterval,
+    handleStartAttempt,
+    isAttemptStarted,
+    isCountdownRunning,
+    isSubmitted,
+    setId,
+    testId,
+  ]);
+
+  const handleStartOverlayClose = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(`/student/tests/${encodeURIComponent(testId || "writingTask2-opinion")}`);
+  }, [navigate, testId]);
 
   useEffect(() => {
     if (testId !== "writingTask2-opinion") {
@@ -395,6 +474,16 @@ function StudentTestStartPage() {
     submissionMeta,
     testId,
   ]);
+
+  const isStartGateModalOpen =
+    testId === "writingTask2-opinion"
+    && !isSubmitted
+    && !isAttemptStarted
+    && isSubmissionHydrated
+    && !isLoadingPrompt
+    && !promptError
+    && Boolean(setId);
+  useBodyScrollLock(isStartGateModalOpen);
 
   if (testId === "writingTask2-opinion") {
     const wordsCount = countWords(essayText);
@@ -528,37 +617,52 @@ function StudentTestStartPage() {
           </aside>
         </div>
 
-        {!isSubmitted && !isAttemptStarted && isSubmissionHydrated && !isLoadingPrompt && !promptError && setId ? (
-          <motion.div
+        {isStartGateModalOpen ? (
+          <Motion.div
             animate={{ opacity: 1 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
             initial={{ opacity: 0 }}
+            onClick={handleStartOverlayClose}
             transition={{ duration: 0.28, ease: "easeOut" }}
           >
-            <motion.div
+            <Motion.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
+              className="relative w-full max-w-xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-7"
               initial={{ opacity: 0, scale: 0.96, y: 18 }}
+              onClick={(event) => event.stopPropagation()}
               transition={{ duration: 0.34, ease: "easeOut", delay: 0.05 }}
             >
+              <button
+                aria-label="Close and go back"
+                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                onClick={handleStartOverlayClose}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
               <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Before You Start</p>
-              <h2 className="mt-3 text-2xl font-semibold text-slate-900">Do Not Leave This Page</h2>
-              <p className="mt-4 text-base font-medium leading-8 text-slate-700">
-                If you switch tab, switch browser/window, or leave this page after starting, your attempt will be
-                auto-checked.
-              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-slate-900"><b>PAY ATTENTION !!!</b></h2>
+              <div className="mx-auto mt-4 max-w-2xl space-y-2 text-base font-medium leading-8 text-slate-700">
+                <p>
+                  You have <span className="text-yellow-500">{Math.max(1, Math.round(durationSeconds / 60))} minutes</span> for this writing task.
+                  If you <span className="text-yellow-500">switch</span> tabs, <span className="text-yellow-500">change</span> browser, or <span className="text-yellow-500">refresh</span>, this task is <span className="text-yellow-500">auto-submitted</span>.
+                </p>
+              </div>
               <button
-                className="emerald-gradient-fill mx-auto mt-6 inline-flex w-fit items-center justify-center rounded-full border border-emerald-300/20 px-7 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition"
-                onClick={handleStartAttempt}
+                className="mx-auto mt-6 inline-flex w-full max-w-[330px] items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-8 py-4 text-sm font-black uppercase tracking-[0.22em] text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition hover:brightness-105"
+                disabled={isCountdownRunning}
+                onClick={handleUnderstandStart}
                 type="button"
               >
-                Ok, Start Timer
+                {isCountdownRunning && Number.isFinite(countdownValue)
+                  ? `Starting in ${countdownValue}`
+                  : "I Understand"}
               </button>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         ) : null}
       </div>
     );
@@ -580,3 +684,4 @@ function StudentTestStartPage() {
 }
 
 export default StudentTestStartPage;
+

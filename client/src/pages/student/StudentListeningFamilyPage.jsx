@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Headphones } from "lucide-react";
+import { ChevronLeft, ChevronRight, Headphones, Lock } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import {
   buildListeningPracticeQueryParams,
@@ -91,9 +91,7 @@ function StudentListeningFamilyPage() {
           page: String(currentPage),
           limit: String(pageSize),
         });
-        const response = await apiRequest(`/listening-blocks/practice?${params.toString()}`, {
-          auth: false,
-        });
+        const response = await apiRequest(`/listening-blocks/practice?${params.toString()}`);
         if (!isMounted) {
           return;
         }
@@ -168,6 +166,33 @@ function StudentListeningFamilyPage() {
           {blocks.map((block, index) => {
             const taskNumber = (currentPage - 1) * pageSize + index + 1;
             const taskTitle = `${familyTaskTitlePrefix} ${taskNumber}`;
+            const progressStatus = String(block?.progressStatus || block?.progression?.status || "available")
+              .trim()
+              .toLowerCase();
+            const isLocked = progressStatus === "locked";
+
+            if (isLocked) {
+              return (
+                <div
+                  key={block._id}
+                  className="flex min-h-[104px] cursor-not-allowed items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 opacity-80"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-500 shadow-sm">
+                    <Headphones className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-slate-900">{taskTitle}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {toReadableLabel(block.blockType)} | {block.questionsCount} questions
+                    </p>
+                  </div>
+                  <span className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <Lock className="h-3.5 w-3.5" />
+                    Locked
+                  </span>
+                </div>
+              );
+            }
 
             return (
               <Link

@@ -2,12 +2,30 @@ const mongoose = require("mongoose");
 const ListeningBlock = require("../models/listeningBlockModel");
 const ListeningAudio = require("../models/listeningAudioModel");
 const ListeningAttempt = require("../models/listeningAttemptModel");
+const { recordStudentTaskAttempt } = require("../services/dailyTaskProgressService");
+const {
+  normalizeListeningPracticeKey,
+  toProgressPayload,
+  listPublishedListeningPracticeBlockTaskRefs,
+  buildAdditionalProgressMap,
+  assertAdditionalTaskUnlocked,
+} = require("../services/additionalTaskProgressService");
 const { sendAudioStreamResponse } = require("../utils/audioStream");
 
 const LEGACY_LISTENING_BLOCKS_COLLECTION = "listeninig_blocks";
+const ATTEMPT_CATEGORIES = ["daily", "additional"];
 
 function normalizeFilterValue(value) {
   return String(value || "").trim();
+}
+
+function normalizeAttemptCategory(value) {
+  const safe = normalizeFilterValue(value).toLowerCase();
+  return ATTEMPT_CATEGORIES.includes(safe) ? safe : "";
+}
+
+function normalizeSourceType(value) {
+  return normalizeFilterValue(value).toLowerCase().replace(/\s+/g, "_");
 }
 
 function parseCsvValues(value) {
@@ -315,6 +333,7 @@ async function listListeningBlocks(req, res) {
 async function listListeningPracticeBlocks(req, res) {
   const collectionName = await getListeningBlocksCollectionName();
   const collection = mongoose.connection.db.collection(collectionName);
+  const practiceKey = normalizeListeningPracticeKey(req.query.practiceKey);
   const blockTypes = Array.from(
     new Set([
       ...parseCsvValues(req.query.blockType),
@@ -373,9 +392,31 @@ async function listListeningPracticeBlocks(req, res) {
       : [],
     hasAudio: audioIdSet.has(block._id),
   }));
+  const studentUserId = normalizeFilterValue(req.auth?.userId);
+  const orderedTaskRefs = await listPublishedListeningPracticeBlockTaskRefs({ practiceKey });
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "listening",
+      sourceType: "listening_question_family",
+      practiceKey,
+      orderedTaskRefs,
+    })
+    : new Map();
+  const enrichedList = list.map((block, index) => {
+    const taskRefId = normalizeFilterValue(block?._id);
+    const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(taskRefId) + 1 || index + 1);
+    const progress = toProgressPayload(progressMap.get(taskRefId), sequenceOrder);
+    return {
+      ...block,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
+    };
+  });
 
   return res.json({
-    count: list.length,
+    count: enrichedList.length,
     pagination: {
       total,
       page,
@@ -386,8 +427,9 @@ async function listListeningPracticeBlocks(req, res) {
     },
     filters: {
       blockTypes,
+      practiceKey: practiceKey || null,
     },
-    blocks: list,
+    blocks: enrichedList,
     sourceCollection: collectionName,
   });
 }
@@ -406,9 +448,29 @@ async function getListeningBlockById(req, res) {
 
   const audioDoc = await ListeningAudio.findById(blockId, { _id: 1, mimeType: 1 }).lean();
   const hasAudio = Boolean(audioDoc);
+  const practiceKey = normalizeListeningPracticeKey(req.query.practiceKey);
+  const studentUserId = normalizeFilterValue(req.auth?.userId);
+  const sourceType = practiceKey ? "listening_question_family" : "listening_block";
+  const orderedTaskRefs = await listPublishedListeningPracticeBlockTaskRefs({ practiceKey });
+  const progressMap = studentUserId
+    ? await buildAdditionalProgressMap({
+      studentUserId,
+      taskType: "listening",
+      sourceType,
+      practiceKey,
+      orderedTaskRefs,
+    })
+    : new Map();
+  const sequenceOrder = Math.max(1, orderedTaskRefs.indexOf(blockId) + 1);
+  const progress = toProgressPayload(progressMap.get(blockId), sequenceOrder);
 
   return res.json({
-    block,
+    block: {
+      ...block,
+      progressStatus: progress.status,
+      accessStatus: progress.accessStatus,
+      progression: progress,
+    },
     audio: {
       exists: hasAudio,
       mimeType: audioDoc?.mimeType || "audio/mpeg",
@@ -428,6 +490,13 @@ async function submitListeningBlockAttempt(req, res) {
 
   const blockId = normalizeFilterValue(req.params.blockId);
   const submitReason = normalizeFilterValue(req.body?.submitReason) || "audio-ended";
+  const attemptCategory = normalizeAttemptCategory(req.body?.attemptCategory);
+  const sourceType = normalizeSourceType(req.body?.sourceType) || "listening_block";
+  const resolvedAttemptCategory = attemptCategory || "additional";
+  const forceReason = normalizeFilterValue(req.body?.forceReason);
+  const status = normalizeFilterValue(req.body?.status).toLowerCase() || "completed";
+  const practiceKey = normalizeFilterValue(req.body?.practiceKey);
+  const taskRoute = normalizeFilterValue(req.body?.route);
   const submittedAnswers = sanitizeSubmittedAnswers(req.body?.answers);
   const collectionName = await getListeningBlocksCollectionName();
   const collection = mongoose.connection.db.collection(collectionName);
@@ -448,6 +517,31 @@ async function submitListeningBlockAttempt(req, res) {
     return res.status(404).json({
       message: `Listening block '${blockId}' not found.`,
     });
+  }
+
+  if (
+    resolvedAttemptCategory === "additional"
+    && (sourceType === "listening_question_family" || sourceType === "listening_block")
+  ) {
+    try {
+      await assertAdditionalTaskUnlocked({
+        studentUserId: studentId,
+        taskType: "listening",
+        taskRefId: blockId,
+        sourceType,
+        payload: {
+          practiceKey: practiceKey || "",
+          submission: {
+            practiceKey: practiceKey || "",
+          },
+        },
+      });
+    } catch (error) {
+      const statusCode = Number(error?.httpStatus) || 403;
+      return res.status(statusCode).json({
+        message: error?.message || "This additional task is locked.",
+      });
+    }
   }
 
   const questions = Array.isArray(block.questions) ? block.questions : [];
@@ -591,6 +685,46 @@ async function submitListeningBlockAttempt(req, res) {
     },
     submittedAt: new Date(),
   });
+
+  try {
+    await recordStudentTaskAttempt({
+      studentUserId: studentId,
+      studentEmail: normalizeFilterValue(req.auth?.email).toLowerCase(),
+      attemptCategory: resolvedAttemptCategory,
+      sourceType,
+      status,
+      taskType: "listening",
+      taskRefId: blockId,
+      taskLabel: normalizeFilterValue(block?.display?.title) || blockId,
+      submitReason,
+      forceReason,
+      isAutoSubmitted: submitReason !== "manual",
+      submittedAt: savedAttempt?.submittedAt || new Date(),
+      totalTimeSpentSeconds: Math.max(0, Math.round(Number(req.body?.timeSpentSeconds) || 0)),
+      score: {
+        percentage,
+        correctCount,
+        incorrectCount: Math.max(0, totalQuestions - correctCount),
+        totalQuestions,
+      },
+      payload: {
+        evaluation: savedAttempt?.evaluation || {},
+        answers: submittedAnswers,
+        practiceKey,
+        blockId,
+        route: taskRoute,
+        submission: {
+          practiceKey,
+          blockId,
+        },
+      },
+      sourceRefs: {
+        listeningBlockAttemptIds: [String(savedAttempt?._id || "")].filter(Boolean),
+      },
+    });
+  } catch {
+    // Do not fail listening block submission when student task history sync fails.
+  }
 
   return res.status(201).json({
     message: "Listening task submitted successfully.",

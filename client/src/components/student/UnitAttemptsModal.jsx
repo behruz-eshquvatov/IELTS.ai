@@ -1,5 +1,20 @@
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
+
+function formatAttemptDate(value) {
+  const parsed = value ? new Date(value) : null;
+  if (!parsed || Number.isNaN(parsed.valueOf())) {
+    return "-";
+  }
+
+  return parsed.toLocaleString();
+}
+
 function UnitAttemptsModal({ isOpen, onClose, unit }) {
+  useBodyScrollLock(isOpen && Boolean(unit));
+
   if (!isOpen || !unit) return null;
+
+  const attempts = Array.isArray(unit?.attempts) ? unit.attempts : [];
 
   return (
     <div
@@ -16,7 +31,7 @@ function UnitAttemptsModal({ isOpen, onClose, unit }) {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
               Attempts History
             </p>
-            <h3 className="mt-2 text-xl font-semibold text-slate-900">{unit.unit}</h3>
+            <h3 className="mt-2 text-xl font-semibold text-slate-900">{unit.unit || unit.title}</h3>
           </div>
           <button
             className="rounded-none border border-slate-200/80 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
@@ -39,21 +54,32 @@ function UnitAttemptsModal({ isOpen, onClose, unit }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/80">
-              {unit.attempts.map((attempt) => (
+              {attempts.map((attempt) => (
                 <tr key={attempt.id} className="text-slate-700">
                   <td className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    {attempt.label}
+                    Attempt {attempt.attemptNumber}
                   </td>
-                  <td className="px-4 py-3">{attempt.date}</td>
+                  <td className="px-4 py-3">{formatAttemptDate(attempt.date)}</td>
                   <td className="px-4 py-3 font-semibold text-slate-900">
-                    Band {attempt.band}
+                    {Number.isFinite(Number(attempt.band))
+                      ? `Band ${Number(attempt.band).toFixed(1)}`
+                      : Number.isFinite(Number(attempt.scorePercent))
+                        ? `${Math.round(Number(attempt.scorePercent))}%`
+                        : "-"}
                   </td>
-                  <td className="px-4 py-3">{attempt.time}</td>
+                  <td className="px-4 py-3">{attempt.timeLabel || "-"}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">
-                    {attempt.breakdown}
+                    {attempt.breakdown || "-"}
                   </td>
                 </tr>
               ))}
+              {attempts.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-slate-500" colSpan={5}>
+                    No attempts yet.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

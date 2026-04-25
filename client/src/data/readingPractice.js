@@ -107,6 +107,10 @@ function buildReadingPracticeQueryParams(practiceConfig, extras = {}) {
   const params = new URLSearchParams({
     status: "published",
   });
+  const canonicalKey = normalizeKey(practiceConfig?.canonicalKey || practiceConfig?.routeKey);
+  if (canonicalKey) {
+    params.set("practiceKey", canonicalKey);
+  }
 
   const questionFamilies = Array.isArray(practiceConfig?.questionFamilies)
     ? practiceConfig.questionFamilies

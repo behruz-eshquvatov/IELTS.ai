@@ -15,8 +15,8 @@ npm run dev
 Set these environment variables in `server/.env`:
 
 ```bash
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4.1-mini
+OPENROUTER_API_KEY_V2=your_openrouter_api_key
+OPENROUTER_MODEL=openai/gpt-4.1-mini
 ```
 
 ## API Base
