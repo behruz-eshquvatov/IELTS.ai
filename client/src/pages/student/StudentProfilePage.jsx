@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { KeyRound, Mail, NotebookPen, ShieldCheck, UserCircle } from "lucide-react";
 import ExamPopup from "../../components/student/exam/ExamPopup";
 import MagneticButton from "../../components/ui/MagneticButton";
+import { ProfileSkeleton } from "../../components/ui/Skeleton";
 import { apiRequest } from "../../lib/apiClient";
 import { getStoredUser, saveAuthSession } from "../../lib/authSession";
 
@@ -354,6 +355,10 @@ function StudentProfilePage() {
     return `${trimmedBio.length}/${PROFILE_BIO_MAX_LENGTH} characters`;
   }, [trimmedBio]);
 
+  if (isLoading) {
+    return <ProfileSkeleton />;
+  }
+
   return (
     <div className="space-y-8 pb-16 pt-4">
       <header className="space-y-3">
@@ -442,7 +447,6 @@ function StudentProfilePage() {
         </div>
       </section>
 
-      {isLoading ? <p className="text-sm text-slate-500">Loading profile...</p> : null}
       {errorMessage ? <p className="text-sm text-rose-600">{errorMessage}</p> : null}
       {successMessage ? <p className="text-sm text-emerald-700">{successMessage}</p> : null}
 

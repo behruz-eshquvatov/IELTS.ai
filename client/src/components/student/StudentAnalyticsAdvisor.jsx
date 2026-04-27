@@ -1,26 +1,8 @@
 import { ArrowUpRight } from "lucide-react";
 import MagneticButton from "../ui/MagneticButton";
 
-const advisorByRange = {
-  week: {
-    title: "Weekly insight",
-    body: "Weekly analysis reflects your latest practice. Fewer than 3 focused sessions widen accuracy ranges, so keep a steady cadence and review errors within 24 hours to stabilize timing.",
-    tip: "Tip: More practice makes your accuracy report clearer.",
-  },
-  month: {
-    title: "Monthly insight",
-    body: "Monthly analysis shows stronger trend confidence. Keep consistent sessions across all sections and review recurring mistakes every 2-3 days to maintain momentum.",
-    tip: "Tip: A steady monthly routine gives clearer skill-level signals.",
-  },
-  lifetime: {
-    title: "Lifetime insight",
-    body: "Lifetime analysis highlights your long-term pattern. Listening and reading improve with consistency, while writing quality rises most when revision and feedback loops are regular.",
-    tip: "Tip: Long-term consistency is the fastest path to stable high bands.",
-  },
-};
-
-export default function StudentAnalyticsAdvisor({ range = "week" }) {
-  const config = advisorByRange[range] ?? advisorByRange.week;
+export default function StudentAnalyticsAdvisor({ insight }) {
+  const recommendations = Array.isArray(insight?.recommendations) ? insight.recommendations : [];
 
   return (
     <section className="space-y-4">
@@ -37,17 +19,19 @@ export default function StudentAnalyticsAdvisor({ range = "week" }) {
         <div className="pointer-events-none absolute -right-28 top-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
         <div className="relative z-10 space-y-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">
-            {config.title}
+            {insight?.title || "Analytics insight"}
           </p>
           <p className="mx-auto max-w-3xl text-[1rem] font-medium leading-relaxed text-slate-200">
-            {config.body}
+            {insight?.text || "Complete more tasks to generate reliable insights."}
           </p>
         </div>
 
         <div className="relative z-10 mt-4 flex flex-col items-center justify-center gap-4">
-          <div className="text-sm text-slate-400">
-            {config.tip}
-          </div>
+          {recommendations.length > 0 ? (
+            <div className="max-w-3xl text-sm text-slate-400">
+              {recommendations.join(" ")}
+            </div>
+          ) : null}
           <MagneticButton
             to="/student/analytics/assistant"
             className="mt-6 inline-flex rounded-full shadow-[0_18px_40px_-30px_rgba(16,185,129,0.7)] cursor-pointer"

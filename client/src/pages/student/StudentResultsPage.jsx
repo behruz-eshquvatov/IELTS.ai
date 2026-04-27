@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, FileCheck2, History } from "lucide-react";
+import { History } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ResultsFilterTabs from "../../components/student/results/ResultsFilterTabs";
 import ResultGroupCard from "../../components/student/results/ResultGroupCard";
+import { ResultsSkeleton } from "../../components/ui/Skeleton";
+import {
+  formatCompletionDateGroup,
+  getCompletionDateKey,
+} from "../../components/student/results/resultsUtils";
 
 const FILTER_ORDER = [
   "all",
@@ -73,15 +78,36 @@ function StudentResultsPage() {
     return [...prioritized, ...extras];
   }, [filters]);
 
+  const groupedResults = useMemo(() => {
+    const sortedGroups = [...groups].sort((first, second) => {
+      const firstTime = new Date(first?.latestSubmittedAt || 0).valueOf();
+      const secondTime = new Date(second?.latestSubmittedAt || 0).valueOf();
+      return (Number.isFinite(secondTime) ? secondTime : 0) - (Number.isFinite(firstTime) ? firstTime : 0);
+    });
+
+    return sortedGroups.reduce((collection, group) => {
+      const dateKey = getCompletionDateKey(group?.latestSubmittedAt);
+      const existing = collection.find((item) => item.dateKey === dateKey);
+
+      if (existing) {
+        existing.groups.push(group);
+        return collection;
+      }
+
+      collection.push({
+        dateKey,
+        label: formatCompletionDateGroup(group?.latestSubmittedAt),
+        groups: [group],
+      });
+      return collection;
+    }, []);
+  }, [groups]);
+
   return (
     <div className="space-y-5">
-      <header className="space-y-2">
+      <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Results Center
-        </p>
-        <h1 className="text-3xl font-semibold text-slate-900">Completed Tasks History</h1>
-        <p className="max-w-3xl text-sm text-slate-600">
-          Review previous attempts, reopen detailed reports, and compare your most recent performance by task type.
+          Completed Tasks
         </p>
       </header>
 
@@ -92,10 +118,7 @@ function StudentResultsPage() {
       />
 
       {isLoading ? (
-        <div className="flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-          <Clock3 className="h-4 w-4" />
-          Loading completed task history...
-        </div>
+        <ResultsSkeleton />
       ) : null}
 
       {errorMessage ? (
@@ -114,24 +137,25 @@ function StudentResultsPage() {
         </div>
       ) : null}
 
-      {!isLoading && !errorMessage && groups.length > 0 ? (
-        <section className="space-y-4">
-          {groups.map((group) => (
-            <ResultGroupCard
-              group={group}
-              key={group?.taskGroupId || `${group?.taskType || "task"}-${group?.taskRefId || "item"}`}
-            />
+      {!isLoading && !errorMessage && groupedResults.length > 0 ? (
+        <section className="space-y-6">
+          {groupedResults.map((resultGroup) => (
+            <div className="space-y-3" key={resultGroup.dateKey}>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {resultGroup.label}
+              </h2>
+              <div className="space-y-4">
+                {resultGroup.groups.map((group) => (
+                  <ResultGroupCard
+                    group={group}
+                    key={group?.taskGroupId || `${group?.taskType || "task"}-${group?.taskRefId || "item"}`}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </section>
       ) : null}
-
-      <section className="rounded-none border border-slate-200/80 bg-white/95 px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-          <FileCheck2 className="h-4 w-4 text-slate-500" />
-          Writing attempts open their analysis pages. Reading and Listening attempts open result history views with
-          attempt switching and active-attempt highlighting.
-        </div>
-      </section>
     </div>
   );
 }

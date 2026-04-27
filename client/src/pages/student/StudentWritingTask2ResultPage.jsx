@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { SkeletonText } from "../../components/ui/Skeleton";
 import { API_BASE_URL, apiRequest } from "../../lib/apiClient";
 
 const TASK_CONFIG = {
@@ -808,10 +809,7 @@ function StudentWritingTask2ResultPage() {
             Task Context
           </p>
           {isLoadingTaskContext ? (
-            <p className="flex items-center gap-2 text-xs text-slate-500">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Loading original prompt...
-            </p>
+            <SkeletonText className="w-48" lines={1} widths={["100%"]} />
           ) : null}
         </div>
 
@@ -930,10 +928,7 @@ function StudentWritingTask2ResultPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">AI Analysis</p>
 
           {isLoadingAnalysis ? (
-            <p className="flex items-center gap-2 text-sm text-slate-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading saved AI analysis...
-            </p>
+            <SkeletonText lines={5} widths={["90%", "72%", "84%", "64%", "48%"]} />
           ) : null}
 
           {analysisError ? (

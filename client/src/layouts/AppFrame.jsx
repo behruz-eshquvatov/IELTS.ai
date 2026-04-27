@@ -3,7 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import RouteLoaderScreen from "../components/layout/RouteLoaderScreen";
 import { getRandomLoadingMessage } from "../lib/loadingMessages";
 
-const TRANSITION_DURATION_MS = 2400;
+const TRANSITION_DURATION_MS = 450;
 
 function AppFrame() {
   const location = useLocation();

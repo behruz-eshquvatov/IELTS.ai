@@ -8,31 +8,12 @@ import {
   YAxis,
 } from "recharts";
 
-const bandByRange = {
-  week: [
-    { label: "Mon", band: 6.5 },
-    { label: "Tue", band: 6.0 },
-    { label: "Wed", band: 7.0 },
-    { label: "Thu", band: 6.5 },
-    { label: "Fri", band: 7.5 },
-    { label: "Sat", band: 7.0 },
-    { label: "Sun", band: 6.5 },
-  ],
-  month: [
-    { label: "W1", band: 6.5 },
-    { label: "W2", band: 6.8 },
-    { label: "W3", band: 7.1 },
-    { label: "W4", band: 7.0 },
-  ],
-  lifetime: [
-    { label: "2024", band: 6.2 },
-    { label: "2025", band: 6.8 },
-    { label: "2026", band: 7.1 },
-  ],
-};
-
-export default function StudentAnalyticsBandChart({ range = "week" }) {
-  const data = bandByRange[range] ?? bandByRange.week;
+export default function StudentAnalyticsBandChart({ range = "week", data = [] }) {
+  const chartData = (Array.isArray(data) ? data : []).map((item) => ({
+    ...item,
+    band: Number.isFinite(Number(item?.band ?? item?.value)) ? Number(item.band ?? item.value) : null,
+  }));
+  const hasData = chartData.some((item) => Number.isFinite(Number(item.band)));
   const titleSuffix =
     range === "month" ? "last month" : range === "lifetime" ? "lifetime" : "last week";
 
@@ -43,8 +24,9 @@ export default function StudentAnalyticsBandChart({ range = "week" }) {
       </h2>
       <div className="rounded-none border border-slate-200/80 bg-[#fffaf4] p-5">
         <div className="h-[260px] w-full">
+          {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 8 }}>
+            <BarChart data={chartData} margin={{ top: 16, right: 12, left: 4, bottom: 8 }}>
               <defs>
                 <linearGradient id="bandBarFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#10b981" />
@@ -78,6 +60,11 @@ export default function StudentAnalyticsBandChart({ range = "week" }) {
               <Bar dataKey="band" fill="url(#bandBarFill)" radius={[0, 0, 0, 0]} maxBarSize={58} />
             </BarChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-slate-500">
+              No scored attempts in this period.
+            </div>
+          )}
         </div>
       </div>
     </section>

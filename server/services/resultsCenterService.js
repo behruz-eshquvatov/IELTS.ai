@@ -353,6 +353,10 @@ function sanitizeIncorrectItems(items = []) {
   }
 
   return items.slice(0, 80).map((item) => ({
+    section: normalizeSourceType(item?.section),
+    questionFamily: normalizeSourceType(item?.questionFamily),
+    blockType: normalizeSourceType(item?.blockType),
+    blockId: normalizeTaskRefId(item?.blockId),
     blockTitle: normalizeText(item?.blockTitle, "", 180),
     questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
     studentAnswer: normalizeText(item?.studentAnswer, "", 240),
@@ -404,6 +408,10 @@ function sanitizeBlockResults(items = []) {
 
   return items.slice(0, 40).map((item) => ({
     blockId: normalizeTaskRefId(item?.blockId),
+    section: normalizeSourceType(item?.section),
+    questionFamily: normalizeSourceType(item?.questionFamily),
+    blockType: normalizeSourceType(item?.blockType),
+    blockTitle: normalizeText(item?.blockTitle, "", 180),
     correctCount: Math.max(0, Math.round(Number(item?.correctCount) || 0)),
     totalQuestions: Math.max(0, Math.round(Number(item?.totalQuestions) || 0)),
     percentage: Math.max(0, Math.round(Number(item?.percentage) || 0)),

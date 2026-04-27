@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, FileCheck2, Headphones, Trash2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { AdminListSkeleton, LibraryListSkeleton } from "../components/ui/Skeleton";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
 import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
 import {
@@ -1091,9 +1092,7 @@ function SuperAdminListeningPage() {
             </span>
           </div>
 
-          {isLoadingBlocks ? (
-            <p className="text-sm text-slate-600">Loading pushed listening blocks...</p>
-          ) : null}
+          {isLoadingBlocks ? <LibraryListSkeleton count={4} /> : null}
 
           {!isLoadingBlocks && blocks.length === 0 ? (
             <p className="text-sm text-slate-600">
@@ -1141,9 +1140,7 @@ function SuperAdminListeningPage() {
             </span>
           </div>
 
-          {isLoadingTests ? (
-            <p className="text-sm text-slate-600">Loading listening tests...</p>
-          ) : null}
+          {isLoadingTests ? <LibraryListSkeleton count={4} /> : null}
 
           {!isLoadingTests && tests.length === 0 ? (
             <p className="text-sm text-slate-600">
@@ -1344,9 +1341,7 @@ function SuperAdminListeningPage() {
             </span>
           </div>
 
-          {isLoading ? (
-            <p className="text-sm text-slate-600">Loading listening audios...</p>
-          ) : null}
+          {isLoading ? <AdminListSkeleton rows={4} /> : null}
 
           {!isLoading && audios.length === 0 ? (
             <p className="text-sm text-slate-600">

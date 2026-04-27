@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Lock, LockOpen, PenLine } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
+import { LibraryListSkeleton } from "../../components/ui/Skeleton";
 
 const VISUAL_TYPE_META = {
   line_chart: {
@@ -191,7 +192,7 @@ function StudentWritingTask1TypePage() {
         <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-900">{sectionMeta.title}</h1>
       </section>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading Writing Task 1 tasks...</p> : null}
+      {isLoading ? <LibraryListSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error ? (

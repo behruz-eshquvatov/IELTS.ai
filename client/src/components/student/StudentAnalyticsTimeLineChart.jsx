@@ -1,7 +1,6 @@
 import {
   Brush,
   CartesianGrid,
-  LabelList,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -10,39 +9,18 @@ import {
   YAxis,
 } from "recharts";
 
-const timeByRange = {
-  week: [
-    { label: "Mon", minutes: 68 },
-    { label: "Tue", minutes: 52 },
-    { label: "Wed", minutes: 81 },
-    { label: "Thu", minutes: 74 },
-    { label: "Fri", minutes: 95 },
-    { label: "Sat", minutes: 86 },
-    { label: "Sun", minutes: 46 },
-  ],
-  month: [
-    { label: "W1", minutes: 340 },
-    { label: "W2", minutes: 390 },
-    { label: "W3", minutes: 420 },
-    { label: "W4", minutes: 405 },
-  ],
-  lifetime: [
-    { label: "2024", minutes: 210 },
-    { label: "2025", minutes: 278 },
-    { label: "2026", minutes: 312 },
-  ],
-};
-
 function minutesToLabel(value) {
-  const hours = Math.floor(value / 60);
-  const minutes = value % 60;
+  const roundedValue = Math.max(0, Math.round(Number(value) || 0));
+  const hours = Math.floor(roundedValue / 60);
+  const minutes = roundedValue % 60;
   if (!hours) return `${minutes}m`;
   if (!minutes) return `${hours}h`;
   return `${hours}h ${minutes}m`;
 }
 
-export default function StudentAnalyticsTimeLineChart({ range = "week" }) {
-  const data = timeByRange[range] ?? timeByRange.week;
+export default function StudentAnalyticsTimeLineChart({ range = "week", data = [] }) {
+  const chartData = Array.isArray(data) ? data : [];
+  const hasData = chartData.some((item) => Number(item?.minutes || 0) > 0);
   const titleSuffix =
     range === "month" ? "last month" : range === "lifetime" ? "lifetime" : "last week";
 
@@ -53,8 +31,9 @@ export default function StudentAnalyticsTimeLineChart({ range = "week" }) {
       </h2>
       <div className="rounded-none border border-slate-200/80 bg-[#fffaf4] p-5">
         <div className="h-[260px] w-full">
+          {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 20, right: 14, left: 4, bottom: 28 }}>
+            <LineChart data={chartData} margin={{ top: 20, right: 14, left: 4, bottom: 28 }}>
               <defs>
                 <linearGradient id="timeLineStroke" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#34d399" />
@@ -91,14 +70,7 @@ export default function StudentAnalyticsTimeLineChart({ range = "week" }) {
                 strokeWidth={4}
                 dot={{ r: 5, fill: "#10b981", strokeWidth: 0 }}
                 activeDot={{ r: 7, fill: "#059669" }}
-              >
-                <LabelList
-                  dataKey="minutes"
-                  position="top"
-                  formatter={(value) => minutesToLabel(value)}
-                  style={{ fontSize: "11px", fill: "#334155" }}
-                />
-              </Line>
+              />
               <Brush
                 dataKey="label"
                 height={18}
@@ -108,6 +80,11 @@ export default function StudentAnalyticsTimeLineChart({ range = "week" }) {
               />
             </LineChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-slate-500">
+              No study activity recorded in this period.
+            </div>
+          )}
         </div>
       </div>
     </section>

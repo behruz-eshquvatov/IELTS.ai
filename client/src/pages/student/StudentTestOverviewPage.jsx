@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Lock, PenLine } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
+import { LibraryListSkeleton } from "../../components/ui/Skeleton";
 
 const writingTask2Tips = [
   "Take a clear position in the introduction, keep one main idea per body paragraph, and support claims with specific examples. Aim for logical progression from opinion to evidence to mini-conclusion in each paragraph.",
@@ -218,7 +219,7 @@ function StudentTestOverviewPage() {
             Writing Sets
           </p>
           {isLoadingOpinionSets ? (
-            <p className="text-sm text-slate-600">Loading writing sets...</p>
+            <LibraryListSkeleton count={4} />
           ) : null}
           {opinionSetsError ? (
             <p className="text-sm text-rose-600">{opinionSetsError}</p>

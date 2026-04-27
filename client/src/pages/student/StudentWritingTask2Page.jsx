@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, LayoutGrid, List } from "lucide-react";
 import { motion } from "framer-motion";
 import MagneticButton from "../../components/ui/MagneticButton";
+import { LibraryGridSkeleton } from "../../components/ui/Skeleton";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
 import { apiRequest } from "../../lib/apiClient";
 
@@ -254,10 +255,10 @@ function StudentWritingTask2Page() {
         </motion.div>
       </header>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading Writing Task 2 sections...</p> : null}
+      {isLoading ? <LibraryGridSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
-      <div
+      {!isLoading ? <div
         className={`grid gap-4 ${
           viewMode === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
         }`}
@@ -265,7 +266,7 @@ function StudentWritingTask2Page() {
         {sections.map((section) => (
           <WritingResourceCard key={section.title} section={section} viewMode={viewMode} />
         ))}
-      </div>
+      </div> : null}
     </div>
   );
 }

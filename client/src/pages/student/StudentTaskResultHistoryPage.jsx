@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Clock3 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ActiveAttemptSummary from "../../components/student/results/ActiveAttemptSummary";
 import AttemptHistoryTable from "../../components/student/results/AttemptHistoryTable";
 import BreakdownTable from "../../components/student/results/BreakdownTable";
+import { ResultsSkeleton } from "../../components/ui/Skeleton";
 import {
   buildResultsAttemptRoute,
   decodeRouteValue,
@@ -219,10 +220,7 @@ function StudentTaskResultHistoryPage() {
       </header>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-          <Clock3 className="h-4 w-4" />
-          Loading attempt history...
-        </div>
+        <ResultsSkeleton count={3} />
       ) : null}
 
       {errorMessage ? (

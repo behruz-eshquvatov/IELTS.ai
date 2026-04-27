@@ -1460,9 +1460,14 @@ function ReadingPassageWithBlocks({
       const blockTitle =
         String(block?.display?.title || "").trim() ||
         `${toReadableLabel(block?.questionFamily || block?.blockType || "Reading Block")} ${index + 1}`;
+      const questionFamily = String(block?.questionFamily || "").trim();
+      const blockType = String(block?.blockType || "").trim();
 
       return {
         blockId: String(block?._id || `block-${index}`),
+        section: "reading",
+        questionFamily,
+        blockType,
         blockTitle,
         correctCount,
         totalQuestions,
@@ -1470,6 +1475,10 @@ function ReadingPassageWithBlocks({
         incorrectItems: scoreBase
           .filter((item) => !item.isCorrect)
           .map((item) => ({
+            section: "reading",
+            questionFamily,
+            blockType,
+            blockId: String(block?._id || `block-${index}`),
             blockTitle,
             questionNumber: item.questionNumber,
             studentAnswer: item.studentAnswer,

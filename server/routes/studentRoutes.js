@@ -20,6 +20,7 @@ const {
   markMyDailyTaskCompleted,
   updateTaskStatus,
   getStudentAnalytics,
+  getMyStudentAnalytics,
   updateStudentAnalytics,
   markStudyVisit,
   addTaskStudyTime,
@@ -64,6 +65,7 @@ router.post("/me/daily-tasks/tasks/complete", protect, authorizeRoles("student")
 router.post("/me/study-activity/visit", protect, authorizeRoles("student"), markMyStudyVisit);
 router.post("/me/study-activity/task-time", protect, authorizeRoles("student"), addMyTaskStudyTime);
 router.get("/me/study-activity/heatmap", protect, authorizeRoles("student"), getMyStudyHeatmap);
+router.get("/me/analytics", protect, authorizeRoles("student"), getMyStudentAnalytics);
 
 router.get("/:studentId/profile", protect, authorizeRoles("teacher", "student"), getStudentProfile);
 router.put("/:studentId/profile", protect, authorizeRoles("teacher", "student"), updateStudentProfile);

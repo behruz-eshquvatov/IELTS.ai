@@ -8,6 +8,7 @@ import ExamLeaveWarningModal from "../../components/student/exam/ExamLeaveWarnin
 import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
 import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
+import { SkeletonText } from "../../components/ui/Skeleton";
 
 const DEFAULT_DURATION_SECONDS = 40 * 60;
 const FALLBACK_MINIMUM_WORDS = 250;
@@ -660,7 +661,7 @@ function StudentWritingTask2TaskPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">
                 Essay Question
               </p>
-              {isLoading ? <p className="mt-4 text-base text-slate-200">Loading question...</p> : null}
+              {isLoading ? <SkeletonText className="mt-5 max-w-2xl" lines={4} widths={["88%", "72%", "94%", "54%"]} /> : null}
               {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
               {!isLoading && !error ? (
                 <>

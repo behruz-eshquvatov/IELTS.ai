@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
+import { TestPageSkeleton } from "../../components/ui/Skeleton";
 
 const FULL_TEST_DURATION_SECONDS = 60 * 60;
 
@@ -152,7 +153,7 @@ function StudentReadingFullPassagesPage() {
         </Link>
       </header>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading full reading test...</p> : null}
+      {isLoading ? <TestPageSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error && test ? (

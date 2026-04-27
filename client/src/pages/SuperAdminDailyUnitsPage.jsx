@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "../lib/apiClient";
+import { AdminListSkeleton } from "../components/ui/Skeleton";
 import { buildSuperAdminApiPath, buildSuperAdminPagePath, isValidSuperAdminPassword } from "../lib/superAdmin";
 
 const TASK_TYPE_OPTIONS = [
@@ -558,7 +559,9 @@ function SuperAdminDailyUnitsPage() {
             </span>
           </div>
           {isLoading ? (
-            <p className="mt-4 text-sm text-slate-600">Loading units...</p>
+            <div className="mt-4">
+              <AdminListSkeleton rows={4} />
+            </div>
           ) : sortedUnits.length === 0 ? (
             <p className="mt-4 text-sm text-slate-600">No units yet.</p>
           ) : (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpenText, Blocks, FileCheck2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { SelectControl } from "../components/ui/StyledFormControls";
+import { AdminListSkeleton } from "../components/ui/Skeleton";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
 import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
 import {
@@ -189,7 +190,7 @@ function SuperAdminReadingPage() {
         </div>
 
         {entry ? <div className="border border-emerald-200/70 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">{`Passages: ${entry?.counts?.passages ?? 0}, Blocks: ${entry?.counts?.blocks ?? 0}, Tests: ${entry?.counts?.tests ?? 0}`}</div> : null}
-        {loading ? <p className="text-sm text-slate-600">Loading...</p> : null}
+        {loading ? <AdminListSkeleton rows={5} /> : null}
         {error ? <div className="border border-rose-200/80 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div> : null}
         {feedback ? <div className="border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{feedback}</div> : null}
 

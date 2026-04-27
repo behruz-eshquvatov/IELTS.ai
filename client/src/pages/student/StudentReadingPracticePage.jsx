@@ -7,6 +7,7 @@ import {
   getReadingPracticeConfig,
 } from "../../data/readingPractice";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
+import { LibraryListSkeleton } from "../../components/ui/Skeleton";
 
 function decodeValue(value) {
   try {
@@ -129,7 +130,7 @@ function StudentReadingPracticePage() {
         </h1>
       </section>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading reading tasks...</p> : null}
+      {isLoading ? <LibraryListSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error ? (

@@ -39,16 +39,16 @@ function StudentDailyTasksPage() {
   }, []);
 
   return (
-    <div className="space-y-4 -my-4">
+    <div className="space-y-4 pt-16">
       <LayoutGroup>
         <div
-          className={`fixed top-16 z-20 left-20 right-0 w-screen transition-all duration-200 ease-out ${
+          className={`fixed left-20 right-0 top-16 z-20 px-6 transition-all duration-200 ease-out lg:px-10 ${
             isCompact
               ? "py-3 border-b border-slate-200 bg-[#fbf8f2]"
               : "py-5 border-b border-transparent bg-transparent"
           }`}
         >
-          <div className="flex mx-auto max-w-7xl flex-wrap gap-2">
+          <div className="mx-auto flex w-full max-w-7xl flex-wrap gap-2">
           {filters.map((filter) => {
             const isActive = activeFilter === filter;
             return (

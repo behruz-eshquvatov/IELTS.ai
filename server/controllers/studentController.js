@@ -26,6 +26,9 @@ const {
   getWritingResultRedirectMeta,
 } = require("../services/resultsCenterService");
 const {
+  getDynamicStudentAnalytics,
+} = require("../services/studentAnalyticsService");
+const {
   studentProfileSeed,
   studentDailyTasksSeed,
   studentAnalyticsSeed,
@@ -559,6 +562,10 @@ function sanitizeIncorrectItemsForResults(items = []) {
   return items
     .slice(0, 60)
     .map((item) => ({
+      section: normalizeSourceType(item?.section),
+      questionFamily: normalizeSourceType(item?.questionFamily),
+      blockType: normalizeSourceType(item?.blockType),
+      blockId: normalizeDailyTaskRefId(item?.blockId),
       blockTitle: normalizeText(item?.blockTitle, "", 180),
       questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
       studentAnswer: normalizeText(item?.studentAnswer, "", 240),
@@ -612,6 +619,10 @@ function sanitizeBlockResultsForResults(items = []) {
     .slice(0, 30)
     .map((item) => ({
       blockId: normalizeDailyTaskRefId(item?.blockId),
+      section: normalizeSourceType(item?.section),
+      questionFamily: normalizeSourceType(item?.questionFamily),
+      blockType: normalizeSourceType(item?.blockType),
+      blockTitle: normalizeText(item?.blockTitle, "", 180),
       correctCount: Math.max(0, Math.round(Number(item?.correctCount) || 0)),
       totalQuestions: Math.max(0, Math.round(Number(item?.totalQuestions) || 0)),
       percentage: Math.max(0, Math.round(Number(item?.percentage) || 0)),
@@ -2320,6 +2331,22 @@ async function getStudentAnalytics(req, res) {
   });
 }
 
+async function getMyStudentAnalytics(req, res) {
+  const studentUserId = String(req.auth?.userId || "").trim();
+  if (!studentUserId) {
+    return res.status(401).json({
+      message: "Student authorization is required.",
+    });
+  }
+
+  const analytics = await getDynamicStudentAnalytics(
+    studentUserId,
+    req.query?.period || req.query?.range || "week",
+  );
+
+  return res.json(analytics);
+}
+
 async function updateStudentAnalytics(req, res) {
   const studentId = normalizeStudentId(req.params.studentId);
   const { ranges, heatmap } = req.body || {};
@@ -2543,6 +2570,7 @@ module.exports = {
   updateStudentDailyTasks,
   updateTaskStatus,
   getStudentAnalytics,
+  getMyStudentAnalytics,
   updateStudentAnalytics,
   markStudyVisit,
   addTaskStudyTime,

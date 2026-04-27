@@ -7,6 +7,7 @@ import {
   getListeningPracticeConfig,
 } from "../../data/listeningPractice";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
+import { LibraryListSkeleton } from "../../components/ui/Skeleton";
 
 function decodeValue(value) {
   try {
@@ -158,7 +159,7 @@ function StudentListeningFamilyPage() {
         <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-900">{pageTitle}</h1>
       </section>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading listening tasks...</p> : null}
+      {isLoading ? <LibraryListSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error ? (

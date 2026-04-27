@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
+import { TestPageSkeleton } from "../../components/ui/Skeleton";
 
 function decodeValue(value) {
   try {
@@ -135,7 +136,7 @@ function StudentReadingPassageTaskPage() {
         </Link>
       </header>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading passage task...</p> : null}
+      {isLoading ? <TestPageSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error && group?.passage ? (

@@ -9,6 +9,7 @@ import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
 import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
 import useTextHighlighting from "../../hooks/useTextHighlighting";
 import ExamLeaveWarningModal from "../../components/student/exam/ExamLeaveWarningModal";
+import { TestPageSkeleton } from "../../components/ui/Skeleton";
 
 const START_COUNTDOWN_SECONDS = 3;
 const AUTO_COMPLETE_KEY_PREFIX = "student:listening:auto-complete:";
@@ -1613,7 +1614,7 @@ function StudentListeningBlockPage() {
         ) : null}
       </header>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading listening task...</p> : null}
+      {isLoading ? <TestPageSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
       {isSubmittingAttempt ? <p className="text-sm text-slate-600">Submitting your task...</p> : null}
 

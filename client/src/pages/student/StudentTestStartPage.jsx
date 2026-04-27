@@ -3,6 +3,7 @@ import { useBlocker, useNavigate, useParams, useSearchParams } from "react-route
 import { AlertTriangle, ShieldBan, X } from "lucide-react";
 import { motion as Motion } from "framer-motion";
 import WritingAttemptTimerCard from "../../components/student/WritingAttemptTimerCard";
+import { SkeletonText } from "../../components/ui/Skeleton";
 import { apiRequest } from "../../lib/apiClient";
 import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
@@ -512,7 +513,7 @@ function StudentTestStartPage() {
                   Essay Question
                 </p>
                 {isLoadingPrompt ? (
-                  <p className="mt-4 text-base text-slate-200">Loading question...</p>
+                  <SkeletonText className="mt-5 max-w-2xl" lines={4} widths={["88%", "72%", "94%", "54%"]} />
                 ) : null}
                 {promptError ? (
                   <p className="mt-4 text-sm text-rose-300">{promptError}</p>

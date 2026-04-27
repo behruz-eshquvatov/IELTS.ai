@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { PanelShell, SectionTitle, StatCard, StatusBadge } from "../../components/teacher/TeacherPanelPrimitives";
+import { SkeletonText } from "../../components/ui/Skeleton";
 import { DatePickerField, SelectControl, TimePickerField } from "../../components/ui/StyledFormControls";
 import { apiRequest } from "../../lib/apiClient";
 import { getAllTeacherClasses, resolveTeacherStudentsWithClassIds } from "../../lib/teacherClassStore";
@@ -470,7 +471,7 @@ function ResourcePicker({
         </SelectControl>
       </label>
 
-      {isLoading ? <p className="mt-3 text-xs text-slate-500">Loading published resources...</p> : null}
+      {isLoading ? <SkeletonText className="mt-3" lines={2} widths={["75%", "45%"]} /> : null}
       {error ? <p className="mt-3 text-xs leading-5 text-amber-700">{error}</p> : null}
     </article>
   );

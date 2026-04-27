@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, BookOpenText, Lock } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
+import { LibraryListSkeleton } from "../../components/ui/Skeleton";
 
 function StudentReadingByPassagePage() {
   const [passageGroups, setPassageGroups] = useState([]);
@@ -72,7 +73,7 @@ function StudentReadingByPassagePage() {
 
       <PracticeTipsCarousel tips={tips} />
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading passages...</p> : null}
+      {isLoading ? <LibraryListSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error ? (

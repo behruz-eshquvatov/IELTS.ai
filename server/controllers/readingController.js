@@ -104,6 +104,10 @@ function sanitizeEvaluationPayload(value) {
   const safe = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const incorrectItems = Array.isArray(safe?.incorrectItems)
     ? safe.incorrectItems.map((item) => ({
+      section: "reading",
+      questionFamily: normalizeValue(item?.questionFamily),
+      blockType: normalizeValue(item?.blockType),
+      blockId: normalizeValue(item?.blockId),
       blockTitle: normalizeValue(item?.blockTitle),
       questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
       studentAnswer: normalizeValue(item?.studentAnswer),

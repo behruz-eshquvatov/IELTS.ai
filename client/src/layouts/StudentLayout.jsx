@@ -14,9 +14,11 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { memo, useEffect, useRef, useState } from "react";
 import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
-import { authApi } from "../lib/apiClient";
+import { apiRequest, authApi } from "../lib/apiClient";
 import { clearAuthSession } from "../lib/authSession";
 import useStudyHeatmapTracker from "../hooks/useStudyHeatmapTracker";
+
+const TRACKER_STORAGE_KEY = "student:study-heatmap:tracker";
 
 const navGroups = [
   {
@@ -38,12 +40,96 @@ const navGroups = [
   {
     title: "Personal Info",
     items: [
-      { label: "Results", to: "/student/results", icon: NotebookPen },
+      { label: "Completed Tasks", to: "/student/results", icon: NotebookPen },
       { label: "Analytics", to: "/student/analytics", icon: LineChart },
       { label: "Profile", to: "/student/profile", icon: UserCircle },
     ],
   },
 ];
+
+function getDateKey(dateInput = new Date()) {
+  const date = new Date(dateInput);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatMinutes(minutesSpent) {
+  const numeric = Number(minutesSpent);
+  const rounded = Number.isFinite(numeric) ? Number(numeric.toFixed(1)) : 0;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function readTrackerMinutes(todayKey) {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TRACKER_STORAGE_KEY);
+    if (!raw) {
+      return 0;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (String(parsed?.date || "") !== todayKey) {
+      return 0;
+    }
+
+    const minutesSpent = Number(parsed?.minutesSpent);
+    return Number.isFinite(minutesSpent) && minutesSpent > 0 ? minutesSpent : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function StudentTodayStudyTime() {
+  const [minutesSpent, setMinutesSpent] = useState(0);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadTodayMinutes() {
+      const todayKey = getDateKey();
+      let serverMinutes = 0;
+
+      try {
+        const response = await apiRequest("/users/me/heatmap");
+        const entries = Array.isArray(response?.entries) ? response.entries : [];
+        const todayEntry = entries.find((entry) => String(entry?.date || "") === todayKey);
+        serverMinutes = Number(todayEntry?.minutesSpent || 0);
+      } catch {
+        try {
+          const response = await apiRequest("/students/me/study-activity/heatmap");
+          const entries = Array.isArray(response?.entries) ? response.entries : [];
+          const todayEntry = entries.find((entry) => String(entry?.date || "") === todayKey);
+          serverMinutes = Number(todayEntry?.minutesSpent || 0);
+        } catch {
+          serverMinutes = 0;
+        }
+      }
+
+      if (isActive) {
+        setMinutesSpent(Math.max(serverMinutes, readTrackerMinutes(todayKey)));
+      }
+    }
+
+    void loadTodayMinutes();
+    const intervalId = window.setInterval(loadTodayMinutes, 60000);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  return (
+    <p className="hidden text-sm font-medium text-slate-500 sm:block">
+      Today you studied <span className="text-slate-700">{formatMinutes(minutesSpent)} min</span>
+    </p>
+  );
+}
 
 function StudentSidebar() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
@@ -209,7 +295,7 @@ const StudentMainContent = memo(function StudentMainContent() {
   return (
     <main className="flex-1 flex flex-col min-w-0" ref={mainRef}>
       <div ref={topAnchorRef} />
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] px-8 z-40 sticky top-0">
+      <header className="relative flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] px-6 lg:px-10 z-40 sticky top-0">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">
             {navGroups
@@ -223,45 +309,50 @@ const StudentMainContent = memo(function StudentMainContent() {
                 : "Student Portal"))}
           </h1>
         </div>
-        <div
-          className="relative flex items-center"
-          ref={notificationsRef}
-          onMouseEnter={() => setIsNotificationsOpen(true)}
-          onMouseLeave={(event) => {
-            if (!notificationsRef.current?.contains(event.relatedTarget)) {
-              setIsNotificationsOpen(false);
-            }
-          }}
-        >
-          <button
-            type="button"
-            aria-label="Notifications"
-            aria-haspopup="dialog"
-            aria-expanded={isNotificationsOpen}
-            className="group relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-none border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300/40 hover:text-white hover:shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
-          >
-            <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 emerald-gradient-fill" />
-            <Bell className="relative h-5 w-5" />
-          </button>
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <StudentTodayStudyTime />
+        </div>
+        <div className="flex items-center gap-3">
           <div
-            role="dialog"
-            aria-label="Notifications"
-            className={`absolute right-0 top-12 w-64 min-h-[6.5rem] origin-top-right rounded-none border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen
-              ? "scale-100 opacity-100"
-              : "pointer-events-none scale-95 opacity-0"
-              }`}
+            className="relative flex items-center"
+            ref={notificationsRef}
+            onMouseEnter={() => setIsNotificationsOpen(true)}
+            onMouseLeave={(event) => {
+              if (!notificationsRef.current?.contains(event.relatedTarget)) {
+                setIsNotificationsOpen(false);
+              }
+            }}
           >
-            <span className="absolute -top-3 left-0 h-3 w-full" />
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Notifications
-            </p>
-            <p className="mt-2 text-sm text-slate-600">No notifications yet.</p>
+            <button
+              type="button"
+              aria-label="Notifications"
+              aria-haspopup="dialog"
+              aria-expanded={isNotificationsOpen}
+              className="group relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-none border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300/40 hover:text-white hover:shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
+            >
+              <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 emerald-gradient-fill" />
+              <Bell className="relative h-5 w-5" />
+            </button>
+            <div
+              role="dialog"
+              aria-label="Notifications"
+              className={`absolute right-0 top-12 w-64 min-h-[6.5rem] origin-top-right rounded-none border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen
+                ? "scale-100 opacity-100"
+                : "pointer-events-none scale-95 opacity-0"
+                }`}
+            >
+              <span className="absolute -top-3 left-0 h-3 w-full" />
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Notifications
+              </p>
+              <p className="mt-2 text-sm text-slate-600">No notifications yet.</p>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-        <div className="mx-auto max-w-6xl">
+      <div className="flex-1 px-6 py-8 lg:px-10 lg:py-10">
+        <div className="mx-auto w-full max-w-7xl">
           <Outlet />
         </div>
       </div>

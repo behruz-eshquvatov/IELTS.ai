@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, Headphones, Lock } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
+import { LibraryListSkeleton } from "../../components/ui/Skeleton";
 
 function toFiniteNumber(value) {
   const numeric = Number(value);
@@ -127,7 +128,7 @@ function StudentListeningByPartPage() {
 
       <PracticeTipsCarousel tips={partTips} />
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading part-by-part tasks...</p> : null}
+      {isLoading ? <LibraryListSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error ? (

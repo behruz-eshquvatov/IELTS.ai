@@ -185,6 +185,26 @@
     display: none;
   }
 
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.58),
+      transparent
+    );
+    animation: skeleton-shimmer 1.55s ease-in-out infinite;
+  }
+
   .font-orbitron {
     font-family: "Orbitron", sans-serif;
   }
@@ -214,5 +234,11 @@
       50px 50px,
       150px 150px,
       150px 150px;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }

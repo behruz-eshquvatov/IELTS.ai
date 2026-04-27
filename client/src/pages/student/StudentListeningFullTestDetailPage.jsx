@@ -9,6 +9,7 @@ import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
 import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
 import useTextHighlighting from "../../hooks/useTextHighlighting";
 import ExamLeaveWarningModal from "../../components/student/exam/ExamLeaveWarningModal";
+import { TestPageSkeleton } from "../../components/ui/Skeleton";
 
 const START_COUNTDOWN_SECONDS = 3;
 const GOOD_SCORE_THRESHOLD_PERCENT = 70;
@@ -1427,10 +1428,15 @@ function StudentListeningFullTestDetailPage() {
     const title =
       String(currentBlock?.display?.title || "").trim() ||
       `${toReadableLabel(currentEntry?.questionFamily)} Task ${currentBlockIndex + 1}`;
+    const questionFamily = String(currentBlock?.questionFamily || currentEntry?.questionFamily || "").trim();
+    const blockType = String(currentBlock?.blockType || "").trim();
 
     const incorrectItems = scoreBase
       .filter((item) => !item.isCorrect)
       .map((item) => ({
+        section: "listening",
+        questionFamily,
+        blockType,
         blockId: currentBlockId,
         blockTitle: title,
         questionNumber: item.questionNumber,
@@ -1440,6 +1446,9 @@ function StudentListeningFullTestDetailPage() {
 
     return {
       blockId: currentBlockId,
+      section: "listening",
+      questionFamily,
+      blockType,
       blockTitle: title,
       correctCount,
       totalQuestions,
@@ -2061,7 +2070,7 @@ function StudentListeningFullTestDetailPage() {
         ) : null}
       </header>
 
-      {isLoadingTest || isLoadingBlocks ? <p className="text-sm text-slate-600">Loading test...</p> : null}
+      {isLoadingTest || isLoadingBlocks ? <TestPageSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
       {submitError ? (
         <p className="rounded-none border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">{submitError}</p>

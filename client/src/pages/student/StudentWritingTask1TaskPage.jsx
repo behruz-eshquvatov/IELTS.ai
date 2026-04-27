@@ -9,6 +9,7 @@ import useExamCopyBlocker from "../../hooks/useExamCopyBlocker";
 import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 import useExamLeaveProtection from "../../hooks/useExamLeaveProtection";
 import useTextHighlighting from "../../hooks/useTextHighlighting";
+import { TestPageSkeleton } from "../../components/ui/Skeleton";
 
 const DEFAULT_DURATION_SECONDS = 20 * 60;
 const MIN_WORD_TARGET = 150;
@@ -666,7 +667,7 @@ function StudentWritingTask1TaskPage() {
         </Link>
       </header>
 
-      {isLoading ? <p className="text-sm text-slate-600">Loading task...</p> : null}
+      {isLoading ? <TestPageSkeleton /> : null}
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {!isLoading && !error && item ? (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, FileCheck2, PenLine, Trash2, Upload, Wand2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { LibraryListSkeleton } from "../components/ui/Skeleton";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
 import { parseRawFetchResponse } from "../lib/jsonParsing";
 import { buildSuperAdminApiPath, buildSuperAdminPagePath, isValidSuperAdminPassword } from "../lib/superAdmin";
@@ -620,7 +621,7 @@ function SuperAdminWritingTask2Page() {
             </span>
           </div>
 
-          {isLoadingData ? <p className="text-sm text-slate-600">Loading Writing Task 2 items...</p> : null}
+          {isLoadingData ? <LibraryListSkeleton count={5} /> : null}
           {!isLoadingData && items.length === 0 ? (
             <p className="text-sm text-slate-600">No Writing Task 2 items yet.</p>
           ) : null}

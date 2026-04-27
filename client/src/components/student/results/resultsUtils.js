@@ -32,6 +32,61 @@ export function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+export function formatCompletionTime(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.valueOf())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function getCompletionDateKey(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.valueOf())) {
+    return "unknown";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function formatCompletionDateGroup(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.valueOf())) {
+    return "Unknown date";
+  }
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const dateKey = getCompletionDateKey(date);
+
+  if (dateKey === getCompletionDateKey(today)) {
+    return "Today";
+  }
+
+  if (dateKey === getCompletionDateKey(yesterday)) {
+    return "Yesterday";
+  }
+
+  const options = {
+    month: "long",
+    day: "numeric",
+  };
+
+  if (date.getFullYear() !== today.getFullYear()) {
+    options.year = "numeric";
+  }
+
+  return date.toLocaleDateString("en-GB", options);
+}
+
 export function formatSeconds(value) {
   const totalSeconds = Math.max(0, Math.round(Number(value) || 0));
   const minutes = Math.floor(totalSeconds / 60);

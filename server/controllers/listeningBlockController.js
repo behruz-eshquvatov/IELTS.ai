@@ -652,6 +652,19 @@ async function submitListeningBlockAttempt(req, res) {
     .filter((item) => !item.isCorrect)
     .map((item) => item.questionNumber)
     .filter((number) => Number.isFinite(number));
+  const blockTitle = normalizeFilterValue(block?.display?.title) || blockId;
+  const incorrectItems = scoreBase
+    .filter((item) => !item.isCorrect)
+    .map((item) => ({
+      section: "listening",
+      questionFamily: block.questionFamily || "",
+      blockType: block.blockType || "",
+      blockId,
+      blockTitle,
+      questionNumber: item.questionNumber,
+      studentAnswer: item.studentAnswer,
+      acceptedAnswers: item.acceptedAnswers,
+    }));
 
   const previousAttempt = await ListeningAttempt.findOne({ studentId, blockId })
     .sort({ submittedAt: -1, createdAt: -1 })
@@ -708,13 +721,20 @@ async function submitListeningBlockAttempt(req, res) {
         totalQuestions,
       },
       payload: {
-        evaluation: savedAttempt?.evaluation || {},
+        evaluation: {
+          ...(savedAttempt?.evaluation || {}),
+          incorrectItems,
+        },
         answers: submittedAnswers,
         practiceKey,
+        questionFamily: block.questionFamily || "",
+        blockType: block.blockType || "",
         blockId,
         route: taskRoute,
         submission: {
           practiceKey,
+          questionFamily: block.questionFamily || "",
+          blockType: block.blockType || "",
           blockId,
         },
       },

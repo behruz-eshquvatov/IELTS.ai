@@ -177,14 +177,19 @@ function formatMinutes(minutesSpent) {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-export function StudentActivityHeatmap() {
+export function StudentActivityHeatmap({ entries: providedEntries = null }) {
   const [entries, setEntries] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [tooltip, setTooltip] = useState(null);
   const currentYear = new Date().getFullYear();
 
   const loadHeatmap = useCallback(async () => {
+    if (Array.isArray(providedEntries)) {
+      setEntries(normalizeHeatmapData(providedEntries));
+      setFetchError("");
+      return;
+    }
+
     try {
       const response = await apiRequest("/users/me/heatmap");
       setEntries(normalizeHeatmapData(response?.entries || []));
@@ -197,10 +202,8 @@ export function StudentActivityHeatmap() {
       } catch {
         setFetchError("Failed to load heatmap activity.");
       }
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
+  }, [providedEntries]);
 
   useEffect(() => {
     const runLoad = async () => {
@@ -208,12 +211,16 @@ export function StudentActivityHeatmap() {
     };
 
     runLoad();
+    if (Array.isArray(providedEntries)) {
+      return undefined;
+    }
+
     const intervalId = window.setInterval(runLoad, 60000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [loadHeatmap]);
+  }, [loadHeatmap, providedEntries]);
 
   const mergedEntries = useMemo(() => {
     const normalized = normalizeHeatmapData(entries);
@@ -240,15 +247,9 @@ export function StudentActivityHeatmap() {
     [currentYear, mergedEntries],
   );
 
-  const todayKey = getDateKey();
-  const todayEntry = useMemo(
-    () => mergedEntries.find((entry) => entry.date === todayKey) || null,
-    [mergedEntries, todayKey],
-  );
-
   return (
     <div className="w-full text-slate-700">
-      <div className="rounded-none border border-slate-200/80 bg-[#fbf7f0]/90 p-4">
+      <div className="rounded-none border border-slate-200/80 bg-[#fbf7f0]/90 p-6">
         <div className="overflow-x-auto">
           <div className="inline-block min-w-full">
             <div className="grid grid-cols-[auto_1fr] items-end gap-3 text-[10px] uppercase tracking-[0.18em] text-slate-400">
@@ -346,14 +347,8 @@ export function StudentActivityHeatmap() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-          <span>
-            {isLoading
-              ? "Loading activity..."
-              : fetchError
-              ? fetchError
-              : `Today: ${todayEntry ? formatMinutes(todayEntry.minutesSpent) : 0} min`}
-          </span>
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3 text-xs text-slate-500">
+          {fetchError ? <span className="mr-auto">{fetchError}</span> : null}
           <div className="flex items-center gap-2">
             <span>Less</span>
             <div className="flex items-center gap-1">

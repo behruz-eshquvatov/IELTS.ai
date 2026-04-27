@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, BookOpen, ChevronDown, FileText, Headphones, Lock, NotebookPen, PenLine } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
+import { LibraryListSkeleton } from "../ui/Skeleton";
 import UnitAttemptsModal from "./UnitAttemptsModal";
 
 const STATUS_FILTER_BY_LABEL = {
@@ -96,7 +97,7 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
   );
 
   return (
-    <section className="space-y-3 mt-20">
+    <section className="space-y-4">
       {showHeader ? (
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
@@ -120,25 +121,23 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
       ) : null}
 
       {isLoading ? (
-        <div className="rounded-none border border-slate-200/80 bg-white p-4 text-sm text-slate-600">
-          Loading daily units...
-        </div>
+        <LibraryListSkeleton count={Number(maxUnits) > 0 ? Math.min(Number(maxUnits), 3) : 5} />
       ) : null}
 
       {!isLoading && errorMessage ? (
-        <div className="rounded-none border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-none border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
           {errorMessage}
         </div>
       ) : null}
 
       {!isLoading && !errorMessage && visibleUnits.length === 0 ? (
-        <div className="rounded-none border border-slate-200/80 bg-white p-4 text-sm text-slate-600">
+        <div className="rounded-none border border-slate-200/80 bg-white p-6 text-sm text-slate-600">
           No daily units found.
         </div>
       ) : null}
 
       {!isLoading && !errorMessage ? (
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           {visibleUnits.map((unit) => {
             const isToday = unit.status === "today";
             const isCompleted = unit.status === "completed";
@@ -150,7 +149,7 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
               <div
                 key={unit.id}
                 onClick={() => (isExpandable ? setExpandedUnit(isExpanded ? null : unit.id) : null)}
-                className={`relative rounded-none border p-4 transition ${
+                className={`relative rounded-none border p-6 transition ${
                   isLocked ? "cursor-not-allowed" : isExpandable ? "cursor-pointer" : ""
                 } ${
                   isToday
@@ -213,13 +212,10 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
                     ) : null}
 
                     {isLocked ? (
-                      <div className="space-y-1">
+                      <div>
                         <span className="rounded-none border border-slate-300/70 bg-transparent px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
                           Locked
                         </span>
-                        {unit.lockHint ? (
-                          <p className="text-xs text-slate-500">{unit.lockHint}</p>
-                        ) : null}
                       </div>
                     ) : null}
 
@@ -255,7 +251,7 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
                   }`}
                 >
                   <div className="overflow-hidden">
-                    <div className="mt-4 space-y-3 pl-12">
+                    <div className="mt-5 space-y-4 pl-12">
                       {(Array.isArray(unit.tasks) ? unit.tasks : []).map((task) => {
                         const taskType = String(task?.taskType || "").trim().toLowerCase();
                         const Icon = ICON_BY_TASK_TYPE[taskType] || FileText;
@@ -271,7 +267,7 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
                                 event.preventDefault();
                               }
                             }}
-                            className={`group flex items-center gap-3 rounded-none border border-transparent bg-white/60 px-3 py-2 text-left transition ${
+                            className={`group flex items-center gap-4 rounded-none border border-transparent bg-white/60 p-4 text-left transition ${
                               isTaskLocked
                                 ? "cursor-not-allowed opacity-70"
                                 : isTaskDone
