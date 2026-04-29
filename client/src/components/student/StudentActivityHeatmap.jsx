@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { apiRequest } from "../../lib/apiClient";
+import { getMyHeatmap } from "../../services/studentService";
 
 const TRACKER_STORAGE_KEY = "student:study-heatmap:tracker";
 const CELL_SIZE = 14;
@@ -191,17 +191,11 @@ export function StudentActivityHeatmap({ entries: providedEntries = null }) {
     }
 
     try {
-      const response = await apiRequest("/users/me/heatmap");
+      const response = await getMyHeatmap({ swr: true });
       setEntries(normalizeHeatmapData(response?.entries || []));
       setFetchError("");
     } catch {
-      try {
-        const fallbackResponse = await apiRequest("/students/me/study-activity/heatmap");
-        setEntries(normalizeHeatmapData(fallbackResponse?.entries || []));
-        setFetchError("");
-      } catch {
-        setFetchError("Failed to load heatmap activity.");
-      }
+      setFetchError("Failed to load heatmap activity.");
     }
   }, [providedEntries]);
 

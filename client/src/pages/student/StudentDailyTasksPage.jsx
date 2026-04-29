@@ -1,6 +1,7 @@
 import { LayoutGroup } from "framer-motion";
 import { useEffect, useState } from "react";
 import StudentTodayTasks from "../../components/student/StudentTodayTasks";
+import { getDailyTasks } from "../../services/studentService";
 
 const filters = ["All", "Today", "Completed", "Locked"];
 
@@ -23,6 +24,9 @@ function RollingLabel({ label, active }) {
 function StudentDailyTasksPage() {
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [isCompact, setIsCompact] = useState(false);
+  const [units, setUnits] = useState([]);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
+  const [unitsError, setUnitsError] = useState("");
 
   useEffect(() => {
     function handleScroll() {
@@ -35,6 +39,37 @@ function StudentDailyTasksPage() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUnits = async () => {
+      setUnitsError("");
+      setIsLoadingUnits(true);
+      try {
+        const response = await getDailyTasks({ swr: true });
+        if (!isMounted) {
+          return;
+        }
+        setUnits(Array.isArray(response?.units) ? response.units : []);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        setUnitsError(error?.message || "Failed to load daily tasks.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingUnits(false);
+        }
+      }
+    };
+
+    void loadUnits();
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -75,6 +110,9 @@ function StudentDailyTasksPage() {
         showHeader={false}
         showAllLink={false}
         activeFilter={activeFilter}
+        unitsData={units}
+        isLoadingData={isLoadingUnits}
+        errorData={unitsError}
       />
     </div>
   );

@@ -106,7 +106,7 @@ export function ConfirmStudentRemovalModal({
             </p>
             <button
               aria-label="Close remove student confirmation"
-              className="inline-flex h-10 w-10 items-center justify-center bg-transparent text-2xl leading-none text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              className="inline-flex h-10 w-10 items-center justify-center bg-transparent text-2xl leading-none text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -147,3 +147,4 @@ export function ConfirmStudentRemovalModal({
     document.body,
   );
 }
+

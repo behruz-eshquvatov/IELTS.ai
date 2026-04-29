@@ -242,3 +242,60 @@
     transform: translateX(100%);
   }
 }
+
+@keyframes teacher-button-roll {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.teacher-side button[class*="emerald-gradient-fill"],
+.teacher-side button[class*="bg-slate-950"],
+.teacher-side button[class*="bg-slate-900"] {
+  border-radius: 9999px !important;
+}
+
+.teacher-side button[class*="border-slate-200"][class*="bg-white"],
+.teacher-side button[class*="border-slate-300"][class*="bg-white"] {
+  border-color: transparent !important;
+  background: transparent !important;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.teacher-side button[class*="border-slate-200"][class*="bg-white"]::after,
+.teacher-side button[class*="border-slate-300"][class*="bg-white"]::after {
+  content: "";
+  position: absolute;
+  inset: -20% -35%;
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgba(148, 163, 184, 0.28) 50%,
+    transparent 65%
+  );
+  transform: translateX(-140%) skewX(-18deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.teacher-side button[class*="border-slate-200"][class*="bg-white"]:hover,
+.teacher-side button[class*="border-slate-300"][class*="bg-white"]:hover {
+  color: #0f172a;
+}
+
+.teacher-side button[class*="border-slate-200"][class*="bg-white"]:hover::after,
+.teacher-side button[class*="border-slate-300"][class*="bg-white"]:hover::after {
+  animation: teacher-button-roll 520ms ease-out;
+}

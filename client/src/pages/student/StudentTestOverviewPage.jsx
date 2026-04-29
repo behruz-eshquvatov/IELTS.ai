@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Lock, PenLine } from "lucide-react";
-import { apiRequest } from "../../lib/apiClient";
 import { LibraryListSkeleton } from "../../components/ui/Skeleton";
+import {
+  getWritingOpinionSets,
+  prefetchWritingOpinionSets,
+} from "../../services/studentService";
 
 const writingTask2Tips = [
   "Take a clear position in the introduction, keep one main idea per body paragraph, and support claims with specific examples. Aim for logical progression from opinion to evidence to mini-conclusion in each paragraph.",
@@ -101,10 +104,7 @@ function StudentTestOverviewPage() {
       setOpinionSetsError("");
 
       try {
-        const response = await apiRequest(
-          `/writing-task2-opinion?page=${currentPage}&limit=${pageSize}`,
-          { auth: false },
-        );
+        const response = await getWritingOpinionSets(currentPage, pageSize, { swr: true });
         const prompts = Array.isArray(response?.prompts) ? response.prompts : [];
         const nextTotalPages = Number(response?.pagination?.totalPages) || 1;
         const nextPage = Number(response?.pagination?.page) || currentPage;
@@ -114,6 +114,10 @@ function StudentTestOverviewPage() {
           setTotalPages(nextTotalPages);
           if (nextPage !== currentPage) {
             setCurrentPage(nextPage);
+          }
+
+          if (nextPage < nextTotalPages) {
+            void prefetchWritingOpinionSets(nextPage + 1, pageSize);
           }
         }
       } catch (error) {

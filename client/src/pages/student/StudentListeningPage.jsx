@@ -3,7 +3,7 @@ import { ChevronRight, LayoutGrid, List } from "lucide-react";
 import { motion } from "framer-motion";
 import MagneticButton from "../../components/ui/MagneticButton";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
-import { apiRequest } from "../../lib/apiClient";
+import { getListeningLibraryStats } from "../../services/studentService";
 
 function ListeningCard({ section, viewMode }) {
   const cardRef = useRef(null);
@@ -104,17 +104,14 @@ function StudentListeningPage() {
       setLoadError("");
 
       try {
-        const [testsResponse, partGroupsResponse] = await Promise.all([
-          apiRequest("/listening-tests?status=published&limit=1"),
-          apiRequest("/listening-tests/part-groups?status=published"),
-        ]);
+        const stats = await getListeningLibraryStats({ swr: true });
 
         if (!isMounted) {
           return;
         }
 
-        setTestsCount(Number(testsResponse?.pagination?.total) || 0);
-        setPartGroupsCount(Number(partGroupsResponse?.count) || 0);
+        setTestsCount(Number(stats?.testsCount) || 0);
+        setPartGroupsCount(Number(stats?.partGroupsCount) || 0);
       } catch (nextError) {
         if (!isMounted) {
           return;

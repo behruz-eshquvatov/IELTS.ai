@@ -175,8 +175,8 @@ function TeacherClassCard({
                     type="button"
                   >
                     <RollingHoverLabel hoverClassName="text-emerald-600" label={`${classroom.students} students`} />
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200/70 bg-emerald-50/60 text-emerald-600 transition-all duration-200 group-hover:scale-110 group-hover:border-emerald-300 group-hover:bg-emerald-50 group-hover:text-emerald-700">
-                      <Plus className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-90" />
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-transparent text-slate-500 transition-colors duration-200 group-hover:border-emerald-300 group-hover:text-emerald-700">
+                      <Plus className="h-3.5 w-3.5" />
                     </span>
                   </button>
                 </div>
@@ -231,8 +231,8 @@ function TeacherClassCard({
                     type="button"
                   >
                     <RollingHoverLabel hoverClassName="text-emerald-600" label={`${classroom.students} students`} />
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200/70 bg-emerald-50/60 text-emerald-600 transition-all duration-200 group-hover:scale-110 group-hover:border-emerald-300 group-hover:bg-emerald-50 group-hover:text-emerald-700">
-                      <Plus className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-90" />
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-transparent text-slate-500 transition-colors duration-200 group-hover:border-emerald-300 group-hover:text-emerald-700">
+                      <Plus className="h-3.5 w-3.5" />
                     </span>
                   </button>
                 </div>

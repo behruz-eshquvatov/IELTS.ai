@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, FileCheck2, Headphones, Trash2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { AdminListSkeleton, LibraryListSkeleton } from "../components/ui/Skeleton";
-import { API_BASE_URL, apiRequest } from "../lib/apiClient";
-import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
+import { apiRequest } from "../lib/apiClient";
+import { parseJsonInput } from "../lib/jsonParsing";
 import {
   buildListeningStreamUrl,
   buildSuperAdminApiPath,
@@ -11,6 +11,10 @@ import {
   deriveAudioIdFromFileName,
   isValidSuperAdminPassword,
 } from "../lib/superAdmin";
+import {
+  extractSuperAdminFromImage,
+  uploadListeningAudio,
+} from "../services/superAdminService";
 
 function formatFileSize(bytes) {
   const value = Number(bytes);
@@ -550,19 +554,10 @@ function SuperAdminListeningPage() {
     setFeedbackMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}${buildSuperAdminApiPath(password, "/listening")}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": audioFile.type || "audio/mpeg",
-          "X-Audio-Filename": audioFile.name,
-        },
-        body: audioFile,
-      });
-
-      const responseBody = await parseRawFetchResponse(response);
-      if (!response.ok) {
-        throw new Error(responseBody?.message || "Audio upload failed.");
-      }
+      const responseBody = await uploadListeningAudio(
+        buildSuperAdminApiPath(password, "/listening"),
+        audioFile,
+      );
 
       setFeedbackMessage(responseBody?.message || "Audio uploaded.");
       setAudioFile(null);
@@ -637,19 +632,7 @@ function SuperAdminListeningPage() {
 
     try {
       const extractPath = buildSuperAdminApiPath(password, "/listening/blocks/extract");
-      const response = await fetch(`${API_BASE_URL}${extractPath}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": blockImageFile.type || "image/png",
-          "X-Image-Filename": blockImageFile.name || `pasted-${Date.now()}.png`,
-        },
-        body: blockImageFile,
-      });
-
-      const responseBody = await parseRawFetchResponse(response);
-      if (!response.ok) {
-        throw new Error(responseBody?.message || "Failed to extract block JSON from image.");
-      }
+      const responseBody = await extractSuperAdminFromImage(extractPath, blockImageFile);
 
       const extractedBlock = responseBody?.block || null;
       if (!extractedBlock || typeof extractedBlock !== "object") {

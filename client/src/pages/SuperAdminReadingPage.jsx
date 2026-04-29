@@ -3,8 +3,8 @@ import { ArrowLeft, BookOpenText, Blocks, FileCheck2, Upload } from "lucide-reac
 import { Link, useParams } from "react-router-dom";
 import { SelectControl } from "../components/ui/StyledFormControls";
 import { AdminListSkeleton } from "../components/ui/Skeleton";
-import { API_BASE_URL, apiRequest } from "../lib/apiClient";
-import { parseJsonInput, parseRawFetchResponse } from "../lib/jsonParsing";
+import { apiRequest } from "../lib/apiClient";
+import { parseJsonInput } from "../lib/jsonParsing";
 import {
   BLOCK_TEMPLATE,
   PASSAGE_TEMPLATE,
@@ -20,6 +20,7 @@ import {
   validateReadingTestPayload,
 } from "../lib/readingAdminPayload";
 import { buildSuperAdminApiPath, buildSuperAdminPagePath, isValidSuperAdminPassword } from "../lib/superAdmin";
+import { extractSuperAdminFromImage } from "../services/superAdminService";
 
 function SuperAdminReadingPage() {
   const { password = "" } = useParams();
@@ -90,9 +91,10 @@ function SuperAdminReadingPage() {
     setExtracting(true); setError(""); setFeedback(""); setValidationErrors([]);
     try {
       const endpoint = type === "passages" ? "/reading/passages/extract" : "/reading/blocks/extract";
-      const response = await fetch(`${API_BASE_URL}${buildSuperAdminApiPath(password, endpoint)}`, { method: "POST", headers: { "Content-Type": extractImageFile.type || "image/png", "X-Image-Filename": extractImageFile.name || `reading-${Date.now()}.png` }, body: extractImageFile });
-      const body = await parseRawFetchResponse(response);
-      if (!response.ok) throw new Error(body?.message || "Extraction failed.");
+      const body = await extractSuperAdminFromImage(
+        buildSuperAdminApiPath(password, endpoint),
+        extractImageFile,
+      );
       if (type === "passages") setPassageJson(JSON.stringify(body?.passage || {}, null, 2));
       if (type === "blocks") setBlockJson(JSON.stringify(body?.block || {}, null, 2));
       const errors = Array.isArray(body?.validation?.errors) ? body.validation.errors : [];

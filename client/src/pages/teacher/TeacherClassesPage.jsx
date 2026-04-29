@@ -5,64 +5,29 @@ import { motion } from "framer-motion";
 import { LayoutGrid, List, Plus, Search, X } from "lucide-react";
 import TeacherClassCard from "../../components/teacher/TeacherClassCard";
 import { TimePickerField } from "../../components/ui/StyledFormControls";
+import MagneticButton from "../../components/ui/MagneticButton";
 import useLocalStorageState from "../../hooks/useLocalStorageState";
-import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 import {
-  buildNewTeacherClass,
-  getAllTeacherClasses,
-  readCustomTeacherStudents,
-  readCustomTeacherClasses,
-  readTeacherStudentMemberships,
-  resolveTeacherStudentsWithClassIds,
-  writeCustomTeacherStudents,
-  writeCustomTeacherClasses,
-  writeTeacherStudentMemberships,
-} from "../../lib/teacherClassStore";
+  createTeacherClass,
+  inviteStudentToTeacherClass,
+  listTeacherClasses,
+  listTeacherClassStudents,
+  searchTeacherClassStudents,
+  updateTeacherClass,
+} from "../../services/teacherService";
 
 const MotionSpan = motion.span;
-const CLASS_OVERRIDES_STORAGE_KEY = "teacher:class-overrides";
-
-function readClassOverrides() {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const savedValue = window.localStorage.getItem(CLASS_OVERRIDES_STORAGE_KEY);
-    return savedValue ? JSON.parse(savedValue) : {};
-  } catch {
-    return {};
-  }
-}
-
-function buildInferredEmail(student) {
-  if (student.email) {
-    return student.email;
-  }
-
-  return `${student.name.toLowerCase().trim().replace(/\s+/g, ".").replace(/[^a-z.]/g, "")}@ieltsai.app`;
-}
 
 function StudentDirectoryModal({
   classroom,
-  form,
-  inviteSearch,
   onClose,
-  onFormChange,
-  onInviteSearchChange,
-  onRegisteredStudentPick,
-  onSubmit,
-  registeredStudents,
+  onSearchChange,
+  onInvite,
+  rows,
+  query,
+  loading,
+  invitingStudentId,
 }) {
-  const normalizedQuery = inviteSearch.trim().toLowerCase();
-  const matchedRegisteredStudents = normalizedQuery
-    ? registeredStudents.filter((student) => student.email.toLowerCase().includes(normalizedQuery))
-    : [];
-  const isSubmitDisabled =
-    !form.name.trim() ||
-    !form.surname.trim() ||
-    !form.email.trim();
-
   if (!classroom) {
     return null;
   }
@@ -74,15 +39,15 @@ function StudentDirectoryModal({
       role="presentation"
     >
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-5xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="flex h-[55vh] w-full max-w-5xl flex-col overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]" onClick={(event) => event.stopPropagation()}>
           <div className="-mx-px flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
-                New student
+                Class students
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white"
               onClick={onClose}
               type="button"
             >
@@ -90,110 +55,71 @@ function StudentDirectoryModal({
             </button>
           </div>
 
-          <div className="space-y-5 p-6">
-            <div className="space-y-3 border-b border-slate-200/70 pb-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Search registered students
-                </p>
+          <div className="flex min-h-0 flex-1 flex-col p-6">
+            <div className="space-y-3 shrink-0">
+              <label className="flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+                <Search className="h-4 w-4" />
+                <input
+                  className="w-full bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder="Search by name or email"
+                  type="text"
+                  value={query}
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
+              <div className="py-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Current class students</p>
+                <div className={`mt-3 space-y-2 ${rows.inClass.length === 0 ? (query.trim() ? "min-h-28" : "min-h-64") : ""}`}>
+                  {rows.inClass.length === 0 ? (
+                    <div className={`flex items-center justify-center ${query.trim() ? "min-h-28" : "min-h-64"}`}>
+                      <p className="text-center text-sm text-slate-500">No students yet.</p>
+                    </div>
+                  ) : rows.inClass.map((student) => (
+                    <div className="flex items-center justify-between px-0 py-2 text-sm" key={`in-${student.studentId}`}>
+                      <span className="font-medium text-slate-800">{student.fullName}</span>
+                      <span className="text-slate-500">{student.email}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="relative">
-                <label className="flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                  <Search className="h-4 w-4" />
-                  <input
-                    className="w-full bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
-                    onChange={(event) => onInviteSearchChange(event.target.value)}
-                    placeholder="Search by registered email"
-                    type="text"
-                    value={inviteSearch}
-                  />
-                </label>
-
-                {normalizedQuery ? (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-[200px] overflow-y-auto border border-slate-200/80 bg-white shadow-[0_18px_40px_-30px_rgba(15,23,42,0.26)]">
-                    {matchedRegisteredStudents.length ? (
-                      <div className="divide-y divide-slate-200/70">
-                        {matchedRegisteredStudents.map((student) => (
+              {query.trim() ? (
+                <div className="py-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Matching students</p>
+                  <div className="mt-3 space-y-2">
+                    {loading ? (
+                      <p className="text-sm text-slate-500">Searching...</p>
+                    ) : rows.others.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-slate-500">No students found.</p>
+                    ) : rows.others.map((student) => (
+                      <div className="flex items-center justify-between gap-3 px-0 py-2 text-sm" key={`other-${student.studentId}`}>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-800">{student.fullName}</p>
+                          <p className="truncate text-slate-500">{student.email}</p>
+                        </div>
+                        {student.inClass ? (
+                          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">In class</span>
+                        ) : student.pendingRequestStatus === "pending" ? (
+                          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-600">Pending</span>
+                        ) : (
                           <button
-                            className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-slate-700 transition-colors duration-200 hover:bg-emerald-100/70 hover:text-emerald-900"
-                            key={`${student.id}-class-list-invite-search`}
-                            onClick={() => onRegisteredStudentPick(student)}
+                            className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition-opacity duration-200 disabled:opacity-50"
+                            disabled={invitingStudentId === student.studentId}
+                            onClick={() => onInvite(student)}
                             type="button"
                           >
-                            <p className="text-sm font-medium">{student.email}</p>
-                            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-current">
-                              Use
-                            </span>
+                            {invitingStudentId === student.studentId ? "Sending..." : "Add"}
+                            <Plus className="h-3.5 w-3.5" />
                           </button>
-                        ))}
+                        )}
                       </div>
-                    ) : (
-                      <div className="px-4 py-4 text-sm text-slate-500">
-                        No registered student matches this email.
-                      </div>
-                    )}
+                    ))}
                   </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <label className="space-y-2 text-sm text-slate-600">
-                <span className="font-medium text-slate-900">Name</span>
-                <input
-                  className="w-full border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
-                  name="name"
-                  onChange={onFormChange}
-                  placeholder="Enter name"
-                  type="text"
-                  value={form.name}
-                />
-                <span className="block whitespace-nowrap text-sm text-slate-500">
-                  The student will be added to the bottom of the list.
-                </span>
-              </label>
-              <label className="space-y-2 text-sm text-slate-600">
-                <span className="font-medium text-slate-900">Surname</span>
-                <input
-                  className="w-full border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
-                  name="surname"
-                  onChange={onFormChange}
-                  placeholder="Enter surname"
-                  type="text"
-                  value={form.surname}
-                />
-              </label>
-              <label className="space-y-2 text-sm text-slate-600">
-                <span className="font-medium text-slate-900">Email</span>
-                <input
-                  className="w-full border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
-                  name="email"
-                  onChange={onFormChange}
-                  placeholder="student@email.com"
-                  type="email"
-                  value={form.email}
-                />
-              </label>
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-3">
-              <button
-                className="inline-flex items-center gap-2 border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
-                onClick={onClose}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white transition-opacity duration-200 disabled:cursor-not-allowed disabled:opacity-45"
-                disabled={isSubmitDisabled}
-                onClick={onSubmit}
-                type="button"
-              >
-                <Plus className="h-4 w-4" />
-                Add to class
-              </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -203,12 +129,12 @@ function StudentDirectoryModal({
   );
 }
 
-function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
+function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit, isSaving }) {
   if (!isOpen) {
     return null;
   }
 
-  const isSubmitDisabled = !form.name.trim() || !form.startTime.trim();
+  const isSubmitDisabled = !form.name.trim() || !form.startTime.trim() || isSaving;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
@@ -224,7 +150,7 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -249,7 +175,6 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               <label className="space-y-2 text-sm text-slate-600">
                 <span className="font-medium text-slate-900">Class time</span>
                 <TimePickerField
-                  className=""
                   name="startTime"
                   onChange={onChange}
                   value={form.startTime}
@@ -257,13 +182,9 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               </label>
             </div>
 
-            <p className="text-sm text-slate-500">
-              The class will be created with 0 students at the bottom of the list.
-            </p>
-
             <div className="flex flex-wrap justify-end gap-3">
               <button
-                className="inline-flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                 onClick={onClose}
                 type="button"
               >
@@ -274,7 +195,7 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
                 disabled={isSubmitDisabled}
                 type="submit"
               >
-                Create class
+                {isSaving ? "Creating..." : "Create class"}
                 <Plus className="h-4 w-4" />
               </button>
             </div>
@@ -289,24 +210,24 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
 function TeacherClassesPage() {
   const {
     isAddClassModalOpen = false,
-    onCloseAddClassModal = () => {},
+    onOpenAddClassModal = () => { },
+    onCloseAddClassModal = () => { },
   } = useOutletContext() ?? {};
   const [viewMode, setViewMode] = useLocalStorageState("teacher:classes:view-mode", "list");
-  const [classOverrides, setClassOverrides] = useState(() => readClassOverrides());
-  const [classesState, setClassesState] = useState(() => getAllTeacherClasses().map((item) => ({ ...item })));
-  const [studentsState, setStudentsState] = useState(() => resolveTeacherStudentsWithClassIds());
+  const [classesState, setClassesState] = useState([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [editingField, setEditingField] = useState(null);
   const [draftValue, setDraftValue] = useState("");
   const [activeClassId, setActiveClassId] = useState(null);
   const [studentInviteSearch, setStudentInviteSearch] = useState("");
-  const [studentInviteForm, setStudentInviteForm] = useState({
-    name: "",
-    surname: "",
-    email: "",
-  });
+  const [modalRows, setModalRows] = useState({ inClass: [], others: [] });
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [invitingStudentId, setInvitingStudentId] = useState("");
   const [createClassForm, setCreateClassForm] = useState({ name: "", startTime: "" });
   const [notice, setNotice] = useState("");
+  const [isCreatingClass, setIsCreatingClass] = useState(false);
   const noticeTimerRef = useRef(null);
+  const searchTimerRef = useRef(null);
   const viewButtons = [
     { key: "list", icon: List },
     { key: "grid", icon: LayoutGrid },
@@ -317,74 +238,73 @@ function TeacherClassesPage() {
       if (noticeTimerRef.current) {
         window.clearTimeout(noticeTimerRef.current);
       }
+      if (searchTimerRef.current) {
+        window.clearTimeout(searchTimerRef.current);
+      }
     };
   }, []);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(CLASS_OVERRIDES_STORAGE_KEY, JSON.stringify(classOverrides));
-    } catch {
-      // Ignore storage write failures.
-    }
-  }, [classOverrides]);
-
-  useEffect(() => {
-    if (!activeClassId && !isAddClassModalOpen) {
-      document.body.style.overflow = "";
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
+    const run = async () => {
+      setIsLoadingClasses(true);
+      try {
+        const response = await listTeacherClasses();
+        const rows = Array.isArray(response?.classes) ? response.classes : [];
+        setClassesState(rows.map((item) => ({
+          ...item,
+          id: String(item?._id || ""),
+          students: Number(item?.activeStudentsCount || 0),
+        })));
+      } catch (error) {
+        showNotice(error?.message || "Failed to load classes.");
+      } finally {
+        setIsLoadingClasses(false);
+      }
     };
-  }, [activeClassId, isAddClassModalOpen]);
+    void run();
+  }, []);
 
-  const studentCountsByClassId = studentsState.reduce((counts, student) => {
-    if (student.classId) {
-      counts[student.classId] = (counts[student.classId] ?? 0) + 1;
-    }
-
-    return counts;
-  }, {});
-
-  const classesForDisplay = classesState.map((classroom) => ({
-    ...classroom,
-    ...(classOverrides[classroom.id] ?? {}),
-    students: studentCountsByClassId[classroom.id] ?? 0,
-  }));
+  const activeClassroom = classesState.find((classroom) => classroom.id === activeClassId) || null;
 
   const handleStartEditing = (classId, field, value) => {
     setEditingField({ classId, field });
     setDraftValue(value);
   };
 
-  const handleCommit = () => {
+  const handleCommit = async () => {
     if (!editingField) {
       return;
     }
 
     const nextValue = draftValue.trim();
-
-    if (nextValue) {
-      setClassesState((current) =>
-        current.map((item) =>
-          item.id === editingField.classId ? { ...item, [editingField.field]: nextValue } : item,
-        ),
-      );
-      setClassOverrides((current) => ({
-        ...current,
-        [editingField.classId]: {
-          ...(current[editingField.classId] ?? {}),
-          [editingField.field]: nextValue,
-        },
-      }));
+    const currentClassId = editingField.classId;
+    const currentField = editingField.field;
+    const previousClass = classesState.find((item) => item.id === currentClassId);
+    if (!previousClass) {
+      setEditingField(null);
+      setDraftValue("");
+      return;
     }
 
+    if (!nextValue) {
+      setEditingField(null);
+      setDraftValue("");
+      return;
+    }
+
+    setClassesState((current) => current.map((item) => (item.id === currentClassId ? { ...item, [currentField]: nextValue } : item)));
     setEditingField(null);
     setDraftValue("");
+
+    try {
+      await updateTeacherClass(currentClassId, { [currentField]: nextValue });
+    } catch (error) {
+      setClassesState((current) =>
+        current.map((item) =>
+          item.id === currentClassId ? { ...item, [currentField]: previousClass[currentField] } : item,
+        ));
+      showNotice(error?.message || "Failed to save class.");
+    }
   };
 
   const handleCancel = () => {
@@ -392,23 +312,53 @@ function TeacherClassesPage() {
     setDraftValue("");
   };
 
-  const handleOpenStudents = (classId) => {
+  const loadClassStudentsSearch = async (classId, query = "") => {
+    setIsLoadingSearch(true);
+    try {
+      const response = await searchTeacherClassStudents(classId, query);
+      setModalRows({
+        inClass: Array.isArray(response?.inClass) ? response.inClass : [],
+        others: Array.isArray(response?.others) ? response.others : [],
+      });
+    } catch (error) {
+      showNotice(error?.message || "Failed to search students.");
+      setModalRows({ inClass: [], others: [] });
+    } finally {
+      setIsLoadingSearch(false);
+    }
+  };
+
+  const handleOpenStudents = async (classId) => {
     setActiveClassId(classId);
     setStudentInviteSearch("");
+    setModalRows({ inClass: [], others: [] });
+    setIsLoadingSearch(true);
+    try {
+      const [membersResponse, searchResponse] = await Promise.all([
+        listTeacherClassStudents(classId),
+        searchTeacherClassStudents(classId, ""),
+      ]);
+      setModalRows({
+        inClass: Array.isArray(membersResponse?.students)
+          ? membersResponse.students.map((item) => ({ ...item, inClass: true }))
+          : Array.isArray(searchResponse?.inClass)
+            ? searchResponse.inClass
+            : [],
+        others: Array.isArray(searchResponse?.others) ? searchResponse.others : [],
+      });
+    } catch (error) {
+      showNotice(error?.message || "Failed to load class students.");
+      setModalRows({ inClass: [], others: [] });
+    } finally {
+      setIsLoadingSearch(false);
+    }
   };
 
   const handleCloseStudents = () => {
     setActiveClassId(null);
-    resetStudentInviteForm();
-  };
-
-  const resetStudentInviteForm = () => {
-    setStudentInviteForm({
-      name: "",
-      surname: "",
-      email: "",
-    });
     setStudentInviteSearch("");
+    setModalRows({ inClass: [], others: [] });
+    setInvitingStudentId("");
   };
 
   const resetCreateClassForm = () => {
@@ -422,140 +372,109 @@ function TeacherClassesPage() {
 
   const handleCreateClassFormChange = (event) => {
     const { name, value } = event.target;
-
     setCreateClassForm((current) => ({
       ...current,
       [name]: value,
     }));
   };
 
-  const handleCreateClass = (event) => {
+  const handleCreateClass = async (event) => {
     event.preventDefault();
-
     const trimmedName = createClassForm.name.trim();
     const trimmedStartTime = createClassForm.startTime.trim();
-
-    if (!trimmedName || !trimmedStartTime) {
+    if (!trimmedName || !trimmedStartTime || isCreatingClass) {
       return;
     }
-
-    const newClassroom = buildNewTeacherClass(
-      { name: trimmedName, startTime: trimmedStartTime },
-      classesState,
-    );
-    const nextCustomClasses = [...readCustomTeacherClasses(), newClassroom];
-
-    writeCustomTeacherClasses(nextCustomClasses);
-    setClassesState((current) => [...current, newClassroom]);
-    handleCloseCreateClassModal();
-    showNotice("Class created");
+    setIsCreatingClass(true);
+    try {
+      const response = await createTeacherClass({
+        name: trimmedName,
+        startTime: trimmedStartTime,
+        status: "active",
+      });
+      const created = response?.class;
+      if (created?._id) {
+        setClassesState((current) => [
+          {
+            ...created,
+            id: String(created._id),
+            students: Number(created?.activeStudentsCount || 0),
+          },
+          ...current,
+        ]);
+      }
+      handleCloseCreateClassModal();
+      showNotice("Class created");
+    } catch (error) {
+      showNotice(error?.message || "Failed to create class.");
+    } finally {
+      setIsCreatingClass(false);
+    }
   };
 
-  const handleStudentInviteFormChange = (event) => {
-    const { name, value } = event.target;
-
-    setStudentInviteForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
-  };
-
-  const handleRegisteredStudentPick = (student) => {
-    const [name = "", ...surnameParts] = student.name.split(" ");
-
-    setStudentInviteForm({
-      name,
-      surname: surnameParts.join(" "),
-      email: student.email,
-    });
-    setStudentInviteSearch("");
-  };
-
-  const handleInviteStudentToActiveClass = () => {
-    const trimmedName = studentInviteForm.name.trim();
-    const trimmedSurname = studentInviteForm.surname.trim();
-    const trimmedEmail = studentInviteForm.email.trim();
-    const targetClass = classesForDisplay.find((classroom) => classroom.id === activeClassId);
-
-    if (!trimmedName || !trimmedSurname || !trimmedEmail || !targetClass) {
+  const handleInviteStudent = async (student) => {
+    if (!activeClassId || !student?.studentId || invitingStudentId) {
       return;
     }
-
-    const baseId = `${trimmedName.toLowerCase()}-${trimmedSurname.toLowerCase()}`
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
-    const existingStudentIds = new Set(studentsState.map((student) => student.id));
-    let generatedId = baseId || "student";
-    let suffix = 2;
-
-    while (existingStudentIds.has(generatedId)) {
-      generatedId = `${baseId || "student"}-${suffix}`;
-      suffix += 1;
+    setInvitingStudentId(student.studentId);
+    try {
+      await inviteStudentToTeacherClass(activeClassId, student.studentId);
+      setModalRows((current) => ({
+        ...current,
+        others: current.others.map((item) =>
+          item.studentId === student.studentId
+            ? { ...item, pendingRequestStatus: "pending", canInvite: false }
+            : item),
+      }));
+      showNotice("Join request sent");
+    } catch (error) {
+      showNotice(error?.message || "Failed to send request.");
+    } finally {
+      setInvitingStudentId("");
     }
-
-    const invitedStudent = {
-      id: generatedId,
-      name: `${trimmedName} ${trimmedSurname}`,
-      classId: targetClass.id,
-      className: targetClass.name,
-      targetBand: "TBD",
-      currentBand: "TBD",
-      status: "Invited",
-      weakArea: "Placement pending",
-      completionRate: "--",
-      lastSubmission: "No submissions yet",
-      notes: `Invitation prepared for ${trimmedEmail}. Awaiting student confirmation.`,
-      email: trimmedEmail,
-    };
-
-    setStudentsState((current) => [...current, invitedStudent]);
-    writeCustomTeacherStudents([...readCustomTeacherStudents(), invitedStudent]);
-    writeTeacherStudentMemberships({
-      ...readTeacherStudentMemberships(),
-      [generatedId]: targetClass.id,
-    });
-    handleCloseStudents();
-    showNotice("Student added to class");
   };
 
   const showNotice = (message) => {
     setNotice(message);
-
     if (noticeTimerRef.current) {
       window.clearTimeout(noticeTimerRef.current);
     }
-
     noticeTimerRef.current = window.setTimeout(() => {
       setNotice("");
     }, 2200);
   };
 
-  const registeredStudents = studentsState
-    .filter((student) => student.classId !== activeClassId)
-    .map((student) => ({
-      ...student,
-      email: buildInferredEmail(student),
-    }));
+  useEffect(() => {
+    if (!activeClassId) {
+      return;
+    }
+    if (searchTimerRef.current) {
+      window.clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = window.setTimeout(() => {
+      void loadClassStudentsSearch(activeClassId, studentInviteSearch);
+    }, 280);
+  }, [activeClassId, studentInviteSearch]);
 
   return (
     <section className="space-y-4">
       <CreateClassModal
         form={createClassForm}
         isOpen={isAddClassModalOpen}
+        isSaving={isCreatingClass}
         onChange={handleCreateClassFormChange}
         onClose={handleCloseCreateClassModal}
         onSubmit={handleCreateClass}
       />
       <StudentDirectoryModal
-        classroom={classesForDisplay.find((item) => item.id === activeClassId) ?? null}
-        form={studentInviteForm}
-        inviteSearch={studentInviteSearch}
+        classroom={activeClassroom}
+        invitingStudentId={invitingStudentId}
+        loading={isLoadingSearch}
         onClose={handleCloseStudents}
-        onFormChange={handleStudentInviteFormChange}
-        onInviteSearchChange={setStudentInviteSearch}
-        onRegisteredStudentPick={handleRegisteredStudentPick}
-        onSubmit={handleInviteStudentToActiveClass}
-        registeredStudents={registeredStudents}
+        onInvite={handleInviteStudent}
+        onSearchChange={setStudentInviteSearch}
+        query={studentInviteSearch}
+        rows={modalRows}
       />
       {notice ? (
         <div className="fixed right-6 top-24 z-[60] rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-[0_18px_40px_-28px_rgba(16,185,129,0.35)]">
@@ -563,62 +482,96 @@ function TeacherClassesPage() {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-600">
-          Classroom Library
-        </p>
-        <motion.div
-          layout
-          className="relative flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.25)]"
-          transition={{ type: "spring", stiffness: 420, damping: 32 }}
-        >
-          {viewButtons.map((item) => {
-            const Icon = item.icon;
-            const isActive = viewMode === item.key;
+      {classesState.length > 0 ? (
+        <div className="flex items-center justify-end gap-3">
+          <MagneticButton
+            className="rounded-full"
+            disableGlow
+            innerClassName="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)]"
+            onClick={onOpenAddClassModal}
+            type="button"
+          >
+            Add class
+            <Plus className="h-4 w-4" />
+          </MagneticButton>
+          <motion.div
+            layout
+            className="relative flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.25)]"
+            transition={{ type: "spring", stiffness: 420, damping: 32 }}
+          >
+            {viewButtons.map((item) => {
+              const Icon = item.icon;
+              const isActive = viewMode === item.key;
 
-            return (
-              <motion.button
-                layout
-                className={`relative z-10 inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-300 ${
-                  isActive ? "text-white" : "text-slate-500 hover:text-slate-900"
-                }`}
-                key={item.key}
-                onClick={() => setViewMode(item.key)}
-                transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                type="button"
-              >
-                {isActive ? (
-                  <MotionSpan
-                    className="absolute inset-0 rounded-full bg-slate-900"
-                    layoutId="teacher-view-switch"
-                    transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                  />
-                ) : null}
-                <Icon className="relative z-10 h-4 w-4" />
-              </motion.button>
-            );
-          })}
-        </motion.div>
-      </div>
+              return (
+                <motion.button
+                  layout
+                  className={`relative z-10 inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-300 ${isActive ? "text-white" : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  key={item.key}
+                  onClick={() => setViewMode(item.key)}
+                  transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                  type="button"
+                >
+                  {isActive ? (
+                    <MotionSpan
+                      className="absolute inset-0 rounded-full bg-slate-900"
+                      layoutId="teacher-view-switch"
+                      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                    />
+                  ) : null}
+                  <Icon className="relative z-10 h-4 w-4" />
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        </div>
+      ) : null}
 
-      <div className={viewMode === "grid" ? "grid gap-4 lg:grid-cols-2 2xl:grid-cols-3" : "grid gap-2"}>
-        {classesForDisplay.map((classroom) => (
-          <TeacherClassCard
-            classroom={classroom}
-            draftValue={draftValue}
-            editingField={editingField}
-            key={classroom.id}
-            onCancel={handleCancel}
-            onCommit={handleCommit}
-            onDraftChange={setDraftValue}
-            onOpenStudents={handleOpenStudents}
-            onStartEditing={handleStartEditing}
-            viewMode={viewMode}
-          />
-        ))}
-      </div>
+      {isLoadingClasses ? (
+        <div className="text-sm text-slate-500">Loading classes...</div>
+      ) : classesState.length === 0 ? (
+        <article className="min-h-[calc(100vh-15rem)] bg-transparent flex items-center justify-center">
+          <div className="flex max-w-lg flex-col items-center gap-5 text-center">
+            <h2 className="text-4xl font-semibold tracking-[-0.04em] text-slate-950">
+              No classes yet
+            </h2>
+            <p className="text-base leading-8 text-slate-600">
+              Start by creating your first class, then invite students and manage their progress from one place.
+            </p>
+            <MagneticButton
+              className="rounded-full"
+              disableGlow
+              innerClassName="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)]"
+              onClick={onOpenAddClassModal}
+              type="button"
+            >
+              Create class
+              <Plus className="h-4 w-4" />
+            </MagneticButton>
+          </div>
+        </article>
+      ) : (
+        <div className={viewMode === "grid" ? "grid gap-4 lg:grid-cols-2 2xl:grid-cols-3" : "grid gap-2"}>
+          {classesState.map((classroom) => (
+            <TeacherClassCard
+              classroom={classroom}
+              draftValue={draftValue}
+              editingField={editingField}
+              key={classroom.id}
+              onCancel={handleCancel}
+              onCommit={handleCommit}
+              onDraftChange={setDraftValue}
+              onOpenStudents={handleOpenStudents}
+              onStartEditing={handleStartEditing}
+              viewMode={viewMode}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
 export default TeacherClassesPage;
+

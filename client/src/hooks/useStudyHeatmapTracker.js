@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
-import { API_BASE_URL, apiRequest } from "../lib/apiClient";
-import { getAccessToken } from "../lib/authSession";
+import {
+  sendHeatmapDayKeepalive,
+  upsertHeatmapDay,
+} from "../services/studentService";
 
 const STORAGE_KEY = "student:study-heatmap:tracker";
 const THRESHOLDS_MINUTES = [30, 60, 120];
@@ -81,39 +83,7 @@ function writeTrackerState(state) {
 }
 
 async function postHeatmapDay(date, minutesSpent) {
-  return apiRequest("/users/me/heatmap/day", {
-    method: "POST",
-    body: {
-      date,
-      minutesSpent: normalizeMinutes(minutesSpent, 0),
-    },
-  });
-}
-
-function postHeatmapDayKeepalive(date, minutesSpent) {
-  const token = getAccessToken();
-  if (!token) {
-    return;
-  }
-
-  const url = `${API_BASE_URL}/users/me/heatmap/day`;
-  const payload = JSON.stringify({
-    date,
-    minutesSpent: normalizeMinutes(minutesSpent, 0),
-  });
-
-  fetch(url, {
-    method: "POST",
-    keepalive: true,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: payload,
-  }).catch(() => {
-    // Non-blocking sync path on unload.
-  });
+  return upsertHeatmapDay(date, normalizeMinutes(minutesSpent, 0));
 }
 
 export function useStudyHeatmapTracker() {
@@ -136,7 +106,7 @@ export function useStudyHeatmapTracker() {
       }
 
       if (keepalive) {
-        postHeatmapDayKeepalive(state.date, safeMinutes);
+        sendHeatmapDayKeepalive(state.date, safeMinutes);
         state.lastSyncedMinutes = Math.max(state.lastSyncedMinutes, safeMinutes);
         writeTrackerState(state);
         return;
@@ -217,7 +187,7 @@ export function useStudyHeatmapTracker() {
       if (document.visibilityState === "hidden") {
         await tick({ allowHidden: true });
         const state = stateRef.current;
-        postHeatmapDayKeepalive(state.date, state.minutesSpent);
+        sendHeatmapDayKeepalive(state.date, state.minutesSpent);
       } else {
         lastVisibleAtRef.current = Date.now();
       }
@@ -225,7 +195,7 @@ export function useStudyHeatmapTracker() {
 
     const handlePageHide = () => {
       const state = stateRef.current;
-      postHeatmapDayKeepalive(state.date, state.minutesSpent);
+      sendHeatmapDayKeepalive(state.date, state.minutesSpent);
     };
 
     const initialState = readTrackerState();
@@ -254,7 +224,7 @@ export function useStudyHeatmapTracker() {
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("beforeunload", handlePageHide);
       const state = stateRef.current;
-      postHeatmapDayKeepalive(state.date, state.minutesSpent);
+      sendHeatmapDayKeepalive(state.date, state.minutesSpent);
     };
   }, []);
 }

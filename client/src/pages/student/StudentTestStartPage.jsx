@@ -4,8 +4,11 @@ import { AlertTriangle, ShieldBan, X } from "lucide-react";
 import { motion as Motion } from "framer-motion";
 import WritingAttemptTimerCard from "../../components/student/WritingAttemptTimerCard";
 import { SkeletonText } from "../../components/ui/Skeleton";
-import { apiRequest } from "../../lib/apiClient";
 import useBodyScrollLock from "../../hooks/useBodyScrollLock";
+import {
+  createWritingTask2Analysis,
+  getWritingOpinionPrompt,
+} from "../../services/studentService";
 
 const DEFAULT_DURATION_SECONDS = 40 * 60;
 const MINIMUM_WORDS = 250;
@@ -181,7 +184,7 @@ function StudentTestStartPage() {
       setPromptError("");
 
       try {
-        const response = await apiRequest(`/writing-task2-opinion/${setId}`, { auth: false });
+        const response = await getWritingOpinionPrompt(setId, { swr: true });
         const nextPrompt = response?.prompt ?? null;
 
         if (!nextPrompt) {
@@ -279,10 +282,7 @@ function StudentTestStartPage() {
       let analysisError = "";
 
       try {
-        const response = await apiRequest("/writing-task2/analyses", {
-          method: "POST",
-          body: payload,
-        });
+        const response = await createWritingTask2Analysis(payload);
         analysis = response?.analysis ?? null;
       } catch (error) {
         analysis = error?.body?.analysis ?? null;

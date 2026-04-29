@@ -1,18 +1,15 @@
 import {
-  BarChart,
+  Bell,
   ClipboardList,
-  FileText,
   LogOut,
-  Plus,
-  Settings2,
   Users,
   User,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authApi } from "../lib/apiClient";
 import { clearAuthSession } from "../lib/authSession";
-import MagneticButton from "../components/ui/MagneticButton";
+import { getTeacherNotifications, markTeacherNotificationRead } from "../services/teacherService";
 
 const navGroups = [
   {
@@ -21,19 +18,6 @@ const navGroups = [
       { label: "Classes", to: "/teacher/classes", icon: Users },
       { label: "Students", to: "/teacher/students", icon: User },
       { label: "Assignments", to: "/teacher/assignments", icon: ClipboardList },
-    ],
-  },
-  {
-    title: "Review",
-    items: [
-      { label: "Submissions", to: "/teacher/submissions", icon: FileText },
-      { label: "Reports", to: "/teacher/reports", icon: BarChart },
-    ],
-  },
-  {
-    title: "Settings",
-    items: [
-      { label: "Teacher Settings", to: "/teacher/settings", icon: Settings2 },
     ],
   },
 ];
@@ -57,16 +41,6 @@ function getTeacherRouteTitle(pathname) {
   if (pathname === "/teacher/assignments") {
     return "Assignments Management";
   }
-  if (pathname === "/teacher/submissions") {
-    return "Submissions Review";
-  }
-  if (pathname === "/teacher/reports") {
-    return "Reports";
-  }
-  if (pathname === "/teacher/settings") {
-    return "Teacher Settings";
-  }
-
   const last = pathname.split("/").filter(Boolean).pop();
   return last ? `${last.charAt(0).toUpperCase()}${last.slice(1)}` : "Teacher Panel";
 }
@@ -74,15 +48,40 @@ function getTeacherRouteTitle(pathname) {
 function TeacherLayout() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const notificationsRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const routeTitle = getTeacherRouteTitle(location.pathname);
-  const isClassesRoute = location.pathname === "/teacher" || location.pathname === "/teacher/classes";
 
   const linkBase =
     "grid items-center rounded-none px-1 py-2 text-sm font-medium transition-all duration-300 ease-out";
 
   const isSidebarExpanded = isSidebarHovered;
+  const unreadNotifications = notifications.filter((item) => !item.read);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await getTeacherNotifications();
+        setNotifications(Array.isArray(response?.notifications) ? response.notifications : []);
+      } catch {
+        setNotifications([]);
+      }
+    };
+    void load();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    function handleOutsideClick(event) {
+      if (!notificationsRef.current?.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -96,7 +95,7 @@ function TeacherLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f4ef] text-slate-900 font-sans flex flex-col lg:flex-row">
+    <div className="teacher-side min-h-screen bg-[#f7f4ef] text-slate-900 font-sans flex flex-col lg:flex-row">
       <aside
         className="relative w-20 shrink-0"
         onMouseEnter={() => setIsSidebarHovered(true)}
@@ -200,23 +199,57 @@ function TeacherLayout() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] px-6 lg:px-8">
-          <div>
+        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] pl-6 pr-0 lg:pl-8">
+          <div className="pr-4">
             <h1 className="text-lg font-semibold text-slate-900">{routeTitle}</h1>
           </div>
-          <div className="flex items-center gap-3">
-            {isClassesRoute ? (
-              <MagneticButton
-                className="rounded-full"
-                disableGlow
-                innerClassName="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)]"
-                onClick={() => setIsAddClassModalOpen(true)}
+          <div className="flex h-full items-stretch">
+            <div className="relative flex items-center border-l border-slate-200 px-4" ref={notificationsRef}>
+              <button
                 type="button"
+                aria-label="Notifications"
+                aria-expanded={isNotificationsOpen}
+                onClick={() => setIsNotificationsOpen((current) => !current)}
+                className="relative flex h-10 w-10 items-center justify-center border border-slate-200 bg-white text-slate-600"
               >
-                Add class
-                <Plus className="h-4 w-4" />
-              </MagneticButton>
-            ) : null}
+                <Bell className="h-5 w-5" />
+                {unreadNotifications.length > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                    {unreadNotifications.length > 99 ? "99+" : unreadNotifications.length}
+                  </span>
+                ) : null}
+              </button>
+              <div
+                className={`absolute right-0 top-12 z-30 w-96 border border-slate-200 bg-white p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"}`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Notifications</p>
+                <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="text-sm text-slate-600">No notifications yet.</p>
+                  ) : notifications.map((item) => (
+                    <button
+                      className={`w-full border p-2.5 text-left ${item.read ? "border-slate-200 bg-white" : "border-emerald-200 bg-emerald-50/40"}`}
+                      key={item._id}
+                      onClick={async () => {
+                        if (item.read) {
+                          return;
+                        }
+                        try {
+                          await markTeacherNotificationRead(item._id);
+                          setNotifications((current) => current.map((row) => (row._id === item._id ? { ...row, read: true } : row)));
+                        } catch {
+                          // keep UI stable
+                        }
+                      }}
+                      type="button"
+                    >
+                      <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                      <p className="mt-1 text-xs text-slate-600">{item.message}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -225,6 +258,7 @@ function TeacherLayout() {
             <Outlet
               context={{
                 isAddClassModalOpen,
+                onOpenAddClassModal: () => setIsAddClassModalOpen(true),
                 onCloseAddClassModal: () => setIsAddClassModalOpen(false),
               }}
             />

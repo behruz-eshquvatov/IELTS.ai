@@ -1,4 +1,4 @@
-import { BookOpenText, Headphones, LockKeyhole, NotebookPen, PenLine, Pencil } from "lucide-react";
+import { BookOpenText, Building2, Headphones, LockKeyhole, NotebookPen, PenLine, Pencil } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { buildSuperAdminPagePath, isValidSuperAdminPassword } from "../lib/superAdmin";
 
@@ -38,6 +38,32 @@ function SuperAdminPage() {
             audio uploads with filename-based IDs.
           </p>
         </div>
+
+        <article className="border border-slate-200/80 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.28)]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 text-emerald-700">
+                <Building2 className="h-4 w-4" />
+                <span className="text-xs font-semibold uppercase tracking-[0.2em]">
+                  Organizations
+                </span>
+              </div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                Organization management
+              </h2>
+              <p className="mt-2 text-slate-600">
+                Create, update, activate, deactivate, and delete organizations for teacher onboarding.
+              </p>
+            </div>
+
+            <Link
+              className="emerald-gradient-fill inline-flex items-center justify-center rounded-full border border-emerald-300/20 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_-28px_rgba(16,185,129,0.72)] transition-transform duration-200 hover:-translate-y-0.5"
+              to={buildSuperAdminPagePath(password, "/organizations")}
+            >
+              Open organizations manager
+            </Link>
+          </div>
+        </article>
 
         <article className="border border-slate-200/80 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.28)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, Mail, NotebookPen, ShieldCheck, UserCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { KeyRound, Mail, ShieldCheck, UserCircle, Users } from "lucide-react";
 import ExamPopup from "../../components/student/exam/ExamPopup";
 import MagneticButton from "../../components/ui/MagneticButton";
 import { ProfileSkeleton } from "../../components/ui/Skeleton";
-import { apiRequest } from "../../lib/apiClient";
 import { getStoredUser, saveAuthSession } from "../../lib/authSession";
+import {
+  getMyClassMemberships,
+  getMyProfile,
+  leaveMyClass,
+  updateMyPassword,
+  updateMyProfile,
+} from "../../services/studentService";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
-const PROFILE_BIO_MAX_LENGTH = 300;
 
 const defaultProfile = {
   fullName: "Student",
@@ -76,7 +81,7 @@ function ActionButton({ label, onClick, disabled = false }) {
   return (
     <MagneticButton
       className="rounded-full"
-      innerClassName="emerald-gradient-fill rounded-full border border-emerald-300/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_14px_36px_-28px_rgba(16,185,129,0.8)] transition hover:shadow-[0_18px_44px_-28px_rgba(16,185,129,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
+      innerClassName="emerald-gradient-fill inline-flex w-[106px] items-center justify-center rounded-full border border-emerald-300/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-[0_14px_36px_-28px_rgba(16,185,129,0.8)] transition hover:shadow-[0_18px_44px_-28px_rgba(16,185,129,0.9)] disabled:cursor-not-allowed disabled:opacity-60"
       onClick={onClick}
       type="button"
       disabled={disabled}
@@ -154,6 +159,7 @@ function StudentProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [memberships, setMemberships] = useState([]);
 
   const [activeModal, setActiveModal] = useState("");
   const [modalError, setModalError] = useState("");
@@ -161,12 +167,12 @@ function StudentProfilePage() {
 
   const [nameInput, setNameInput] = useState(defaultProfile.fullName);
   const [emailInput, setEmailInput] = useState(defaultProfile.email);
-  const [bioInput, setBioInput] = useState(defaultProfile.bio);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
     confirmNewPassword: "",
   });
+  const [leaveForm, setLeaveForm] = useState({ classId: "", className: "", confirmName: "", reason: "" });
 
   const syncStoredUser = useCallback((nextProfile) => {
     const storedUser = getStoredUser();
@@ -188,14 +194,15 @@ function StudentProfilePage() {
     setErrorMessage("");
 
     try {
-      const response = await apiRequest("/students/me/profile");
+      const response = await getMyProfile({ swr: true });
       const nextProfile = response?.profile
         ? { ...defaultProfile, ...response.profile }
         : defaultProfile;
+      const membershipsResponse = await getMyClassMemberships();
       setProfile(nextProfile);
+      setMemberships(Array.isArray(membershipsResponse?.memberships) ? membershipsResponse.memberships : []);
       setNameInput(nextProfile.fullName || "");
       setEmailInput(nextProfile.email || "");
-      setBioInput(nextProfile.bio || "");
     } catch (error) {
       setErrorMessage(error.message || "Failed to load profile.");
     } finally {
@@ -237,19 +244,25 @@ function StudentProfilePage() {
       return;
     }
 
-    if (fieldKey === "bio") {
-      setBioInput(profile.bio || "");
-      return;
-    }
-
     if (fieldKey === "password") {
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
         confirmNewPassword: "",
       });
+      return;
     }
-  }, [profile.bio, profile.email, profile.fullName]);
+
+    if (fieldKey === "leaveClass") {
+      const activeMembership = memberships[0];
+      setLeaveForm({
+        classId: String(activeMembership?.classId || ""),
+        className: String(activeMembership?.className || ""),
+        confirmName: "",
+        reason: "",
+      });
+    }
+  }, [memberships, profile.email, profile.fullName]);
 
   const saveField = useCallback(async (fieldKey) => {
     setModalError("");
@@ -271,18 +284,13 @@ function StudentProfilePage() {
         return;
       }
       payload.email = trimmedEmail;
-    } else if (fieldKey === "bio") {
-      payload.bio = String(bioInput || "").trim().slice(0, PROFILE_BIO_MAX_LENGTH);
     } else {
       return;
     }
 
     setSavingField(fieldKey);
     try {
-      const response = await apiRequest("/students/me/profile", {
-        method: "PATCH",
-        body: payload,
-      });
+      const response = await updateMyProfile(payload);
       const nextProfile = response?.profile
         ? { ...defaultProfile, ...response.profile }
         : profile;
@@ -295,7 +303,7 @@ function StudentProfilePage() {
     } finally {
       setSavingField("");
     }
-  }, [bioInput, emailInput, nameInput, profile, syncStoredUser]);
+  }, [emailInput, nameInput, profile, syncStoredUser]);
 
   const savePassword = useCallback(async () => {
     setModalError("");
@@ -321,13 +329,10 @@ function StudentProfilePage() {
 
     setSavingField("password");
     try {
-      await apiRequest("/students/me/profile/password", {
-        method: "PATCH",
-        body: {
-          currentPassword,
-          newPassword,
-          confirmNewPassword,
-        },
+      await updateMyPassword({
+        currentPassword,
+        newPassword,
+        confirmNewPassword,
       });
       setPasswordForm({
         currentPassword: "",
@@ -344,16 +349,38 @@ function StudentProfilePage() {
     }
   }, [loadProfile, passwordForm.confirmNewPassword, passwordForm.currentPassword, passwordForm.newPassword]);
 
-  const trimmedBio = String(profile.bio || "").trim();
-  const bioActionLabel = trimmedBio ? "Change" : "Add";
-  const bioValue = trimmedBio || "Add a short bio to personalize your profile.";
-  const bioSubtitle = useMemo(() => {
-    if (!trimmedBio) {
-      return "Visible in your account profile";
+  const submitLeaveClass = useCallback(async () => {
+    const classId = String(leaveForm.classId || "").trim();
+    const className = String(leaveForm.className || "").trim();
+    const confirmName = String(leaveForm.confirmName || "").trim();
+    const reason = String(leaveForm.reason || "").trim();
+    if (!classId || !className) {
+      setModalError("Class is not available.");
+      return;
+    }
+    if (!confirmName || confirmName.toLowerCase() !== className.toLowerCase()) {
+      setModalError("Please retype the class name exactly.");
+      return;
+    }
+    if (reason.length < 3) {
+      setModalError("Please provide a reason.");
+      return;
     }
 
-    return `${trimmedBio.length}/${PROFILE_BIO_MAX_LENGTH} characters`;
-  }, [trimmedBio]);
+    setSavingField("leaveClass");
+    setModalError("");
+    try {
+      await leaveMyClass(classId, { className: confirmName, reason });
+      setSuccessMessage("You left the class.");
+      setActiveModal("");
+      const membershipsResponse = await getMyClassMemberships();
+      setMemberships(Array.isArray(membershipsResponse?.memberships) ? membershipsResponse.memberships : []);
+    } catch (error) {
+      setModalError(error?.message || "Failed to leave class.");
+    } finally {
+      setSavingField("");
+    }
+  }, [leaveForm.classId, leaveForm.className, leaveForm.confirmName, leaveForm.reason]);
 
   if (isLoading) {
     return <ProfileSkeleton />;
@@ -378,6 +405,48 @@ function StudentProfilePage() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
           Personal Info
         </p>
+        {memberships.length > 0 ? (
+          <article className="rounded-none border border-slate-200/80 bg-white/90 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center border border-slate-200/80 bg-slate-50 text-slate-600">
+                  <Users className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Class membership</p>
+                  <div className="mt-2 space-y-2">
+                    {memberships.map((membership) => (
+                      <p className="whitespace-pre-wrap break-words text-base font-semibold text-slate-900" key={membership.membershipId || membership.classId}>
+                        {membership.className}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                className="inline-flex w-[106px] items-center justify-center rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-600 transition hover:bg-rose-50"
+                onClick={() => {
+                  const membership = memberships[0] || {};
+                  setLeaveForm({
+                    classId: String(membership.classId || ""),
+                    className: String(membership.className || ""),
+                    confirmName: "",
+                    reason: "",
+                  });
+                  openModal("leaveClass");
+                }}
+                type="button"
+              >
+                Leave
+              </button>
+            </div>
+            {memberships.length > 1 ? (
+              <p className="mt-3 text-xs text-slate-500">
+                Leaving will apply to the first listed class.
+              </p>
+            ) : null}
+          </article>
+        ) : null}
         <div className="grid gap-4">
           <SettingsDisplayCard
             actionLabel="Change"
@@ -399,15 +468,6 @@ function StudentProfilePage() {
             isActionDisabled={Boolean(savingField)}
           />
 
-          <SettingsDisplayCard
-            actionLabel={bioActionLabel}
-            icon={NotebookPen}
-            subtitle={bioSubtitle}
-            title="Bio"
-            value={bioValue}
-            onAction={() => openModal("bio")}
-            isActionDisabled={Boolean(savingField)}
-          />
         </div>
       </section>
 
@@ -507,38 +567,6 @@ function StudentProfilePage() {
         </form>
       </ExamPopup>
 
-      <ExamPopup isOpen={activeModal === "bio"} maxWidthClass="max-w-2xl" onClose={closeModal}>
-        <form
-          className="space-y-4 text-left"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void saveField("bio");
-          }}
-        >
-          <ModalHeader
-            title={trimmedBio ? "Change Bio" : "Add Bio"}
-            description="Write a short profile bio. Keep it focused and clear."
-          />
-          <textarea
-            autoFocus
-            className="h-44 w-full resize-none rounded-none border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-300"
-            maxLength={PROFILE_BIO_MAX_LENGTH}
-            onChange={(event) => setBioInput(event.target.value)}
-            placeholder="Tell us about your learning goals..."
-            value={bioInput}
-          />
-          <p className="text-xs text-slate-500">
-            {String(bioInput || "").trim().length}/{PROFILE_BIO_MAX_LENGTH}
-          </p>
-          {modalError ? <p className="text-sm text-rose-600">{modalError}</p> : null}
-          <ModalActions
-            isSaving={savingField === "bio"}
-            saveLabel={trimmedBio ? "Save Bio" : "Add Bio"}
-            onCancel={closeModal}
-          />
-        </form>
-      </ExamPopup>
-
       <ExamPopup isOpen={activeModal === "password"} maxWidthClass="max-w-2xl" onClose={closeModal}>
         <form
           className="space-y-4 text-left"
@@ -584,6 +612,52 @@ function StudentProfilePage() {
             isSaving={savingField === "password"}
             onCancel={closeModal}
           />
+        </form>
+      </ExamPopup>
+
+      <ExamPopup isOpen={activeModal === "leaveClass"} maxWidthClass="max-w-2xl" onClose={closeModal}>
+        <form
+          className="space-y-4 text-left"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitLeaveClass();
+          }}
+        >
+          <ModalHeader
+            title="Leave Class"
+            description={`Retype "${leaveForm.className}" and tell why you are leaving.`}
+          />
+          <input
+            autoFocus
+            className="w-full rounded-none border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300"
+            onChange={(event) => setLeaveForm((previous) => ({ ...previous, confirmName: event.target.value }))}
+            placeholder="Retype class name"
+            value={leaveForm.confirmName}
+          />
+          <textarea
+            className="h-32 w-full resize-none rounded-none border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-300"
+            onChange={(event) => setLeaveForm((previous) => ({ ...previous, reason: event.target.value }))}
+            placeholder="Reason for leaving"
+            value={leaveForm.reason}
+          />
+          {modalError ? <p className="text-sm text-rose-600">{modalError}</p> : null}
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
+            <button
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={savingField === "leaveClass"}
+              onClick={closeModal}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="rounded-full border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={savingField === "leaveClass"}
+              type="submit"
+            >
+              {savingField === "leaveClass" ? "Leaving..." : "Leave class"}
+            </button>
+          </div>
         </form>
       </ExamPopup>
     </div>

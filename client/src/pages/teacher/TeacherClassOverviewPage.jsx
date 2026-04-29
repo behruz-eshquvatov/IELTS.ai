@@ -44,13 +44,12 @@ import {
 import { TimePickerField } from "../../components/ui/StyledFormControls";
 import { teacherStudents } from "../../data/teacherPanel";
 import {
-  getAllTeacherClasses,
-  readCustomTeacherStudents,
-  readTeacherStudentMemberships,
-  resolveTeacherStudentsWithClassIds,
-  writeCustomTeacherStudents,
-  writeTeacherStudentMemberships,
-} from "../../lib/teacherClassStore";
+  getTeacherClassOverview,
+  inviteStudentToTeacherClass,
+  removeStudentFromTeacherClass,
+  searchTeacherClassStudents,
+  updateTeacherClass,
+} from "../../services/teacherService";
 
 const CLASS_OVERRIDES_STORAGE_KEY = "teacher:class-overrides";
 const TIMER_PRESETS = [
@@ -473,15 +472,15 @@ function ResultsTooltip({ active, label, payload }) {
 
 function SummaryChip({ icon: Icon, label, value, tone = "slate" }) {
   const toneClasses = {
-    slate: "border-slate-200/80 bg-white text-slate-700",
-    emerald: "border-emerald-200/80 bg-emerald-50/60 text-emerald-700",
-    amber: "border-amber-200/80 bg-amber-50 text-amber-700",
-    rose: "border-rose-200/80 bg-rose-50 text-rose-700",
-    blue: "border-blue-200/80 bg-blue-50 text-blue-700",
+    slate: "text-slate-700",
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+    rose: "text-rose-700",
+    blue: "text-blue-700",
   };
 
   return (
-    <div className={`inline-flex h-[80px] items-center gap-3 border px-4 ${toneClasses[tone]}`}>
+    <div className={`inline-flex h-[80px] items-center gap-3 ${toneClasses[tone]}`}>
       <span className="flex h-9 w-9 items-center justify-center border border-current/15 bg-white/80">
         <Icon className="h-4 w-4" />
       </span>
@@ -508,9 +507,6 @@ function HeaderPanel({
         <div className="space-y-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-600">
-                Live Classroom
-              </p>
               <h2 className="text-3xl font-semibold tracking-[-0.05em] text-slate-950">
                 {classroom.name}
               </h2>
@@ -545,9 +541,9 @@ function HeaderPanel({
           </div>
 
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-8">
               <SummaryChip icon={Clock3} label="Lesson time" value={classroom.startTime} />
-              <SummaryChip icon={Users2} label="Total students" value={String(totalStudents)} tone="emerald" />
+              <SummaryChip icon={Users2} label="Total students" value={String(totalStudents)} />
             </div>
 
             {note ? (
@@ -583,7 +579,7 @@ function ClassNoteModal({ isOpen, noteDraft, onChange, onClose, onSubmit }) {
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -639,7 +635,7 @@ function EditClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -731,7 +727,7 @@ function InviteStudentModal({
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200 hover:bg-white hover:text-slate-950"
+              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -891,7 +887,7 @@ function AddStudentModal({
               </h3>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center border border-slate-200 bg-white text-slate-500 transition-colors duration-200 hover:bg-slate-50 hover:text-slate-900"
+              className="inline-flex h-11 w-11 items-center justify-center border border-slate-200 bg-white text-slate-500 transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -1685,8 +1681,12 @@ function TeacherClassOverviewPage() {
   const navigate = useNavigate();
   const { classId } = useParams();
   const [classOverrides, setClassOverrides] = useState(() => readClassOverrides());
-  const allTeacherClasses = useMemo(() => getAllTeacherClasses(), []);
-  const baseClassroom = allTeacherClasses.find((item) => item.id === classId) ?? allTeacherClasses[0];
+  const baseClassroom = useMemo(() => ({
+    id: classId,
+    name: "Classroom",
+    startTime: "--:--",
+    note: "",
+  }), [classId]);
   const classroom = {
     ...baseClassroom,
     ...(classOverrides[baseClassroom.id] ?? {}),
@@ -1699,8 +1699,34 @@ function TeacherClassOverviewPage() {
     name: classroom.name,
     startTime: classroom.startTime,
   }));
-  const [teacherStudentCatalog, setTeacherStudentCatalog] = useState(() => resolveTeacherStudentsWithClassIds());
-  const refreshStudentMemberships = () => setTeacherStudentCatalog(resolveTeacherStudentsWithClassIds());
+  const [teacherStudentCatalog, setTeacherStudentCatalog] = useState([]);
+  const refreshStudentMemberships = async () => {
+    try {
+      const response = await searchTeacherClassStudents(classId, "");
+      const inClass = Array.isArray(response?.inClass) ? response.inClass : [];
+      const others = Array.isArray(response?.others) ? response.others : [];
+      setTeacherStudentCatalog(
+        [...inClass, ...others].map((student) => ({
+          id: student.studentId,
+          name: student.fullName,
+          email: student.email,
+          classId: student.inClass ? classId : null,
+          className: student.inClass ? classDetails.name : "Unassigned",
+          targetBand: "TBD",
+          currentBand: "TBD",
+          status: student.pendingRequestStatus === "pending" ? "Invited" : "On track",
+          weakArea: "Placement pending",
+          completionRate: "--",
+          lastSubmission: "No submissions yet",
+          notes: student.pendingRequestStatus === "pending"
+            ? "Invitation pending student response."
+            : "No insights yet.",
+        })),
+      );
+    } catch {
+      setTeacherStudentCatalog([]);
+    }
+  };
   const matchedStudents = useMemo(
     () => teacherStudentCatalog.filter((student) => student.classId === classId),
     [classId, teacherStudentCatalog],
@@ -1783,7 +1809,40 @@ function TeacherClassOverviewPage() {
   }, [matchedStudents]);
 
   useEffect(() => {
-    setTeacherStudentCatalog(resolveTeacherStudentsWithClassIds());
+    const loadOverview = async () => {
+      try {
+        const response = await getTeacherClassOverview(classId);
+        const loadedClass = response?.class || {};
+        const loadedStudents = Array.isArray(response?.students) ? response.students : [];
+        setClassDetails({
+          name: String(loadedClass?.name || "Classroom"),
+          startTime: String(loadedClass?.startTime || "--:--"),
+        });
+        setClassEditForm({
+          name: String(loadedClass?.name || "Classroom"),
+          startTime: String(loadedClass?.startTime || "--:--"),
+        });
+        setTeacherStudentCatalog(
+          loadedStudents.map((student) => ({
+            id: student.studentId,
+            name: student.fullName,
+            email: student.email,
+            classId,
+            className: String(loadedClass?.name || "Classroom"),
+            targetBand: Number.isFinite(Number(student?.latestBand)) ? String(Number(student.latestBand).toFixed(1)) : "TBD",
+            currentBand: Number.isFinite(Number(student?.latestBand)) ? String(Number(student.latestBand).toFixed(1)) : "TBD",
+            status: "On track",
+            weakArea: "Needs analysis",
+            completionRate: student.attemptsCount > 0 ? "100%" : "--",
+            lastSubmission: student.latestSubmittedAt ? "Recently active" : "No submissions yet",
+            notes: "Live progress is now connected to backend attempt data.",
+          })),
+        );
+      } catch {
+        setTeacherStudentCatalog([]);
+      }
+    };
+    void loadOverview();
   }, [classId]);
 
   useEffect(() => {
@@ -1937,6 +1996,10 @@ function TeacherClassOverviewPage() {
       name: trimmedName,
       startTime: trimmedStartTime,
     });
+    void updateTeacherClass(classroom.id, {
+      name: trimmedName,
+      startTime: trimmedStartTime,
+    });
     setClassOverrides((current) => ({
       ...current,
       [classroom.id]: {
@@ -1981,25 +2044,17 @@ function TeacherClassOverviewPage() {
   };
 
   const handleAddStudentToClass = (student) => {
-    setRosterStudents((current) => [
-      ...current,
-      { ...student, classId, className: classDetails.name },
-    ]);
-    writeTeacherStudentMemberships({
-      ...readTeacherStudentMemberships(),
-      [student.id]: classId,
-    });
-    refreshStudentMemberships();
-    setIsAddStudentModalOpen(false);
+    void inviteStudentToTeacherClass(classId, student.id).then(() => {
+      setIsAddStudentModalOpen(false);
+      void refreshStudentMemberships();
+    }).catch(() => {});
   };
 
   const handleRemoveStudentFromClass = (studentId) => {
-    setRosterStudents((current) => current.filter((student) => student.id !== studentId));
-    writeTeacherStudentMemberships({
-      ...readTeacherStudentMemberships(),
-      [studentId]: null,
-    });
-    refreshStudentMemberships();
+    void removeStudentFromTeacherClass(classId, studentId).then(() => {
+      setRosterStudents((current) => current.filter((student) => student.id !== studentId));
+      void refreshStudentMemberships();
+    }).catch(() => {});
   };
   const handleConfirmRemoveStudent = () => {
     if (!studentPendingRemoval) {
@@ -2030,35 +2085,15 @@ function TeacherClassOverviewPage() {
       return;
     }
 
-    const generatedId = `${trimmedName.toLowerCase()}-${trimmedSurname.toLowerCase()}-${Date.now()}`
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
-
-    const invitedStudent = {
-      id: generatedId,
-      name: `${trimmedName} ${trimmedSurname}`,
-      classId,
-      className: classDetails.name,
-      targetBand: "TBD",
-      currentBand: "TBD",
-      status: "Invited",
-      weakArea: "Placement pending",
-      completionRate: "--",
-      lastSubmission: "No submissions yet",
-      notes: `Invitation prepared for ${trimmedEmail}. Awaiting student confirmation.`,
-      email: trimmedEmail,
-    };
-
-    setRosterStudents((current) => [...current, invitedStudent]);
-    writeCustomTeacherStudents([...readCustomTeacherStudents(), invitedStudent]);
-    writeTeacherStudentMemberships({
-      ...readTeacherStudentMemberships(),
-      [generatedId]: classId,
-    });
-    refreshStudentMemberships();
-
-    resetInviteForm();
-    setIsInviteModalOpen(false);
+    const found = teacherStudentCatalog.find((student) => String(student.email || "").toLowerCase() === trimmedEmail.toLowerCase());
+    if (!found?.id) {
+      return;
+    }
+    void inviteStudentToTeacherClass(classId, found.id).then(() => {
+      resetInviteForm();
+      setIsInviteModalOpen(false);
+      void refreshStudentMemberships();
+    }).catch(() => {});
   };
 
   return (
@@ -2159,3 +2194,4 @@ function TeacherClassOverviewPage() {
 }
 
 export default TeacherClassOverviewPage;
+

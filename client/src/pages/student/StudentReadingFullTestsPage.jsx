@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, BookOpenText, Lock } from "lucide-react";
-import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
 import { LibraryListSkeleton } from "../../components/ui/Skeleton";
+import {
+  getReadingFullTests,
+  prefetchReadingFullTest,
+} from "../../services/studentService";
 
 function toReadableLabel(value) {
   const safe = String(value || "").trim();
@@ -37,12 +40,22 @@ function StudentReadingFullTestsPage() {
       setError("");
 
       try {
-        const response = await apiRequest("/reading/full-tests?status=published");
+        const response = await getReadingFullTests({ swr: true });
         if (!isMounted) {
           return;
         }
 
-        setTests(Array.isArray(response?.tests) ? response.tests : []);
+        const nextTests = Array.isArray(response?.tests) ? response.tests : [];
+        setTests(nextTests);
+        const firstUnlocked = nextTests.find((item) => {
+          const progressStatus = String(item?.progressStatus || item?.progression?.status || "available")
+            .trim()
+            .toLowerCase();
+          return progressStatus !== "locked" && item?._id;
+        });
+        if (firstUnlocked?._id) {
+          void prefetchReadingFullTest(firstUnlocked._id);
+        }
       } catch (nextError) {
         if (!isMounted) {
           return;

@@ -269,24 +269,6 @@ export const router = createBrowserRouter([
                   Component: (await import("../pages/teacher/TeacherCreateAssignmentPage")).default,
                 }),
               },
-              {
-                path: "submissions",
-                lazy: async () => ({
-                  Component: (await import("../pages/teacher/TeacherSubmissionsPage")).default,
-                }),
-              },
-              {
-                path: "reports",
-                lazy: async () => ({
-                  Component: (await import("../pages/teacher/TeacherReportsPage")).default,
-                }),
-              },
-              {
-                path: "settings",
-                lazy: async () => ({
-                  Component: (await import("../pages/teacher/TeacherSettingsPage")).default,
-                }),
-              },
             ],
           },
         ],
@@ -371,6 +353,12 @@ export const router = createBrowserRouter([
         path: "/super-admin/:password/daily-units",
         lazy: async () => ({
           Component: (await import("../pages/SuperAdminDailyUnitsPage")).default,
+        }),
+      },
+      {
+        path: "/super-admin/:password/organizations",
+        lazy: async () => ({
+          Component: (await import("../pages/SuperAdminOrganizationsPage")).default,
         }),
       },
       {

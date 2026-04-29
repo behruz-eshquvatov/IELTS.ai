@@ -3,8 +3,8 @@ import { ArrowLeft, FileCheck2, PenLine, Trash2, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { AdminListSkeleton, LibraryListSkeleton } from "../components/ui/Skeleton";
 import { API_BASE_URL, apiRequest } from "../lib/apiClient";
-import { parseRawFetchResponse } from "../lib/jsonParsing";
 import { buildSuperAdminApiPath, buildSuperAdminPagePath, isValidSuperAdminPassword } from "../lib/superAdmin";
+import { extractSuperAdminFromImage, uploadWritingTask1Visual } from "../services/superAdminService";
 
 const VISUAL_TYPES = [
   "line_chart",
@@ -210,20 +210,10 @@ function SuperAdminWritingTask1Page() {
     try {
       const visualPath = buildSuperAdminApiPath(password, "/writing-task1/visuals");
       const safeFileName = normalizeText(sourceImageFile.name) || `writing-task1-${Date.now()}.png`;
-
-      const response = await fetch(`${API_BASE_URL}${visualPath}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": sourceImageFile.type || "image/png",
-          "X-Visual-Filename": safeFileName,
-        },
-        body: sourceImageFile,
+      const renamedFile = new File([sourceImageFile], safeFileName, {
+        type: sourceImageFile.type || "image/png",
       });
-
-      const responseBody = await parseRawFetchResponse(response);
-      if (!response.ok) {
-        throw new Error(responseBody?.message || "Failed to upload visual image.");
-      }
+      const responseBody = await uploadWritingTask1Visual(visualPath, renamedFile);
 
       setUploadedVisual(responseBody?.visual || null);
       setFeedbackMessage(responseBody?.message || "Visual image uploaded.");
@@ -247,19 +237,7 @@ function SuperAdminWritingTask1Page() {
 
     try {
       const extractPath = buildSuperAdminApiPath(password, "/writing-task1/extract-question-topic");
-      const response = await fetch(`${API_BASE_URL}${extractPath}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": sourceImageFile.type || "image/png",
-          "X-Image-Filename": sourceImageFile.name || `writing-task1-${Date.now()}.png`,
-        },
-        body: sourceImageFile,
-      });
-
-      const responseBody = await parseRawFetchResponse(response);
-      if (!response.ok) {
-        throw new Error(responseBody?.message || "Question topic extraction failed.");
-      }
+      const responseBody = await extractSuperAdminFromImage(extractPath, sourceImageFile);
 
       const extractedTopic = normalizeText(responseBody?.questionTopic);
       if (!extractedTopic) {

@@ -14,9 +14,15 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { memo, useEffect, useRef, useState } from "react";
 import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
-import { apiRequest, authApi } from "../lib/apiClient";
+import { authApi } from "../lib/apiClient";
 import { clearAuthSession } from "../lib/authSession";
 import useStudyHeatmapTracker from "../hooks/useStudyHeatmapTracker";
+import {
+  getMyClassMemberships,
+  getMyHeatmap,
+  getMyNotifications,
+  respondToMyClassJoinRequest,
+} from "../services/studentService";
 
 const TRACKER_STORAGE_KEY = "student:study-heatmap:tracker";
 
@@ -95,19 +101,12 @@ function StudentTodayStudyTime() {
       let serverMinutes = 0;
 
       try {
-        const response = await apiRequest("/users/me/heatmap");
+        const response = await getMyHeatmap({ swr: true });
         const entries = Array.isArray(response?.entries) ? response.entries : [];
         const todayEntry = entries.find((entry) => String(entry?.date || "") === todayKey);
         serverMinutes = Number(todayEntry?.minutesSpent || 0);
       } catch {
-        try {
-          const response = await apiRequest("/students/me/study-activity/heatmap");
-          const entries = Array.isArray(response?.entries) ? response.entries : [];
-          const todayEntry = entries.find((entry) => String(entry?.date || "") === todayKey);
-          serverMinutes = Number(todayEntry?.minutesSpent || 0);
-        } catch {
-          serverMinutes = 0;
-        }
+        serverMinutes = 0;
       }
 
       if (isActive) {
@@ -257,6 +256,9 @@ function StudentSidebar() {
 const StudentMainContent = memo(function StudentMainContent() {
   const location = useLocation();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [classMemberships, setClassMemberships] = useState([]);
+  const [isNotificationActionLoading, setIsNotificationActionLoading] = useState("");
   const notificationsRef = useRef(null);
   const mainRef = useRef(null);
   const topAnchorRef = useRef(null);
@@ -291,6 +293,26 @@ const StudentMainContent = memo(function StudentMainContent() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [notificationsResponse, membershipsResponse] = await Promise.all([
+          getMyNotifications(),
+          getMyClassMemberships(),
+        ]);
+        setNotifications(Array.isArray(notificationsResponse?.notifications) ? notificationsResponse.notifications : []);
+        setClassMemberships(Array.isArray(membershipsResponse?.memberships) ? membershipsResponse.memberships : []);
+      } catch {
+        setNotifications([]);
+        setClassMemberships([]);
+      }
+    };
+
+    void load();
+  }, [location.pathname]);
+
+  const classJoinNotifications = notifications.filter((item) => item.type === "class_join_request" && !item.read);
 
   return (
     <main className="flex-1 flex flex-col min-w-0" ref={mainRef}>
@@ -328,15 +350,20 @@ const StudentMainContent = memo(function StudentMainContent() {
               aria-label="Notifications"
               aria-haspopup="dialog"
               aria-expanded={isNotificationsOpen}
-              className="group relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-none border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300/40 hover:text-white hover:shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
+              className="group relative flex h-9 w-9 items-center justify-center overflow-visible rounded-none border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300/40 hover:text-white hover:shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
             >
               <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 emerald-gradient-fill" />
               <Bell className="relative h-5 w-5" />
+              {classJoinNotifications.length > 0 ? (
+                <span className="absolute right-0 top-0 z-10 inline-flex h-[18px] min-w-[18px] translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
+                  {classJoinNotifications.length > 99 ? "99+" : classJoinNotifications.length}
+                </span>
+              ) : null}
             </button>
             <div
               role="dialog"
               aria-label="Notifications"
-              className={`absolute right-0 top-12 w-64 min-h-[6.5rem] origin-top-right rounded-none border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen
+              className={`absolute right-0 top-12 w-80 min-h-[6.5rem] origin-top-right rounded-none border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen
                 ? "scale-100 opacity-100"
                 : "pointer-events-none scale-95 opacity-0"
                 }`}
@@ -345,7 +372,65 @@ const StudentMainContent = memo(function StudentMainContent() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Notifications
               </p>
-              <p className="mt-2 text-sm text-slate-600">No notifications yet.</p>
+              {classMemberships.length > 0 ? (
+                <div className="mt-2 rounded-none border border-emerald-200 bg-emerald-50/50 px-2.5 py-2 text-xs text-emerald-700">
+                  Joined: {classMemberships.map((item) => item.className).filter(Boolean).join(", ")}
+                </div>
+              ) : null}
+              <div className="mt-2 space-y-2">
+                {classJoinNotifications.length === 0 ? (
+                  <p className="text-sm text-slate-600">No notifications yet.</p>
+                ) : classJoinNotifications.map((item) => (
+                  <div className="rounded-none border border-slate-100 shadow p-2.5" key={item._id}>
+                    <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                    <p className="mt-1 text-xs text-slate-600">{item.message}</p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        className="rounded-full border border-emerald-500 bg-emerald-500 px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-white disabled:opacity-60"
+                        disabled={isNotificationActionLoading === item._id}
+                        onClick={async () => {
+                          const requestId = item?.data?.requestId;
+                          if (!requestId) {
+                            return;
+                          }
+                          setIsNotificationActionLoading(item._id);
+                          try {
+                            await respondToMyClassJoinRequest(requestId, "accept");
+                            setNotifications((current) => current.map((row) => (row._id === item._id ? { ...row, read: true } : row)));
+                            const membershipsResponse = await getMyClassMemberships();
+                            setClassMemberships(Array.isArray(membershipsResponse?.memberships) ? membershipsResponse.memberships : []);
+                          } finally {
+                            setIsNotificationActionLoading("");
+                          }
+                        }}
+                        type="button"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        className="rounded-full bg-white px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-rose-600 disabled:opacity-60"
+                        disabled={isNotificationActionLoading === item._id}
+                        onClick={async () => {
+                          const requestId = item?.data?.requestId;
+                          if (!requestId) {
+                            return;
+                          }
+                          setIsNotificationActionLoading(item._id);
+                          try {
+                            await respondToMyClassJoinRequest(requestId, "reject");
+                            setNotifications((current) => current.map((row) => (row._id === item._id ? { ...row, read: true } : row)));
+                          } finally {
+                            setIsNotificationActionLoading("");
+                          }
+                        }}
+                        type="button"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

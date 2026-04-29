@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, BookOpen, ChevronDown, FileText, Headphones, Lock, NotebookPen, PenLine } from "lucide-react";
-import { apiRequest } from "../../lib/apiClient";
+import { getDailyTasks } from "../../services/studentService";
 import { LibraryListSkeleton } from "../ui/Skeleton";
 import UnitAttemptsModal from "./UnitAttemptsModal";
 
@@ -44,6 +44,9 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
   showAllLink = true,
   maxUnits = null,
   activeFilter = "All",
+  unitsData = null,
+  isLoadingData = null,
+  errorData = "",
 }) {
   const [units, setUnits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +55,13 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
   const [attemptsModalUnit, setAttemptsModalUnit] = useState(null);
 
   useEffect(() => {
+    if (Array.isArray(unitsData)) {
+      setUnits(unitsData);
+      setIsLoading(Boolean(isLoadingData));
+      setErrorMessage(String(errorData || ""));
+      return;
+    }
+
     let isActive = true;
 
     async function loadUnits() {
@@ -59,7 +69,7 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
       setErrorMessage("");
 
       try {
-        const response = await apiRequest("/students/me/daily-tasks");
+        const response = await getDailyTasks({ swr: true });
         if (!isActive) {
           return;
         }
@@ -89,7 +99,26 @@ const StudentTodayTasks = memo(function StudentTodayTasks({
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [errorData, isLoadingData, unitsData]);
+
+  useEffect(() => {
+    if (!Array.isArray(units) || units.length === 0) {
+      setExpandedUnit(null);
+      return;
+    }
+
+    setExpandedUnit((previous) => {
+      if (previous && units.some((unit) => unit?.id === previous)) {
+        return previous;
+      }
+
+      return (
+        units.find((unit) => unit?.status === "today")?.id
+        || units.find((unit) => unit?.status === "completed")?.id
+        || null
+      );
+    });
+  }, [units]);
 
   const visibleUnits = useMemo(
     () => resolveVisibleUnits(units, activeFilter, maxUnits),

@@ -4,7 +4,7 @@ import { ChevronLeft, Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import InteractiveGridBackground from "../components/layout/InteractiveGridBackground";
 import MagneticButton from "../components/ui/MagneticButton";
-import { authApi } from "../lib/apiClient";
+import { authApi, organizationsApi } from "../lib/apiClient";
 import {
   clearAuthSession,
   getAccessToken,
@@ -124,6 +124,7 @@ function TeacherRegistrationPage() {
     fullName: "",
     workEmail: "",
     organization: "",
+    organizationId: "",
     password: "",
     confirmPassword: "",
   });
@@ -132,6 +133,10 @@ function TeacherRegistrationPage() {
   const [keepSignedIn, setKeepSignedIn] = useState(true);
   const [sendOnboardingUpdates, setSendOnboardingUpdates] = useState(false);
   const [status, setStatus] = useState(null);
+  const [organizationOptions, setOrganizationOptions] = useState([]);
+  const [isOrganizationLoading, setIsOrganizationLoading] = useState(false);
+  const [organizationTouched, setOrganizationTouched] = useState(false);
+  const [isOrganizationDropdownOpen, setIsOrganizationDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [scrollbar, setScrollbar] = useState({
@@ -141,6 +146,7 @@ function TeacherRegistrationPage() {
   });
   const scrollContainerRef = useRef(null);
   const scrollTrackRef = useRef(null);
+  const organizationDropdownRef = useRef(null);
   const dragStateRef = useRef({
     isDragging: false,
     startY: 0,
@@ -149,6 +155,11 @@ function TeacherRegistrationPage() {
   const navigate = useNavigate();
 
   const theme = teacherModes[mode];
+  const hasValidOrganizationSelection = Boolean(formData.organizationId);
+  const organizationError =
+    mode === "signup" && organizationTouched && !hasValidOrganizationSelection
+      ? "Please select a valid organization from the list."
+      : "";
 
   useEffect(() => {
     let isMounted = true;
@@ -230,11 +241,33 @@ function TeacherRegistrationPage() {
   }, [getScrollMetrics]);
 
   const handleInputChange = (field) => (event) => {
+    if (field === "organization") {
+      const nextValue = event.target.value;
+      setOrganizationTouched(true);
+      setIsOrganizationDropdownOpen(true);
+      setFormData((current) => ({
+        ...current,
+        organization: nextValue,
+        organizationId: "",
+      }));
+      return;
+    }
+
     setFormData((current) => ({
       ...current,
       [field]: event.target.value,
     }));
   };
+
+  const handleOrganizationSelect = useCallback((organization) => {
+    setFormData((current) => ({
+      ...current,
+      organization: String(organization?.name || ""),
+      organizationId: String(organization?._id || ""),
+    }));
+    setOrganizationTouched(true);
+    setIsOrganizationDropdownOpen(false);
+  }, []);
 
   const handleModeChange = (nextMode) => {
     if (nextMode === mode) {
@@ -243,6 +276,9 @@ function TeacherRegistrationPage() {
 
     setMode(nextMode);
     setStatus(null);
+    setOrganizationTouched(false);
+    setOrganizationOptions([]);
+    setIsOrganizationDropdownOpen(false);
     setShowPassword(false);
     setShowConfirmPassword(false);
   };
@@ -279,6 +315,14 @@ function TeacherRegistrationPage() {
         return;
       }
 
+      if (!hasValidOrganizationSelection) {
+        setStatus({
+          type: "error",
+          message: "Please select a valid organization from the list.",
+        });
+        return;
+      }
+
       if (formData.password !== formData.confirmPassword) {
         setStatus({
           type: "error",
@@ -300,7 +344,7 @@ function TeacherRegistrationPage() {
               password: formData.password,
               confirmPassword: formData.confirmPassword,
               role: "teacher",
-              organization: formData.organization.trim(),
+              organizationId: formData.organizationId,
               rememberMe: true,
             }
           : {
@@ -421,6 +465,62 @@ function TeacherRegistrationPage() {
       window.removeEventListener("mouseup", handleThumbMouseUp);
     };
   }, [handleThumbMouseMove, handleThumbMouseUp, mode, status, updateScrollbar]);
+
+  useEffect(() => {
+    if (mode !== "signup") {
+      return undefined;
+    }
+
+    const query = String(formData.organization || "").trim();
+    if (query.length < 1) {
+      setOrganizationOptions([]);
+      setIsOrganizationLoading(false);
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      setIsOrganizationLoading(true);
+      try {
+        const response = await organizationsApi.search(query);
+        if (isCancelled) {
+          return;
+        }
+        const nextOptions = Array.isArray(response?.organizations) ? response.organizations : [];
+        setOrganizationOptions(nextOptions);
+      } catch {
+        if (!isCancelled) {
+          setOrganizationOptions([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsOrganizationLoading(false);
+        }
+      }
+    }, 280);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [formData.organization, mode]);
+
+  useEffect(() => {
+    if (mode !== "signup") {
+      return undefined;
+    }
+
+    const handleOutsideClick = (event) => {
+      if (!organizationDropdownRef.current?.contains(event.target)) {
+        setIsOrganizationDropdownOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      window.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [mode]);
 
   const statusClassName =
     status?.type === "error"
@@ -577,13 +677,48 @@ function TeacherRegistrationPage() {
                         />
 
                         {mode === "signup" ? (
-                          <TeacherField
-                            inputClassName={theme.inputClass}
-                            label="Organization"
-                            onChange={handleInputChange("organization")}
-                            placeholder="Learning center, school, or team"
-                            value={formData.organization}
-                          />
+                          <label className="block space-y-2.5" ref={organizationDropdownRef}>
+                            <span className="text-[0.68rem] font-semibold uppercase tracking-[0.22em]">
+                              Organization
+                            </span>
+                            <div className="relative">
+                              <input
+                                autoComplete="off"
+                                className={`auth-input ${authInputBaseClass} ${theme.inputClass}`}
+                                onChange={handleInputChange("organization")}
+                                onFocus={() => setIsOrganizationDropdownOpen(true)}
+                                placeholder="Search organization"
+                                type="text"
+                                value={formData.organization}
+                              />
+                              {isOrganizationDropdownOpen ? (
+                                <div className="absolute z-30 mt-2 max-h-52 w-full overflow-y-auto border border-slate-200 bg-white shadow-[0_22px_48px_-38px_rgba(15,23,42,0.5)]">
+                                  {isOrganizationLoading ? (
+                                    <p className="px-3 py-2 text-sm text-slate-500">Searching...</p>
+                                  ) : organizationOptions.length === 0 ? (
+                                    <p className="px-3 py-2 text-sm text-slate-500">No organization found</p>
+                                  ) : (
+                                    <ul className="py-1">
+                                      {organizationOptions.map((organization) => (
+                                        <li key={organization._id}>
+                                          <button
+                                            className="w-full px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-emerald-50"
+                                            onClick={() => handleOrganizationSelect(organization)}
+                                            type="button"
+                                          >
+                                            {organization.name}
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                            {organizationError ? (
+                              <p className="text-xs text-rose-600">{organizationError}</p>
+                            ) : null}
+                          </label>
                         ) : null}
 
                         <TeacherField
@@ -648,7 +783,7 @@ function TeacherRegistrationPage() {
                           <MagneticButton
                             className="rounded-full"
                             innerClassName={authPrimaryButtonClass}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || (mode === "signup" && !hasValidOrganizationSelection)}
                             type="submit"
                           >
                             <span className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-150%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(150%)]">

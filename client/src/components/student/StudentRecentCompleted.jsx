@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
 import { ArrowUpRight, BookOpen, FileText, Headphones, PencilLine } from "lucide-react";
 import { Link } from "react-router-dom";
-import { apiRequest } from "../../lib/apiClient";
+import { getRecentCompletedTasks } from "../../services/studentService";
 import { Skeleton, SkeletonGrid } from "../ui/Skeleton";
 
 const ICON_BY_TASK_TYPE = {
@@ -142,18 +142,34 @@ function ResultsCenterCard({ className = "" }) {
   );
 }
 
-const StudentRecentCompleted = memo(function StudentRecentCompleted() {
+const StudentRecentCompleted = memo(function StudentRecentCompleted({
+  itemsData = null,
+  isLoadingData = null,
+}) {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (Array.isArray(itemsData)) {
+      const mappedItems = itemsData.map((item) => ({
+        id: String(item?.id || `${item?.taskType || "task"}-${item?.taskRefId || ""}`),
+        title: String(item?.title || "").trim() || "Completed task",
+        detail: String(item?.detail || "").trim() || "Completed",
+        to: String(item?.to || "/student/dailytasks"),
+        icon: ICON_BY_TASK_TYPE[String(item?.taskType || "").toLowerCase()] || FileText,
+      }));
+      setItems(mappedItems);
+      setIsLoading(Boolean(isLoadingData));
+      return;
+    }
+
     let isActive = true;
 
     async function loadRecentCompleted() {
       setIsLoading(true);
 
       try {
-        const response = await apiRequest("/students/me/task-attempts/recent-completed?limit=11");
+        const response = await getRecentCompletedTasks(11, { swr: true });
         if (!isActive) {
           return;
         }
@@ -185,7 +201,7 @@ const StudentRecentCompleted = memo(function StudentRecentCompleted() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [isLoadingData, itemsData]);
 
   const baseCount = Math.min(5, items.length);
   const visibleTasks = items.slice(0, baseCount);

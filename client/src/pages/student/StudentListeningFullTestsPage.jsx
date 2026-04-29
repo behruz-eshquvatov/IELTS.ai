@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Headphones, Lock } from "lucide-react";
-import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
 import { LibraryListSkeleton } from "../../components/ui/Skeleton";
+import {
+  getListeningFullTests,
+  prefetchListeningFullTest,
+} from "../../services/studentService";
 
 function toReadableLabel(value) {
   const safe = String(value || "").trim();
@@ -37,12 +40,22 @@ function StudentListeningFullTestsPage() {
       setError("");
 
       try {
-        const response = await apiRequest("/listening-tests?status=published&limit=100");
+        const response = await getListeningFullTests({ swr: true });
         if (!isMounted) {
           return;
         }
 
-        setTests(Array.isArray(response?.tests) ? response.tests : []);
+        const nextTests = Array.isArray(response?.tests) ? response.tests : [];
+        setTests(nextTests);
+        const firstUnlocked = nextTests.find((item) => {
+          const progressStatus = String(item?.progressStatus || item?.progression?.status || "available")
+            .trim()
+            .toLowerCase();
+          return progressStatus !== "locked" && item?._id;
+        });
+        if (firstUnlocked?._id) {
+          void prefetchListeningFullTest(firstUnlocked._id);
+        }
       } catch (nextError) {
         if (!isMounted) {
           return;

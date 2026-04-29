@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
 import { TestPageSkeleton } from "../../components/ui/Skeleton";
+import { getReadingFullTestById } from "../../services/studentService";
 
 const FULL_TEST_DURATION_SECONDS = 60 * 60;
 
@@ -42,7 +43,7 @@ function StudentReadingFullPassagesPage() {
       setError("");
 
       try {
-        const response = await apiRequest(`/reading/full-tests/${encodeURIComponent(testId)}?status=published`);
+        const response = await getReadingFullTestById(testId, { swr: true });
         if (!isMounted) {
           return;
         }

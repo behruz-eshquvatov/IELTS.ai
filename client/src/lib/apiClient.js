@@ -70,8 +70,15 @@ export async function apiRequest(path, options = {}, retried = false) {
     finalHeaders.Authorization = `Bearer ${token}`;
   }
 
+  const isFormData =
+    typeof FormData !== "undefined" &&
+    body instanceof FormData;
+  const isBlobPayload =
+    typeof Blob !== "undefined" &&
+    body instanceof Blob;
+
   let payload = body;
-  if (body && typeof body === "object" && !(body instanceof FormData)) {
+  if (body && typeof body === "object" && !isFormData && !isBlobPayload) {
     finalHeaders["Content-Type"] = "application/json";
     payload = JSON.stringify(body);
   }
@@ -153,6 +160,15 @@ export const authApi = {
   logout() {
     return apiRequest("/auth/logout", {
       method: "POST",
+      auth: false,
+    });
+  },
+};
+
+export const organizationsApi = {
+  search(query) {
+    return apiRequest(`/organizations/search?q=${encodeURIComponent(String(query || ""))}`, {
+      method: "GET",
       auth: false,
     });
   },
