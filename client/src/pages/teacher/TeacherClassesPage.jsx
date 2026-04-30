@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, List, Plus, Search, X } from "lucide-react";
+import { ArrowUpRight, LayoutGrid, List, Plus, Search, Trash2, UserRound, X } from "lucide-react";
 import TeacherClassCard from "../../components/teacher/TeacherClassCard";
 import { TimePickerField } from "../../components/ui/StyledFormControls";
 import MagneticButton from "../../components/ui/MagneticButton";
@@ -12,6 +12,7 @@ import {
   inviteStudentToTeacherClass,
   listTeacherClasses,
   listTeacherClassStudents,
+  removeStudentFromTeacherClass,
   searchTeacherClassStudents,
   updateTeacherClass,
 } from "../../services/teacherService";
@@ -23,10 +24,16 @@ function StudentDirectoryModal({
   onClose,
   onSearchChange,
   onInvite,
+  onRemoveStudent,
+  onViewStudent,
+  pendingRemoval,
+  onCancelRemove,
+  onConfirmRemove,
   rows,
   query,
   loading,
   invitingStudentId,
+  removingStudentId,
 }) {
   if (!classroom) {
     return null;
@@ -78,9 +85,53 @@ function StudentDirectoryModal({
                       <p className="text-center text-sm text-slate-500">No students yet.</p>
                     </div>
                   ) : rows.inClass.map((student) => (
-                    <div className="flex items-center justify-between px-0 py-2 text-sm" key={`in-${student.studentId}`}>
-                      <span className="font-medium text-slate-800">{student.fullName}</span>
-                      <span className="text-slate-500">{student.email}</span>
+                    <div
+                      className="group flex cursor-pointer items-center justify-between gap-3 border-b border-slate-200 px-2 py-4 text-sm transition-all duration-200 hover:bg-slate-50 last:border-b-0"
+                      key={`in-${student.studentId}`}
+                      onClick={() => onViewStudent(student)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onViewStudent(student);
+                        }
+                      }}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-slate-200 bg-white text-slate-600 transition-colors duration-200 group-hover:border-slate-300 group-hover:text-slate-800">
+                          <UserRound className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-800 transition-colors duration-200 group-hover:text-slate-900">{student.fullName}</p>
+                          <p className="truncate text-slate-500">{student.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          aria-label={`View ${student.fullName}`}
+                          className="inline-flex h-8 w-8 items-center justify-center text-slate-500 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100 hover:text-slate-800"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onViewStudent(student);
+                          }}
+                          type="button"
+                        >
+                          <ArrowUpRight className="h-4 w-4" />
+                        </button>
+                        <button
+                          aria-label={`Remove ${student.fullName}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-600 transition-colors duration-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          disabled={removingStudentId === student.studentId}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onRemoveStudent(student);
+                          }}
+                          type="button"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -124,6 +175,35 @@ function StudentDirectoryModal({
           </div>
         </div>
       </div>
+      {pendingRemoval ? (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/45 p-4" onClick={onCancelRemove} role="presentation">
+          <div
+            className="w-full max-w-md bg-white p-6 shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-base font-semibold text-slate-900">Remove student</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Are you sure you want to remove <span className="font-medium text-slate-900">{pendingRemoval.fullName || "this student"}</span> from <span className="font-medium text-slate-900">{classroom?.name || "this class"}</span> class?
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                className="inline-flex items-center border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                onClick={onCancelRemove}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="inline-flex items-center bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-red-700"
+                onClick={onConfirmRemove}
+                type="button"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>,
     document.body,
   );
@@ -208,6 +288,7 @@ function CreateClassModal({ form, isOpen, onChange, onClose, onSubmit, isSaving 
 }
 
 function TeacherClassesPage() {
+  const navigate = useNavigate();
   const {
     isAddClassModalOpen = false,
     onOpenAddClassModal = () => { },
@@ -223,6 +304,8 @@ function TeacherClassesPage() {
   const [modalRows, setModalRows] = useState({ inClass: [], others: [] });
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
   const [invitingStudentId, setInvitingStudentId] = useState("");
+  const [removingStudentId, setRemovingStudentId] = useState("");
+  const [pendingRemoval, setPendingRemoval] = useState(null);
   const [createClassForm, setCreateClassForm] = useState({ name: "", startTime: "" });
   const [notice, setNotice] = useState("");
   const [isCreatingClass, setIsCreatingClass] = useState(false);
@@ -359,6 +442,8 @@ function TeacherClassesPage() {
     setStudentInviteSearch("");
     setModalRows({ inClass: [], others: [] });
     setInvitingStudentId("");
+    setRemovingStudentId("");
+    setPendingRemoval(null);
   };
 
   const resetCreateClassForm = () => {
@@ -434,6 +519,49 @@ function TeacherClassesPage() {
     }
   };
 
+  const handleViewStudent = (student) => {
+    const targetId = String(student?.studentId || "").trim();
+    if (!targetId) {
+      return;
+    }
+    navigate(`/teacher/students/${encodeURIComponent(targetId)}`);
+  };
+
+  const handleRemoveStudent = (student) => {
+    const targetId = String(student?.studentId || "").trim();
+    if (!activeClassId || !targetId || removingStudentId) {
+      return;
+    }
+    setPendingRemoval(student);
+  };
+
+  const handleConfirmRemoveStudent = async () => {
+    const targetId = String(pendingRemoval?.studentId || "").trim();
+    if (!activeClassId || !targetId || removingStudentId) {
+      return;
+    }
+
+    setRemovingStudentId(targetId);
+    try {
+      await removeStudentFromTeacherClass(activeClassId, targetId);
+      setModalRows((current) => ({
+        ...current,
+        inClass: current.inClass.filter((row) => row.studentId !== targetId),
+      }));
+      setClassesState((current) => current.map((item) => (
+        item.id === activeClassId
+          ? { ...item, students: Math.max(0, Number(item.students || 0) - 1) }
+          : item
+      )));
+      setPendingRemoval(null);
+      showNotice("Student removed from class");
+    } catch (error) {
+      showNotice(error?.message || "Failed to remove student.");
+    } finally {
+      setRemovingStudentId("");
+    }
+  };
+
   const showNotice = (message) => {
     setNotice(message);
     if (noticeTimerRef.current) {
@@ -472,8 +600,14 @@ function TeacherClassesPage() {
         loading={isLoadingSearch}
         onClose={handleCloseStudents}
         onInvite={handleInviteStudent}
+        onRemoveStudent={handleRemoveStudent}
+        onCancelRemove={() => setPendingRemoval(null)}
+        onConfirmRemove={handleConfirmRemoveStudent}
         onSearchChange={setStudentInviteSearch}
+        onViewStudent={handleViewStudent}
+        pendingRemoval={pendingRemoval}
         query={studentInviteSearch}
+        removingStudentId={removingStudentId}
         rows={modalRows}
       />
       {notice ? (

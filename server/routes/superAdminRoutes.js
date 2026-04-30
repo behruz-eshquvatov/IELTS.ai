@@ -39,6 +39,12 @@ const {
   updateDailyTaskUnit,
   deleteDailyTaskUnit,
 } = require("../controllers/superAdminController");
+const {
+  listSuperAdminOrganizations,
+  createSuperAdminOrganization,
+  updateSuperAdminOrganization,
+  deleteSuperAdminOrganization,
+} = require("../controllers/organizationController");
 
 const router = express.Router();
 
@@ -120,5 +126,9 @@ router.get("/:password/daily-units", listDailyTaskUnits);
 router.post("/:password/daily-units", createDailyTaskUnit);
 router.put("/:password/daily-units/:unitId", updateDailyTaskUnit);
 router.delete("/:password/daily-units/:unitId", deleteDailyTaskUnit);
+router.get("/:password/organizations", listSuperAdminOrganizations);
+router.post("/:password/organizations", createSuperAdminOrganization);
+router.put("/:password/organizations/:organizationId", updateSuperAdminOrganization);
+router.delete("/:password/organizations/:organizationId", deleteSuperAdminOrganization);
 
 module.exports = router;

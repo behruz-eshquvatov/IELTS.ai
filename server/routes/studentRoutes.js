@@ -7,6 +7,7 @@ const {
   updateStudentProfile,
   getStudentDailyTasks,
   getMyStudentDailyTasks,
+  getMyStudentDashboard,
   createMyDailyTaskAttempt,
   getMyRecentCompletedDailyTasks,
   listMyTaskAttempts,
@@ -40,6 +41,7 @@ router.post("/:studentId/seed", seedStudentData);
 router.get("/me/profile", protect, authorizeRoles("student"), getMyStudentProfile);
 router.patch("/me/profile", protect, authorizeRoles("student"), updateMyAccountProfile);
 router.patch("/me/profile/password", protect, authorizeRoles("student"), updateMyAccountPassword);
+router.get("/me/dashboard", protect, authorizeRoles("student"), getMyStudentDashboard);
 router.get("/me/daily-tasks", protect, authorizeRoles("student"), getMyStudentDailyTasks);
 router.get("/me/daily-tasks/recent-completed", protect, authorizeRoles("student"), getMyRecentCompletedDailyTasks);
 router.get("/me/task-attempts/recent-completed", protect, authorizeRoles("student"), getMyRecentCompletedDailyTasks);

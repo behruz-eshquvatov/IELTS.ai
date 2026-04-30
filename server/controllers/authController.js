@@ -1,6 +1,8 @@
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const User = require("../models/userModel");
+const { Organization } = require("../models/organizationModel");
 const StudentProfile = require("../models/studentProfileModel");
 const StudentAnalytics = require("../models/studentAnalyticsModel");
 const { studentAnalyticsSeed } = require("../data/studentSeedData");
@@ -23,6 +25,8 @@ function sanitizeUser(userDoc) {
     email: userDoc.email,
     role: userDoc.role,
     organization: userDoc.organization || "",
+    organizationId: userDoc.organizationId ? String(userDoc.organizationId) : "",
+    organizationName: userDoc.organizationName || "",
     createdAt: userDoc.createdAt,
   };
 }
@@ -136,8 +140,13 @@ function validateRegisterInput(body) {
     errors.push("Password confirmation does not match.");
   }
 
-  if (body.role === "teacher" && (!body.organization || body.organization.trim().length < 2)) {
-    errors.push("Organization is required for teacher accounts.");
+  if (body.role === "teacher") {
+    const organizationId = String(body.organizationId || "").trim();
+    if (!organizationId) {
+      errors.push("Organization is required for teacher accounts.");
+    } else if (!mongoose.Types.ObjectId.isValid(organizationId)) {
+      errors.push("Organization id is invalid.");
+    }
   }
 
   return errors;
@@ -163,12 +172,30 @@ async function register(req, res) {
     });
   }
 
+  let organizationDoc = null;
+  if (body.role === "teacher") {
+    const organizationId = String(body.organizationId || "").trim();
+    organizationDoc = await Organization.findOne({
+      _id: organizationId,
+      status: "active",
+    }).lean();
+
+    if (!organizationDoc) {
+      return res.status(400).json({
+        message: "Please select a valid organization from the list.",
+        errors: ["Please select a valid organization from the list."],
+      });
+    }
+  }
+
   const user = await User.create({
     fullName: body.fullName.trim(),
     email,
     password: body.password,
     role: body.role,
-    organization: body.role === "teacher" ? body.organization.trim() : "",
+    organization: body.role === "teacher" ? String(organizationDoc?.name || "") : "",
+    organizationId: body.role === "teacher" ? organizationDoc?._id : null,
+    organizationName: body.role === "teacher" ? String(organizationDoc?.name || "") : "",
   });
 
   if (user.role === "student") {

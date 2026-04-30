@@ -1,4 +1,5 @@
-﻿import { motion as Motion } from "framer-motion";
+import { motion as Motion } from "framer-motion";
+import { createPortal } from "react-dom";
 import useBodyScrollLock from "../../../hooks/useBodyScrollLock";
 
 function ExamPopup({ children, isOpen, maxWidthClass = "max-w-xl", onClose }) {
@@ -8,10 +9,10 @@ function ExamPopup({ children, isOpen, maxWidthClass = "max-w-xl", onClose }) {
     return null;
   }
 
-  return (
+  return createPortal(
     <Motion.div
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 px-4"
       initial={{ opacity: 0 }}
       onClick={() => {
         if (typeof onClose === "function") {
@@ -30,9 +31,9 @@ function ExamPopup({ children, isOpen, maxWidthClass = "max-w-xl", onClose }) {
       >
         {children}
       </Motion.div>
-    </Motion.div>
+    </Motion.div>,
+    document.body,
   );
 }
 
 export default ExamPopup;
-

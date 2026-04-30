@@ -2,11 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
-  BellRing,
   BookOpenText,
   ChevronRight,
   Clock3,
-  FileText,
   Headphones,
   LockKeyhole,
   PauseCircle,
@@ -16,11 +14,12 @@ import {
   Plus,
   Radio,
   Search,
+  Settings2,
   Send,
   ShieldAlert,
   TimerReset,
   Trash2,
-  TrendingDown,
+  ArrowUpRight,
   TrendingUp,
   Users2,
   X,
@@ -45,8 +44,11 @@ import { TimePickerField } from "../../components/ui/StyledFormControls";
 import { teacherStudents } from "../../data/teacherPanel";
 import {
   getTeacherClassOverview,
+  getTeacherClassHomeworkUnits,
+  getTeacherClassUnitHomework,
   inviteStudentToTeacherClass,
   removeStudentFromTeacherClass,
+  sendTeacherClassMessage,
   searchTeacherClassStudents,
   updateTeacherClass,
 } from "../../services/teacherService";
@@ -57,10 +59,6 @@ const TIMER_PRESETS = [
   { label: "40 min", minutes: 40 },
   { label: "60 min", minutes: 60 },
   { label: "90 min", minutes: 90 },
-];
-
-const DEFAULT_REMINDERS = [
-  { id: "payment-reminder", label: "Pay payment" },
 ];
 
 function readClassOverrides() {
@@ -151,7 +149,7 @@ const CLASS_SKILL_AREAS = [
   {
     key: "writingTask1",
     label: "Writing Task 1",
-    icon: FileText,
+    icon: PenLine,
     accent: "bg-amber-50 text-amber-700",
   },
   {
@@ -472,21 +470,21 @@ function ResultsTooltip({ active, label, payload }) {
 
 function SummaryChip({ icon: Icon, label, value, tone = "slate" }) {
   const toneClasses = {
-    slate: "text-slate-700",
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
-    rose: "text-rose-700",
-    blue: "text-blue-700",
+    slate: "text-slate-200",
+    emerald: "text-emerald-200",
+    amber: "text-amber-200",
+    rose: "text-rose-200",
+    blue: "text-sky-200",
   };
 
   return (
     <div className={`inline-flex h-[80px] items-center gap-3 ${toneClasses[tone]}`}>
-      <span className="flex h-9 w-9 items-center justify-center border border-current/15 bg-white/80">
+      <span className="flex h-9 w-9 items-center justify-center border border-white/20 bg-white/10">
         <Icon className="h-4 w-4" />
       </span>
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-current/80">{label}</p>
-        <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-current/90">{label}</p>
+        <p className="mt-1 text-sm font-semibold text-white">{value}</p>
       </div>
     </div>
   );
@@ -494,35 +492,46 @@ function SummaryChip({ icon: Icon, label, value, tone = "slate" }) {
 
 function HeaderPanel({
   classroom,
-  note,
-  onOpenNoteModal,
   onOpenEditModal,
+  onOpenAnalysisModal,
+  onOpenMessageModal,
   onOpenInviteModal,
   totalStudents,
-  students,
 }) {
   return (
-    <PanelShell className="border-slate-200/80 bg-white">
-      <div className="px-5 py-5 lg:px-6 lg:py-6">
+    <PanelShell className="relative overflow-hidden border-slate-800/80 bg-slate-950">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_20%,rgba(56,189,248,0.18),transparent_38%),radial-gradient(circle_at_88%_12%,rgba(16,185,129,0.18),transparent_36%),linear-gradient(145deg,#020617_0%,#0b1223_55%,#111827_100%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(to_right,rgba(148,163,184,0.24)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.2)_1px,transparent_1px)] [background-size:34px_34px]" />
+      <div className="pointer-events-none absolute inset-0 [background-image:radial-gradient(60%_90%_at_-12%_100%,rgba(148,163,184,0.26),transparent_62%),radial-gradient(54%_82%_at_112%_0%,rgba(56,189,248,0.2),transparent_60%),radial-gradient(42%_68%_at_68%_-18%,rgba(16,185,129,0.14),transparent_64%)]" />
+      <div className="pointer-events-none absolute inset-0 border border-dashed border-white/10" />
+      <div className="relative px-5 py-5 lg:px-6 lg:py-6">
         <div className="space-y-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-4">
-              <h2 className="text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+              <h2 className="text-3xl font-semibold tracking-[-0.05em] text-white">
                 {classroom.name}
               </h2>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <button
-                className="inline-flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-slate-300 hover:bg-slate-50"
-                onClick={onOpenNoteModal}
+                className="inline-flex items-center gap-2 bg-transparent px-1 py-3 text-sm font-semibold text-slate-200/90 transition-colors duration-200 hover:text-white"
+                onClick={onOpenAnalysisModal}
                 type="button"
               >
-                <FileText className="h-4 w-4" />
-                Note
+                <ArrowUpRight className="h-4 w-4" />
+                Analyses
               </button>
               <button
-                className="inline-flex items-center gap-2 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex items-center gap-2 bg-transparent px-1 py-3 text-sm font-semibold text-slate-200/90 transition-colors duration-200 hover:text-white"
+                onClick={onOpenMessageModal}
+                type="button"
+              >
+                <Send className="h-4 w-4" />
+                Message
+              </button>
+              <button
+                className="inline-flex items-center gap-2 px-1 py-3 text-sm font-semibold text-slate-100 transition-colors duration-200 "
                 onClick={onOpenEditModal}
                 type="button"
               >
@@ -530,7 +539,7 @@ function HeaderPanel({
                 Edit class
               </button>
               <button
-                className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
+                className="emerald-gradient-fill ml-3 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white"
                 onClick={onOpenInviteModal}
                 type="button"
               >
@@ -545,77 +554,10 @@ function HeaderPanel({
               <SummaryChip icon={Clock3} label="Lesson time" value={classroom.startTime} />
               <SummaryChip icon={Users2} label="Total students" value={String(totalStudents)} />
             </div>
-
-            {note ? (
-              <div className="h-[80px] w-full overflow-hidden border border-slate-200/80 bg-slate-50/70 px-4 py-3 xl:ml-6 xl:max-w-md xl:flex-shrink-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Note
-                </p>
-                <div className="mt-1 max-h-[calc(75px-34px)] overflow-y-auto pr-1">
-                  <p className="text-sm leading-5 text-slate-700">{note}</p>
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
     </PanelShell>
-  );
-}
-
-function ClassNoteModal({ isOpen, noteDraft, onChange, onClose, onSubmit }) {
-  if (!isOpen) {
-    return null;
-  }
-
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
-      <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-2xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
-          <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
-            <div className="flex min-h-11 items-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
-                Class note
-              </p>
-            </div>
-            <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
-              onClick={onClose}
-              type="button"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="space-y-5 p-6">
-            <textarea
-              className="min-h-40 w-full resize-none border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
-              onChange={onChange}
-              placeholder="Write a note for this class."
-              value={noteDraft}
-            />
-
-            <div className="flex flex-wrap justify-end gap-3">
-              <button
-                className="inline-flex items-center gap-2 border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
-                onClick={onClose}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white"
-                onClick={onSubmit}
-                type="button"
-              >
-                Save note
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }
 
@@ -627,7 +569,7 @@ function EditClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-xl overflow-hidden border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <div className="flex min-h-11 items-center">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
@@ -635,7 +577,7 @@ function EditClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -669,14 +611,14 @@ function EditClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
-                className="inline-flex items-center gap-2 border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
                 onClick={onClose}
                 type="button"
               >
                 Cancel
               </button>
               <button
-                className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white"
+                className="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white"
                 onClick={onSubmit}
                 type="button"
               >
@@ -719,7 +661,7 @@ function InviteStudentModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-5xl overflow-visible bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-5xl overflow-visible rounded-3xl bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="-mx-px flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
@@ -727,7 +669,7 @@ function InviteStudentModal({
               </p>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center bg-slate-950 text-white transition-colors duration-200"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -824,20 +766,83 @@ function InviteStudentModal({
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
-                className="inline-flex items-center gap-2 border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-950 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
                 onClick={onClose}
                 type="button"
               >
                 Cancel
               </button>
               <button
-                className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white transition-opacity duration-200 disabled:cursor-not-allowed disabled:opacity-45"
+                className="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white transition-opacity duration-200 disabled:cursor-not-allowed disabled:opacity-45"
                 disabled={isSubmitDisabled}
                 onClick={onInviteSubmit}
                 type="button"
               >
                 <Plus className="h-4 w-4" />
                 Add to class
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function MessageClassModal({
+  className,
+  isOpen,
+  isSending,
+  messageText,
+  errorText,
+  onChangeMessage,
+  onClose,
+  onSend,
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
+      <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+          <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
+              Message to class
+            </p>
+            <button
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white transition-colors duration-200"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="space-y-4 p-6">
+            <p className="text-sm text-slate-600">
+              Send to everyone in <span className="font-semibold text-slate-900">{className}</span>.
+            </p>
+            <textarea
+              className="min-h-40 w-full resize-y border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-emerald-300"
+              onChange={(event) => onChangeMessage(event.target.value)}
+              placeholder="Write your message to all students in this class..."
+              value={messageText}
+            />
+            {errorText ? (
+              <p className="text-sm text-rose-600">{errorText}</p>
+            ) : null}
+            <div className="flex justify-end">
+              <button
+                className="emerald-gradient-fill inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSending || !messageText.trim()}
+                onClick={onSend}
+                type="button"
+              >
+                <Send className="h-4 w-4" />
+                {isSending ? "Sending..." : "Send"}
               </button>
             </div>
           </div>
@@ -876,7 +881,7 @@ function AddStudentModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-3xl overflow-hidden border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -887,7 +892,7 @@ function AddStudentModal({
               </h3>
             </div>
             <button
-              className="inline-flex h-11 w-11 items-center justify-center border border-slate-200 bg-white text-slate-500 transition-colors duration-200"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors duration-200"
               onClick={onClose}
               type="button"
             >
@@ -926,7 +931,7 @@ function AddStudentModal({
                         </p>
                       </div>
                       <button
-                        className="inline-flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:bg-emerald-100"
+                        className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:bg-emerald-100"
                         onClick={() => onAddStudent(student)}
                         type="button"
                       >
@@ -950,174 +955,514 @@ function AddStudentModal({
   );
 }
 
-function StudentsPanel({
+function formatDuration(seconds) {
+  const safeSeconds = Number.isFinite(Number(seconds)) ? Math.max(0, Number(seconds)) : 0;
+  const totalMinutes = Math.round(safeSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+function formatBand(value) {
+  const band = Number(value);
+  return Number.isFinite(band) ? band.toFixed(1) : "-";
+}
+
+function UnitHomeworkPanel({
+  classId,
+  classroomName,
+  refreshKey,
   searchValue,
-  showTrendColumn = false,
-  students,
   onOpenStudent,
   onRemoveStudent,
   onSearchChange,
 }) {
+  const [payload, setPayload] = useState({ selectedUnitId: "", units: [], rows: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorText, setErrorText] = useState("");
+  const [sortBy, setSortBy] = useState("status");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+  const columnMenuRef = useRef(null);
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem("teacher:unit-homework:visible-columns");
+      return raw ? JSON.parse(raw) : {
+        attempts: true,
+        timeSpent: true,
+        overallScore: true,
+        listening: true,
+        reading: true,
+        writingTask1: true,
+        writingTask2: true,
+        risk: true,
+      };
+    } catch {
+      return {
+        attempts: true,
+        timeSpent: true,
+        overallScore: true,
+        listening: true,
+        reading: true,
+        writingTask1: true,
+        writingTask2: true,
+        risk: true,
+      };
+    }
+  });
+  const [columnOrder, setColumnOrder] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem("teacher:unit-homework:column-order");
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return ["attempts", "timeSpent", "overallScore", "listening", "reading", "writingTask1", "writingTask2", "risk"];
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem("teacher:unit-homework:visible-columns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    window.localStorage.setItem("teacher:unit-homework:column-order", JSON.stringify(columnOrder));
+  }, [columnOrder]);
+
+  useEffect(() => {
+    function handleOutsideClick(event) {
+      if (!columnMenuRef.current?.contains(event.target)) {
+        setIsColumnMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setIsColumnMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const run = async () => {
+      setIsLoading(true);
+      setErrorText("");
+      try {
+        const response = await getTeacherClassHomeworkUnits(classId);
+        if (!isMounted) {
+          return;
+        }
+        setPayload({
+          selectedUnitId: String(response?.selectedUnitId || ""),
+          units: Array.isArray(response?.units) ? response.units : [],
+          rows: Array.isArray(response?.rows) ? response.rows : [],
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        setErrorText(error?.message || "Could not load unit homework data.");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+    void run();
+    return () => {
+      isMounted = false;
+    };
+  }, [classId, refreshKey]);
+
+  const activeUnitIndex = payload.units.findIndex((unit) => unit.unitId === payload.selectedUnitId);
+  const selectedUnit = activeUnitIndex >= 0 ? payload.units[activeUnitIndex] : null;
+  const totalUnits = payload.units.length;
+
+  const handleUnitSelect = async (unitId) => {
+    if (!unitId || unitId === payload.selectedUnitId) {
+      return;
+    }
+    setIsLoading(true);
+    setErrorText("");
+    try {
+      const response = await getTeacherClassUnitHomework(classId, unitId);
+      setPayload({
+        selectedUnitId: String(response?.selectedUnitId || unitId),
+        units: Array.isArray(response?.units) ? response.units : [],
+        rows: Array.isArray(response?.rows) ? response.rows : [],
+      });
+    } catch (error) {
+      setErrorText(error?.message || "Could not load selected unit.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSort = (columnKey) => {
+    if (sortBy === columnKey) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortBy(columnKey);
+    setSortDirection("asc");
+  };
+
+  const filteredRows = useMemo(() => {
+    const query = String(searchValue || "").trim().toLowerCase();
+    const base = Array.isArray(payload.rows) ? payload.rows : [];
+    if (!query) {
+      return base;
+    }
+    return base.filter((row) =>
+      `${String(row.studentName || "")} ${String(row.email || "")}`.toLowerCase().includes(query));
+  }, [payload.rows, searchValue]);
+
+  const sortedRows = useMemo(() => {
+    const rows = [...filteredRows];
+    const riskRank = { clean: 0, low: 1, medium: 2, high: 3 };
+    rows.sort((left, right) => {
+      let cmp = 0;
+      if (sortBy === "studentName") {
+        cmp = String(left.studentName || "").localeCompare(String(right.studentName || ""));
+      } else if (sortBy === "status") {
+        const leftValue = left.status === "incomplete" ? 0 : 1;
+        const rightValue = right.status === "incomplete" ? 0 : 1;
+        cmp = leftValue - rightValue;
+      } else if (sortBy === "attempts") {
+        cmp = Number(left.attemptsCount || 0) - Number(right.attemptsCount || 0);
+      } else if (sortBy === "timeSpent") {
+        cmp = Number(left.timeSpentSeconds || 0) - Number(right.timeSpentSeconds || 0);
+      } else if (sortBy === "overallScore") {
+        cmp = Number(left.overallScore ?? -1) - Number(right.overallScore ?? -1);
+      } else if (sortBy === "risk") {
+        cmp = (riskRank[left?.risk?.level] ?? -1) - (riskRank[right?.risk?.level] ?? -1);
+      }
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [filteredRows, sortBy, sortDirection]);
+
+  const optionalColumns = [
+    { key: "attempts", label: "ATTEMPTS", sortable: true },
+    { key: "timeSpent", label: "TIME SPENT", sortable: true },
+    { key: "overallScore", label: "OVERALL SCORE", sortable: true },
+    { key: "listening", label: "LISTENING", sortable: false },
+    { key: "reading", label: "READING", sortable: false },
+    { key: "writingTask1", label: "WRITING TASK 1", sortable: false },
+    { key: "writingTask2", label: "WRITING TASK 2", sortable: false },
+    { key: "risk", label: "RISK", sortable: true },
+  ];
+  const optionalColumnKeys = optionalColumns.map((column) => column.key);
+  const normalizedColumnOrder = [
+    ...columnOrder.filter((key) => optionalColumnKeys.includes(key)),
+    ...optionalColumnKeys.filter((key) => !columnOrder.includes(key)),
+  ];
+  const orderedColumns = normalizedColumnOrder
+    .map((columnKey) => optionalColumns.find((column) => column.key === columnKey))
+    .filter(Boolean);
+  const visibleOrderedColumns = orderedColumns.filter((column) => visibleColumns[column.key]);
+  const getColumnMinWidth = (column) => {
+    const baseFromLabel = Math.max(String(column?.label || "").length * 10 + 42, 120);
+    if (column?.key === "risk") {
+      return Math.max(baseFromLabel, 165);
+    }
+    if (column?.key === "overallScore") {
+      return Math.max(baseFromLabel, 150);
+    }
+    return baseFromLabel;
+  };
+  const tableMinWidth = visibleOrderedColumns.reduce(
+    (totalWidth, column) => totalWidth + getColumnMinWidth(column),
+    384, // STUDENT + STATUS baseline width + sticky actions column
+  );
+  const unitPager = (
+    <div className="flex w-full items-center gap-2 overflow-x-auto lg:w-auto">
+      <button
+        aria-label="Previous unit"
+        className="flex h-12 w-12 shrink-0 items-center justify-center border border-transparent bg-transparent text-slate-700 transition-colors duration-200 hover:border-slate-300 disabled:opacity-40"
+        disabled={activeUnitIndex <= 0}
+        onClick={() => handleUnitSelect(payload.units[activeUnitIndex - 1]?.unitId)}
+        type="button"
+      >
+        <ChevronRight className="h-5 w-5 rotate-180" />
+      </button>
+      {payload.units.length ? payload.units.map((unit, index) => {
+        const isActive = unit.unitId === payload.selectedUnitId;
+        return (
+          <button
+            className={`min-h-10 shrink-0 rounded-none border bg-transparent px-4 py-2 text-left transition-colors duration-200 ${
+              isActive
+                ? "border-slate-950 text-slate-950"
+                : "border-transparent text-slate-700 hover:border-slate-300"
+            }`}
+            key={unit.unitId}
+            onClick={() => handleUnitSelect(unit.unitId)}
+            type="button"
+          >
+            <span className="block text-sm font-semibold">
+              {unit.title || `Unit ${index + 1}`}
+            </span>
+          </button>
+        );
+      }) : (
+        <div className="min-h-12 min-w-[120px] shrink-0 rounded-none border border-slate-200 bg-transparent px-4 py-3 text-sm font-semibold text-slate-500">
+          No units
+        </div>
+      )}
+      <button
+        aria-label="Next unit"
+        className="flex h-12 w-12 shrink-0 items-center justify-center border border-transparent bg-transparent text-slate-700 transition-colors duration-200 hover:border-slate-300 disabled:opacity-40"
+        disabled={activeUnitIndex < 0 || activeUnitIndex >= payload.units.length - 1}
+        onClick={() => handleUnitSelect(payload.units[activeUnitIndex + 1]?.unitId)}
+        type="button"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center">
+        <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Students Panel
+            Unit Homework Monitoring
           </p>
         </div>
-        <label className="flex min-w-72 items-center gap-3 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-          <Search className="h-4 w-4" />
-          <input
-            className="w-full bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search students in this class"
-            type="text"
-            value={searchValue}
-          />
-        </label>
+        <div className="flex items-center gap-2">
+          <div
+            className="relative"
+            ref={columnMenuRef}
+            onMouseEnter={() => setIsColumnMenuOpen(true)}
+            onMouseLeave={(event) => {
+              if (!columnMenuRef.current?.contains(event.relatedTarget)) {
+                setIsColumnMenuOpen(false);
+              }
+            }}
+          >
+            <button
+              aria-expanded={isColumnMenuOpen}
+              aria-haspopup="menu"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-200"
+              onClick={() => setIsColumnMenuOpen((current) => !current)}
+              type="button"
+            >
+              <Settings2 className="h-4 w-4" />
+              Columns
+            </button>
+            <div
+              className={`absolute right-0 top-full z-20 mt-0 w-72 origin-top-right overflow-hidden border border-slate-200 bg-white shadow-[0_24px_48px_-30px_rgba(15,23,42,0.45)] transition ${
+                isColumnMenuOpen
+                  ? "scale-100 opacity-100"
+                  : "pointer-events-none scale-95 opacity-0"
+              }`}
+              role="menu"
+            >
+                <span className="absolute -top-2 left-0 h-2 w-full bg-transparent" />
+                <div className="max-h-80 space-y-1 overflow-y-auto p-2">
+                  {optionalColumns.map((column) => (
+                    <label
+                      className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm text-slate-700 transition-colors duration-150 hover:bg-slate-50"
+                      key={column.key}
+                    >
+                      <span className="font-medium text-slate-700">{column.label}</span>
+                      <input
+                        className="h-4 w-4 border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-300"
+                        checked={Boolean(visibleColumns[column.key])}
+                        onChange={(event) => setVisibleColumns((current) => ({
+                          ...current,
+                          [column.key]: event.target.checked,
+                        }))}
+                        type="checkbox"
+                      />
+                    </label>
+                  ))}
+                </div>
+            </div>
+          </div>
+          <label className="flex min-w-72 items-center gap-3 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+            <Search className="h-4 w-4" />
+            <input
+              className="w-full bg-transparent text-slate-700 outline-none placeholder:text-slate-400"
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search students in this class"
+              type="text"
+              value={searchValue}
+            />
+          </label>
+        </div>
       </div>
 
       <PanelShell>
-        <div className="bg-slate-950">
-          <table className="w-full table-fixed">
-            <colgroup>
-              <col className={showTrendColumn ? "w-[27%]" : "w-[32%]"} />
-              <col className={showTrendColumn ? "w-[19%]" : "w-[21%]"} />
-              <col className={showTrendColumn ? "w-[16%]" : "w-[17%]"} />
-              {showTrendColumn ? <col className="w-[11%]" /> : null}
-              <col className={showTrendColumn ? "w-[10%]" : "w-[11%]"} />
-              <col className={showTrendColumn ? "w-[11%]" : "w-[13%]"} />
-              <col className="w-[6%]" />
-            </colgroup>
+        <div className="overflow-x-auto overflow-y-hidden">
+          <table className="w-full table-auto" style={{ minWidth: `${tableMinWidth}px` }}>
             <thead>
               <tr className="bg-slate-950 text-left text-[11px] font-semibold uppercase tracking-[0.2em] text-white">
-                <th className="bg-slate-950 px-5 py-4">Student</th>
-                <th className="bg-slate-950 px-5 py-4">Progress</th>
-                <th className="bg-slate-950 px-5 py-4">Last Week Time</th>
-                {showTrendColumn ? <th className="bg-slate-950 px-5 py-4">Trend</th> : null}
-                <th className="bg-slate-950 px-5 py-4">Score</th>
-                <th className="bg-slate-950 px-5 py-4">Status</th>
-                <th aria-label="Remove student" className="bg-slate-950 px-5 py-4" />
+                <th className="w-[320px] min-w-[320px] px-4 py-4 whitespace-nowrap">
+                  <button className="inline-flex items-center gap-1" onClick={() => handleSort("studentName")} type="button">
+                    STUDENT
+                  </button>
+                </th>
+                <th className="w-[190px] min-w-[190px] px-4 py-4 whitespace-nowrap">
+                  <button className="inline-flex items-center gap-1" onClick={() => handleSort("status")} type="button">
+                    STATUS
+                  </button>
+                </th>
+                {visibleOrderedColumns.map((column) => (
+                  <th
+                    className="px-4 py-4 whitespace-nowrap"
+                    draggable
+                    key={column.key}
+                    style={{ minWidth: `${getColumnMinWidth(column)}px` }}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("text/plain", column.key);
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const sourceKey = event.dataTransfer.getData("text/plain");
+                      if (!sourceKey || sourceKey === column.key) {
+                        return;
+                      }
+                      const nextOrder = [...columnOrder];
+                      const sourceIndex = nextOrder.indexOf(sourceKey);
+                      const targetIndex = nextOrder.indexOf(column.key);
+                      if (sourceIndex === -1 || targetIndex === -1) {
+                        return;
+                      }
+                      nextOrder.splice(sourceIndex, 1);
+                      nextOrder.splice(targetIndex, 0, sourceKey);
+                      setColumnOrder(nextOrder);
+                    }}
+                  >
+                    {column.sortable ? (
+                      <button className="inline-flex items-center gap-1" onClick={() => handleSort(column.key)} type="button">
+                        {column.label}
+                      </button>
+                    ) : column.label}
+                  </th>
+                ))}
+                <th className="sticky right-0 z-20 w-16 min-w-[72px] bg-slate-950 px-4 py-4 whitespace-nowrap" />
               </tr>
             </thead>
-          </table>
-        </div>
-        <div className="max-h-[690px] overflow-auto">
-          <table className="w-full table-fixed">
-            <colgroup>
-              <col className={showTrendColumn ? "w-[27%]" : "w-[32%]"} />
-              <col className={showTrendColumn ? "w-[19%]" : "w-[21%]"} />
-              <col className={showTrendColumn ? "w-[16%]" : "w-[17%]"} />
-              {showTrendColumn ? <col className="w-[11%]" /> : null}
-              <col className={showTrendColumn ? "w-[10%]" : "w-[11%]"} />
-              <col className={showTrendColumn ? "w-[11%]" : "w-[13%]"} />
-              <col className="w-[6%]" />
-            </colgroup>
             <tbody className="divide-y divide-slate-200/70 bg-white">
-              {students.length ? students.map((student) => (
+              {isLoading ? (
+                <tr>
+                  <td className="px-4 py-8 text-sm text-slate-500" colSpan={9}>Loading unit homework...</td>
+                </tr>
+              ) : errorText ? (
+                <tr>
+                  <td className="px-4 py-8 text-sm text-rose-600" colSpan={9}>{errorText}</td>
+                </tr>
+              ) : sortedRows.length ? sortedRows.map((row) => (
                 <tr
-                  className="cursor-pointer align-middle transition-colors duration-200 hover:bg-slate-50"
-                  key={student.id}
-                  onClick={() => onOpenStudent(student)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onOpenStudent(student);
-                    }
-                  }}
-                  tabIndex={0}
+                  className="cursor-pointer transition-colors duration-200 hover:bg-slate-50"
+                  key={row.studentId}
+                  onClick={() => onOpenStudent({
+                    id: row.studentId,
+                    name: row.studentName,
+                    email: row.email,
+                    className: classroomName,
+                    currentBand: row.overallScore,
+                    weakArea: row.missingTasks?.length ? `Missing: ${row.missingTasks.join(", ")}` : "On track",
+                  })}
                 >
-                  <td className="px-5 py-4 align-middle">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">{student.name}</p>
-                        <p className="mt-1 text-sm text-slate-500">{student.email}</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-                    </div>
+                  <td className="w-[280px] min-w-[280px] px-4 py-4">
+                    <p className="text-sm font-semibold text-slate-950">{row.studentName}</p>
+                    <p className="mt-1 break-all text-sm text-slate-500">{row.email}</p>
                   </td>
-                  <td className="px-5 py-4 align-middle">
-                    <div className="min-w-36">
-                      <div className="h-2 w-full overflow-hidden bg-slate-200">
-                        <div
-                          className={`h-full ${
-                            student.status === "Suspicious"
-                              ? "bg-linear-to-r from-rose-500 to-rose-400"
-                              : student.status === "Inactive"
-                                ? "bg-linear-to-r from-amber-500 to-amber-400"
-                                : "bg-linear-to-r from-emerald-500 to-emerald-400"
-                          }`}
-                          style={{ width: `${student.progress}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        {student.progress}% complete
-                      </p>
-                    </div>
+                  <td className="w-[150px] min-w-[150px] px-4 py-4">
+                    <span
+                      className={`inline-flex items-center text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                        row.status === "complete" ? "text-emerald-700" : "text-rose-700"
+                      }`}
+                    >
+                      {row.status}
+                    </span>
                   </td>
-                  <td className="px-5 py-4 align-middle">
-                    <p className="text-sm font-semibold text-slate-950">
-                      {formatLastWeekTime(student.lastWeekHours)}
-                    </p>
-                  </td>
-                  <td className="px-5 py-4 align-middle">
-                    {showTrendColumn ? (
-                      <div className="flex items-center gap-2">
-                        {student.scoreTrendDelta > 0 ? (
-                          <TrendingUp className="h-4 w-4 text-emerald-600" />
-                        ) : student.scoreTrendDelta < 0 ? (
-                          <TrendingDown className="h-4 w-4 text-rose-600" />
-                        ) : (
-                          <span className="text-base font-semibold leading-none text-slate-950">~</span>
-                        )}
-                        <span
-                          className={`text-sm font-semibold ${
-                            student.scoreTrendDelta > 0
-                              ? "text-emerald-700"
-                              : student.scoreTrendDelta < 0
-                                ? "text-rose-700"
-                                : "text-slate-950"
-                          }`}
-                        >
-                          {student.scoreTrendDelta > 0 ? "+" : student.scoreTrendDelta < 0 ? "-" : ""}
-                          {Math.abs(student.scoreTrendDelta).toFixed(1)}
-                        </span>
-                      </div>
-                    ) : (
-                      <p className="text-lg font-semibold tracking-[-0.04em] text-slate-950">
-                        {student.score.toFixed(1)}
-                      </p>
-                    )}
-                  </td>
-                  {showTrendColumn ? (
-                    <td className="px-5 py-4 align-middle">
-                      <p className="text-lg font-semibold tracking-[-0.04em] text-slate-950">
-                        {student.score.toFixed(1)}
-                      </p>
-                    </td>
-                  ) : null}
-                  <td className="px-5 py-4 align-middle">
-                    {(() => {
-                      const paymentStatus = getPaymentStatus(student);
-
+                  {visibleOrderedColumns.map((column) => {
+                    if (column.key === "attempts") {
+                      return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{row.attemptsCount}</td>;
+                    }
+                    if (column.key === "timeSpent") {
+                      return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{formatDuration(row.timeSpentSeconds)}</td>;
+                    }
+                    if (column.key === "overallScore") {
+                      const tooltip = row.attemptScores?.length > 1
+                        ? row.attemptScores
+                          .map((attempt) => `Attempt ${attempt.attemptNumber}: ${formatBand(attempt.score)}${attempt.submittedAt ? ` (${new Date(attempt.submittedAt).toLocaleString()})` : ""}`)
+                          .join("\n")
+                        : "No other attempts.";
                       return (
-                        <StatusBadge tone={paymentStatus === "Paid" ? "emerald" : "rose"}>
-                          {paymentStatus}
-                        </StatusBadge>
+                        <td className="px-4 py-4 text-sm font-semibold text-slate-900" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }} title={tooltip}>
+                          {formatBand(row.overallScore)}
+                        </td>
                       );
-                    })()}
-                  </td>
-                  <td className="px-5 py-4 align-middle text-right">
+                    }
+                    if (column.key === "listening") {
+                      return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{formatBand(row.sectionScores?.listening)}</td>;
+                    }
+                    if (column.key === "reading") {
+                      return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{formatBand(row.sectionScores?.reading)}</td>;
+                    }
+                    if (column.key === "writingTask1") {
+                      return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{formatBand(row.sectionScores?.writingTask1)}</td>;
+                    }
+                    if (column.key === "writingTask2") {
+                      return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{formatBand(row.sectionScores?.writingTask2)}</td>;
+                    }
+                    if (column.key === "risk") {
+                      const isIncomplete = String(row?.status || "").toLowerCase() !== "complete";
+                      const level = String(row?.risk?.level || "clean");
+                      if (isIncomplete) {
+                        return (
+                          <td className="px-4 py-4" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }} title="Risk is undefined until the task is completed.">
+                            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              UNDEFINED
+                            </span>
+                          </td>
+                        );
+                      }
+                      const isDanger = level !== "clean";
+                      const riskLabel = isDanger ? "DANGER" : "CLEAN";
+                      const riskText = Array.isArray(row?.risk?.reasons) && row.risk.reasons.length
+                        ? row.risk.reasons.join("\n")
+                        : "No risk signals detected.";
+                      return (
+                        <td className="px-4 py-4" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }} title={riskText}>
+                          <span
+                            className={`text-xs font-semibold uppercase tracking-[0.14em] ${
+                              isDanger ? "text-rose-600" : "text-emerald-700"
+                            }`}
+                          >
+                            {riskLabel}
+                          </span>
+                        </td>
+                      );
+                    }
+                    return null;
+                  })}
+                  <td className="sticky right-0 z-10 relative w-16 min-w-[72px] bg-white px-4 py-4 text-right">
                     <button
-                      aria-label={`Remove ${student.name} from class`}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors duration-200 hover:bg-rose-50 hover:text-rose-600"
+                      aria-label={`Remove ${row.studentName} from class`}
+                      className="absolute right-4 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white text-slate-400 transition-colors duration-200 hover:bg-rose-50 hover:text-rose-600"
                       onClick={(event) => {
                         event.stopPropagation();
-                        onRemoveStudent(student);
+                        onRemoveStudent({ id: row.studentId, name: row.studentName });
                       }}
-                      onKeyDown={(event) => event.stopPropagation()}
                       type="button"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1126,8 +1471,8 @@ function StudentsPanel({
                 </tr>
               )) : (
                 <tr>
-                  <td className="px-5 py-8 text-sm text-slate-500" colSpan={showTrendColumn ? 7 : 6}>
-                    {searchValue.trim() ? "No students match this search." : "No students in this class yet."}
+                  <td className="px-4 py-8 text-sm text-slate-500" colSpan={9}>
+                    {searchValue.trim() ? "No students match this search." : "No homework rows for this unit."}
                   </td>
                 </tr>
               )}
@@ -1135,6 +1480,10 @@ function StudentsPanel({
           </table>
         </div>
       </PanelShell>
+
+      <div className="flex justify-center pt-1 lg:justify-end">
+        {unitPager}
+      </div>
     </div>
   );
 }
@@ -1256,20 +1605,15 @@ function ClassStrengthPanel({ students }) {
   const weakestArea = [...rankedMetrics].sort((left, right) => left.strengthScore - right.strengthScore)[0] ?? null;
 
   return (
-    <div className="space-y-2">
-      <p className="px-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-        Class Strength Chart
-      </p>
-
-      <PanelShell>
-        <div className="space-y-4 p-5">
+    <div>
+        <div className="space-y-4">
           {rankedMetrics.map((area) => {
             const Icon = area.icon;
             const isStrongest = strongestArea?.key === area.key;
             const isWeakest = weakestArea?.key === area.key;
 
             return (
-              <article className="border border-slate-200/80 bg-white p-4" key={area.key}>
+              <article key={area.key}>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-3">
                     <span className="inline-flex h-9 w-9 items-center justify-center border border-slate-900/20 bg-white text-slate-500/80">
@@ -1315,7 +1659,6 @@ function ClassStrengthPanel({ students }) {
             );
           })}
         </div>
-      </PanelShell>
     </div>
   );
 }
@@ -1507,176 +1850,6 @@ function LiveResultsPanel({ students }) {
   );
 }
 
-function CommunicationPanel({ message, lastSentMessage, onChange, onSend, onQuickAlert }) {
-  const [reminders, setReminders] = useState(() => DEFAULT_REMINDERS);
-  const [reminderDraft, setReminderDraft] = useState("");
-  const [isReminderComposerOpen, setIsReminderComposerOpen] = useState(false);
-  const hasReminderDraft = reminderDraft.trim().length > 0;
-  const reminderComposerRef = useRef(null);
-
-  const handleAddReminder = () => {
-    const trimmedReminder = reminderDraft.trim();
-    if (!trimmedReminder) {
-      return;
-    }
-
-    setReminders((current) => [
-      ...current,
-      {
-        id: `reminder-${Date.now()}`,
-        label: trimmedReminder,
-      },
-    ]);
-    setReminderDraft("");
-    setIsReminderComposerOpen(false);
-  };
-
-  const handleDeleteReminder = (reminderId) => {
-    setReminders((current) => current.filter((reminder) => reminder.id !== reminderId));
-  };
-
-  useEffect(() => {
-    if (!isReminderComposerOpen) {
-      return undefined;
-    }
-
-    const handleOutsidePointerDown = (event) => {
-      if (reminderComposerRef.current?.contains(event.target)) {
-        return;
-      }
-
-      setReminderDraft("");
-      setIsReminderComposerOpen(false);
-    };
-
-    document.addEventListener("mousedown", handleOutsidePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handleOutsidePointerDown);
-    };
-  }, [isReminderComposerOpen]);
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-        Messaging
-      </p>
-      <PanelShell>
-        <div className="border-b border-slate-950 bg-slate-950 px-5 py-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white">
-            Send message to class
-          </p>
-        </div>
-
-        <div className="space-y-4 p-5">
-          <textarea
-            className="min-h-32 w-full resize-none border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white"
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="Type a message for all students."
-            value={message}
-          />
-
-          <div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Quick reminders
-              </p>
-              <div className="flex items-center justify-end gap-2 overflow-hidden sm:w-auto" ref={reminderComposerRef}>
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-out ${
-                    isReminderComposerOpen
-                      ? "max-w-xs translate-x-0 opacity-100"
-                      : "max-w-0 translate-x-6 opacity-0 pointer-events-none"
-                  }`}
-                >
-                  <input
-                    className="w-56 min-w-0 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-slate-400"
-                    onChange={(event) => setReminderDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleAddReminder();
-                      }
-                    }}
-                    placeholder="Type reminder"
-                    value={reminderDraft}
-                  />
-                </div>
-                <button
-                  className={`inline-flex items-center justify-center gap-2 border px-3 py-2 text-sm font-medium shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)] ${
-                    !isReminderComposerOpen
-                      ? "emerald-gradient-fill border-emerald-300/20 text-white"
-                      : hasReminderDraft
-                        ? "emerald-gradient-fill border-emerald-300/20 text-white"
-                        : "border-slate-200 bg-white text-slate-700"
-                  }`}
-                  onClick={() => {
-                    if (!isReminderComposerOpen) {
-                      setIsReminderComposerOpen(true);
-                      return;
-                    }
-
-                    if (!hasReminderDraft) {
-                      setReminderDraft("");
-                      setIsReminderComposerOpen(false);
-                      return;
-                    }
-
-                    handleAddReminder();
-                  }}
-                  type="button"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>{isReminderComposerOpen ? "Add" : "Add reminder"}</span>
-                </button>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {reminders.map((reminder) => (
-                <div
-                  className="inline-flex items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
-                  key={reminder.id}
-                >
-                  <button
-                    className="inline-flex items-center gap-2 text-left transition-colors duration-200 hover:text-amber-800"
-                    onClick={() => onQuickAlert(reminder.label)}
-                    type="button"
-                  >
-                    <BellRing className="h-4 w-4" />
-                    <span>{reminder.label}</span>
-                  </button>
-                  <button
-                    aria-label={`Delete ${reminder.label}`}
-                    className="inline-flex items-center justify-center text-slate-400 transition-colors duration-200 hover:text-rose-600"
-                    onClick={() => handleDeleteReminder(reminder.id)}
-                    type="button"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-slate-500">
-              {lastSentMessage ? `Last message ${lastSentMessage}` : "No classroom message sent yet."}
-            </div>
-            <button
-              className="inline-flex items-center justify-center gap-2 border border-slate-950 bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-slate-800"
-              onClick={onSend}
-              type="button"
-            >
-              <Send className="h-4 w-4" />
-              Send message
-            </button>
-          </div>
-        </div>
-      </PanelShell>
-    </div>
-  );
-}
-
 function TeacherClassOverviewPage() {
   const navigate = useNavigate();
   const { classId } = useParams();
@@ -1685,7 +1858,6 @@ function TeacherClassOverviewPage() {
     id: classId,
     name: "Classroom",
     startTime: "--:--",
-    note: "",
   }), [classId]);
   const classroom = {
     ...baseClassroom,
@@ -1735,7 +1907,11 @@ function TeacherClassOverviewPage() {
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [classMessageText, setClassMessageText] = useState("");
+  const [classMessageError, setClassMessageError] = useState("");
+  const [isSendingClassMessage, setIsSendingClassMessage] = useState(false);
   const [studentPendingRemoval, setStudentPendingRemoval] = useState(null);
   const [inviteSearch, setInviteSearch] = useState("");
   const [studentRosterSearch, setStudentRosterSearch] = useState("");
@@ -1750,23 +1926,6 @@ function TeacherClassOverviewPage() {
     () => buildSessionStudents(classroom, rosterStudents),
     [classroom, rosterStudents],
   );
-  const filteredStudents = useMemo(() => {
-    const query = studentRosterSearch.trim().toLowerCase();
-
-    if (!query) {
-      return students;
-    }
-
-    return students.filter((student) => {
-      const searchable = [
-        student.name,
-        student.id,
-        student.email,
-      ].filter(Boolean).join(" ").toLowerCase();
-
-      return searchable.includes(query);
-    });
-  }, [studentRosterSearch, students]);
   const activityFeed = useMemo(() => buildActivityFeed(classroom, students), [classroom, students]);
   const availableStudents = useMemo(
     () =>
@@ -1793,14 +1952,9 @@ function TeacherClassOverviewPage() {
   const [remainingSeconds, setRemainingSeconds] = useState(defaultPreset * 60);
   const [sessionLive, setSessionLive] = useState(true);
   const [answersLocked, setAnswersLocked] = useState(false);
-  const [message, setMessage] = useState("");
-  const [lastSentMessage, setLastSentMessage] = useState("");
-  const [classNote, setClassNote] = useState(() => String(classroom.note || "").trim());
-  const [classNoteDraft, setClassNoteDraft] = useState(() => String(classroom.note || "").trim());
   const displayClassroom = {
     ...classroom,
     ...classDetails,
-    note: classNote,
   };
   const totalStudentsCount = rosterStudents.length;
 
@@ -1853,10 +2007,7 @@ function TeacherClassOverviewPage() {
 
     setClassDetails(nextClassDetails);
     setClassEditForm(nextClassDetails);
-    const nextClassNote = String(classroom.note || "").trim();
-    setClassNote(nextClassNote);
-    setClassNoteDraft(nextClassNote);
-  }, [classroom.id, classroom.name, classroom.note, classroom.startTime]);
+  }, [classroom.id, classroom.name, classroom.startTime]);
 
   useEffect(() => {
     try {
@@ -1867,7 +2018,7 @@ function TeacherClassOverviewPage() {
   }, [classOverrides]);
 
   useEffect(() => {
-    if (!isAddStudentModalOpen && !isInviteModalOpen && !isEditClassModalOpen && !isNoteModalOpen && !studentPendingRemoval) {
+    if (!isAddStudentModalOpen && !isInviteModalOpen && !isEditClassModalOpen && !isAnalysisModalOpen && !isMessageModalOpen && !studentPendingRemoval) {
       setStudentSearch("");
       document.body.style.overflow = "";
       return undefined;
@@ -1879,7 +2030,7 @@ function TeacherClassOverviewPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isAddStudentModalOpen, isEditClassModalOpen, isInviteModalOpen, isNoteModalOpen, studentPendingRemoval]);
+  }, [isAddStudentModalOpen, isEditClassModalOpen, isInviteModalOpen, isAnalysisModalOpen, isMessageModalOpen, studentPendingRemoval]);
 
   useEffect(() => {
     if (!sessionLive || remainingSeconds <= 0) {
@@ -1925,36 +2076,6 @@ function TeacherClassOverviewPage() {
     setRemainingSeconds(selectedPreset * 60);
   };
 
-  const handleSendMessage = () => {
-    if (!message.trim()) {
-      return;
-    }
-
-    const sentAtLabel = new Intl.DateTimeFormat("en-GB", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date());
-
-    setLastSentMessage(`(${sentAtLabel}): ${message.trim()}`);
-    setMessage("");
-  };
-
-  const handleQuickAlert = (alert) => {
-    const sentAtLabel = new Intl.DateTimeFormat("en-GB", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date());
-
-    setLastSentMessage(`(${sentAtLabel}): ${alert}`);
-    setMessage("");
-  };
-
   const handleOpenEditClassModal = () => {
     setClassEditForm(classDetails);
     setIsEditClassModalOpen(true);
@@ -1965,14 +2086,18 @@ function TeacherClassOverviewPage() {
     setIsEditClassModalOpen(false);
   };
 
-  const handleOpenNoteModal = () => {
-    setClassNoteDraft(classNote);
-    setIsNoteModalOpen(true);
+  const handleOpenMessageModal = () => {
+    setClassMessageText("");
+    setClassMessageError("");
+    setIsMessageModalOpen(true);
   };
 
-  const handleCloseNoteModal = () => {
-    setClassNoteDraft(classNote);
-    setIsNoteModalOpen(false);
+  const handleCloseMessageModal = () => {
+    if (isSendingClassMessage) {
+      return;
+    }
+    setIsMessageModalOpen(false);
+    setClassMessageError("");
   };
 
   const handleEditClassFormChange = (event) => {
@@ -2009,20 +2134,6 @@ function TeacherClassOverviewPage() {
       },
     }));
     setIsEditClassModalOpen(false);
-  };
-
-  const handleSaveClassNote = () => {
-    const trimmedNote = classNoteDraft.trim();
-
-    setClassNote(trimmedNote);
-    setClassOverrides((current) => ({
-      ...current,
-      [classroom.id]: {
-        ...(current[classroom.id] ?? {}),
-        note: trimmedNote,
-      },
-    }));
-    setIsNoteModalOpen(false);
   };
 
   const resetInviteForm = () => {
@@ -2096,6 +2207,28 @@ function TeacherClassOverviewPage() {
     }).catch(() => {});
   };
 
+  const handleSendClassMessage = () => {
+    const trimmedMessage = classMessageText.trim();
+    if (!trimmedMessage) {
+      setClassMessageError("Please write a message.");
+      return;
+    }
+
+    setClassMessageError("");
+    setIsSendingClassMessage(true);
+    void sendTeacherClassMessage(classId, trimmedMessage)
+      .then(() => {
+        setIsMessageModalOpen(false);
+        setClassMessageText("");
+      })
+      .catch((error) => {
+        setClassMessageError(String(error?.message || "Could not send message."));
+      })
+      .finally(() => {
+        setIsSendingClassMessage(false);
+      });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -2146,52 +2279,75 @@ function TeacherClassOverviewPage() {
         onSubmit={handleSaveClassDetails}
       />
 
-      <ClassNoteModal
-        isOpen={isNoteModalOpen}
-        noteDraft={classNoteDraft}
-        onChange={(event) => setClassNoteDraft(event.target.value)}
-        onClose={handleCloseNoteModal}
-        onSubmit={handleSaveClassNote}
+      <MessageClassModal
+        className={displayClassroom.name}
+        errorText={classMessageError}
+        isOpen={isMessageModalOpen}
+        isSending={isSendingClassMessage}
+        messageText={classMessageText}
+        onChangeMessage={(value) => {
+          setClassMessageText(value);
+          if (classMessageError) {
+            setClassMessageError("");
+          }
+        }}
+        onClose={handleCloseMessageModal}
+        onSend={handleSendClassMessage}
       />
+
+      {isAnalysisModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
+          <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
+            <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+              <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                  Analyses
+                </p>
+                <button
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white transition-colors duration-200"
+                  onClick={() => setIsAnalysisModalOpen(false)}
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="p-10">
+                <ClassStrengthPanel students={students} />
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
 
       <HeaderPanel
         classroom={displayClassroom}
-        note={classNote}
-        onOpenNoteModal={handleOpenNoteModal}
+        onOpenAnalysisModal={() => setIsAnalysisModalOpen(true)}
         onOpenEditModal={handleOpenEditClassModal}
+        onOpenMessageModal={handleOpenMessageModal}
         onOpenInviteModal={() => setIsInviteModalOpen(true)}
         totalStudents={totalStudentsCount}
-        students={students}
       />
 
       <section>
-        <StudentsPanel
+        <UnitHomeworkPanel
+          classId={classId}
+          classroomName={displayClassroom.name}
           onOpenStudent={(student) =>
             navigate(`/teacher/students/${student.id}`, {
               state: { studentData: student },
             })}
           onRemoveStudent={setStudentPendingRemoval}
           onSearchChange={setStudentRosterSearch}
+          refreshKey={rosterStudents.length}
           searchValue={studentRosterSearch}
-          showTrendColumn
-          students={filteredStudents}
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <ClassStrengthPanel classroomName={displayClassroom.name} students={students} />
-
-        <CommunicationPanel
-          lastSentMessage={lastSentMessage}
-          message={message}
-          onChange={setMessage}
-          onQuickAlert={handleQuickAlert}
-          onSend={handleSendMessage}
-        />
-      </section>
     </div>
   );
 }
 
 export default TeacherClassOverviewPage;
+
 

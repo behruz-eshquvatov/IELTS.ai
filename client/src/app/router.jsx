@@ -258,15 +258,9 @@ export const router = createBrowserRouter([
                 }),
               },
               {
-                path: "assignments",
+                path: "profile",
                 lazy: async () => ({
-                  Component: (await import("../pages/teacher/TeacherAssignmentsPage")).default,
-                }),
-              },
-              {
-                path: "assignments/create",
-                lazy: async () => ({
-                  Component: (await import("../pages/teacher/TeacherCreateAssignmentPage")).default,
+                  Component: (await import("../pages/teacher/TeacherProfilePage")).default,
                 }),
               },
             ],

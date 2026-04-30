@@ -10,6 +10,9 @@ const listeningTestRoutes = require("./listeningTestRoutes");
 const readingRoutes = require("./readingRoutes");
 const superAdminRoutes = require("./superAdminRoutes");
 const userRoutes = require("./userRoutes");
+const organizationsRoutes = require("./organizationsRoutes");
+const teacherRoutes = require("./teacherRoutes");
+const studentClassRoutes = require("./studentClassRoutes");
 const { getApiIndex } = require("../controllers/systemController");
 
 const router = express.Router();
@@ -26,5 +29,8 @@ router.use("/listening-tests", listeningTestRoutes);
 router.use("/reading", readingRoutes);
 router.use("/super-admin", superAdminRoutes);
 router.use("/users", userRoutes);
+router.use("/organizations", organizationsRoutes);
+router.use("/teacher", teacherRoutes);
+router.use("/student", studentClassRoutes);
 
 module.exports = router;

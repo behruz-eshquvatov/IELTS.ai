@@ -1,9 +1,10 @@
 import {
   Bell,
-  ClipboardList,
+  GraduationCap,
   LogOut,
   Users,
   User,
+  UserCircle,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
@@ -16,8 +17,8 @@ const navGroups = [
     title: "Workspace",
     items: [
       { label: "Classes", to: "/teacher/classes", icon: Users },
-      { label: "Students", to: "/teacher/students", icon: User },
-      { label: "Assignments", to: "/teacher/assignments", icon: ClipboardList },
+      { label: "Students", to: "/teacher/students", icon: GraduationCap },
+      { label: "Profile", to: "/teacher/profile", icon: UserCircle },
     ],
   },
 ];
@@ -35,11 +36,8 @@ function getTeacherRouteTitle(pathname) {
   if (pathname.startsWith("/teacher/students/")) {
     return "Student Detail";
   }
-  if (pathname === "/teacher/assignments/create") {
-    return "Create Assignment";
-  }
-  if (pathname === "/teacher/assignments") {
-    return "Assignments Management";
+  if (pathname === "/teacher/profile") {
+    return "Teacher Profile";
   }
   const last = pathname.split("/").filter(Boolean).pop();
   return last ? `${last.charAt(0).toUpperCase()}${last.slice(1)}` : "Teacher Panel";

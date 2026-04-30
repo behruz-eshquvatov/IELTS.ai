@@ -30,6 +30,7 @@ function getApiIndex(req, res) {
       "reading",
       "reading-admin",
       "system",
+      "organizations",
     ],
     authRoutes: {
       register: "/api/v1/auth/register",
@@ -40,6 +41,9 @@ function getApiIndex(req, res) {
       refresh: "/api/v1/auth/refresh",
       logout: "/api/v1/auth/logout",
       me: "/api/v1/auth/me",
+    },
+    organizationRoutes: {
+      search: "GET /api/v1/organizations/search?q=pdp",
     },
     studentRoutes: {
       list: "/api/v1/students",
@@ -138,6 +142,12 @@ function getApiIndex(req, res) {
       createUnit: "POST /api/v1/super-admin/:password/daily-units",
       updateUnit: "PUT /api/v1/super-admin/:password/daily-units/:unitId",
       deleteUnit: "DELETE /api/v1/super-admin/:password/daily-units/:unitId",
+    },
+    organizationsAdminRoutes: {
+      list: "GET /api/v1/super-admin/:password/organizations",
+      create: "POST /api/v1/super-admin/:password/organizations",
+      update: "PUT /api/v1/super-admin/:password/organizations/:organizationId",
+      delete: "DELETE /api/v1/super-admin/:password/organizations/:organizationId",
     },
     health: "/api/v1/system/health",
   });

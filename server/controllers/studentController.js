@@ -1618,6 +1618,70 @@ async function getMyStudentDailyTasks(req, res) {
   return getStudentDailyTasks(req, res);
 }
 
+async function getMyStudentDashboard(req, res) {
+  const studentUserId = String(req.auth?.userId || "").trim();
+  if (!studentUserId) {
+    return res.status(401).json({
+      message: "Student authorization is required.",
+    });
+  }
+
+  const user = await User.findById(studentUserId)
+    .select("_id email role fullName createdAt isActive")
+    .lean();
+  if (!user || user.role !== "student" || !user.isActive) {
+    return res.status(403).json({
+      message: "Only students can access this endpoint.",
+    });
+  }
+
+  const studentId = normalizeStudentId(user.email);
+  const safeDailyTaskUser = {
+    _id: String(user._id),
+    email: studentId,
+  };
+
+  const [
+    profileDoc,
+    dailyTasks,
+    analytics,
+    heatmapEntries,
+    recentAttempts,
+  ] = await Promise.all([
+    ensureStudentProfileForUser(user),
+    buildStudentDailyTasksResponse(safeDailyTaskUser),
+    getDynamicStudentAnalytics(studentUserId, "week"),
+    getHeatmapEntriesForStudent(studentId),
+    listRecentStudentTaskAttempts(studentUserId, 11, {
+      status: "completed",
+    }),
+  ]);
+
+  const recentItems = (Array.isArray(recentAttempts) ? recentAttempts : []).map((attempt) => {
+    const summary = summarizeStudentTaskAttemptForClient(attempt);
+    return {
+      ...summary,
+      title: buildRecentCompletedTitle(summary),
+      detail: buildAttemptDetailLine({ score: summary.score }),
+      to: buildRecentCompletedRoute(summary, attempt),
+    };
+  });
+
+  return res.json({
+    profile: buildMyStudentProfileResponse(user, profileDoc),
+    dailyTasks,
+    recentAttempts: {
+      count: recentItems.length,
+      items: recentItems,
+    },
+    analyticsSummary: analytics || null,
+    heatmap: {
+      entries: normalizeStudyHeatmapEntries(heatmapEntries || []),
+    },
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
 async function createMyDailyTaskAttempt(req, res) {
   const studentUserId = String(req.auth?.userId || "").trim();
   const studentEmail = normalizeStudentId(req.auth?.email);
@@ -2557,6 +2621,7 @@ module.exports = {
   updateStudentProfile,
   getStudentDailyTasks,
   getMyStudentDailyTasks,
+  getMyStudentDashboard,
   createMyDailyTaskAttempt,
   getMyRecentCompletedDailyTasks,
   listMyTaskAttempts,

@@ -138,7 +138,8 @@ function buildStudentEmail(student) {
     return student.email;
   }
 
-  return `${student.name.toLowerCase().trim().replace(/\s+/g, ".").replace(/[^a-z.]/g, "")}@ieltsai.app`;
+  const baseName = String(student?.name || student?.id || "student");
+  return `${baseName.toLowerCase().trim().replace(/\s+/g, ".").replace(/[^a-z.]/g, "")}@ieltsai.app`;
 }
 
 function getPerformanceTaskLabels(student) {
@@ -575,22 +576,23 @@ function TeacherStudentDetailPage() {
         </p>
       </div>
 
-      <section className="border border-slate-200/80 bg-white p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+      <section className="relative overflow-hidden border border-dashed border-slate-700/90 bg-gradient-to-br from-[#062316] via-[#050505] to-[#061421] p-6">
+        <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(to_right,rgba(148,163,184,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.16)_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-white">
               {student.name}
             </h2>
-            <p className="text-sm font-medium text-slate-500">
+            <p className="text-sm font-medium text-white/65">
               {studentEmail}
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
-            <div className="border border-slate-200/80 bg-white px-5 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="border border-white/10 bg-white/[0.08] px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
                 Previous week avg
               </p>
-              <p className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+              <p className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">
                 {scoreMetrics.previousAverageScore?.toFixed(1) ?? "TBD"}
               </p>
             </div>
@@ -607,11 +609,11 @@ function TeacherStudentDetailPage() {
               </div>
             </div>
 
-            <div className="border border-slate-200/80 bg-white px-5 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="border border-white/10 bg-white/[0.08] px-5 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
                 Current score
               </p>
-              <p className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+              <p className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">
                 {scoreMetrics.averageScore?.toFixed(1) ?? "TBD"}
               </p>
             </div>
@@ -661,7 +663,7 @@ function TeacherStudentDetailPage() {
               action={(
                 <div className="relative" ref={filterRef}>
                   <button
-                    className="inline-flex min-w-[13rem] items-center justify-between gap-4 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-950 transition-colors"
+                    className="inline-flex min-w-[13rem] items-center justify-between gap-4 rounded-none bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-950 transition-colors"
                     onClick={() =>
                       setFilterState((current) => ({
                         studentId: student.id,
@@ -680,7 +682,7 @@ function TeacherStudentDetailPage() {
                     <div className="absolute right-0 top-full z-20 mt-2 min-w-full bg-slate-950 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.8)]">
                       {performanceFilterOptions.map((option) => (
                         <button
-                          className="flex w-full items-center justify-between bg-slate-950 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-slate-950"
+                          className="flex w-full items-center justify-between rounded-none bg-slate-950 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-slate-950 focus:bg-white focus:text-slate-950"
                           key={option}
                           onClick={() => {
                             setSelectedTestTypes((current) => ({

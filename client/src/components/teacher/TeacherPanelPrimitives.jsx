@@ -5,7 +5,7 @@ export function PanelShell({ children, className = "" }) {
   return (
     <section
       className={clsx(
-        "overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.35)]",
+        "overflow-hidden border border-slate-200/80 bg-white/90",
         className,
       )}
     >
@@ -71,6 +71,8 @@ export function StatusBadge({ tone = "slate", children }) {
     emerald: "border border-emerald-200/80 bg-emerald-50/60 text-emerald-700",
     amber: "bg-amber-100 text-amber-700",
     rose: "border border-rose-200/80 bg-rose-50/60 text-rose-700",
+    paid: "bg-transparent text-emerald-700",
+    unpaid: "bg-transparent text-rose-700",
   };
 
   return (
@@ -126,7 +128,7 @@ export function ConfirmStudentRemovalModal({
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
-                className="inline-flex items-center justify-center border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex items-center justify-center bg-transparent px-5 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:text-slate-950"
                 onClick={onClose}
                 type="button"
               >

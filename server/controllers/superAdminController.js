@@ -480,6 +480,11 @@ async function getSuperAdminStatus(req, res) {
         label: "Daily Units",
         path: `/super-admin/${req.params.password}/daily-units`,
       },
+      {
+        key: "organizations",
+        label: "Organizations",
+        path: `/super-admin/${req.params.password}/organizations`,
+      },
     ],
   });
 }
