@@ -927,7 +927,7 @@ function StudentWritingTask2ResultPage() {
         <aside className="space-y-4 rounded-none border border-slate-200 bg-white p-5 text-slate-900 sm:p-6 xl:sticky xl:top-24 xl:self-start">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">AI Analysis</p>
 
-          {isLoadingAnalysis ? (
+          {isLoadingAnalysis && !hasCompletedAnalysis ? (
             <SkeletonText lines={5} widths={["90%", "72%", "84%", "64%", "48%"]} />
           ) : null}
 

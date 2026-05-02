@@ -54,7 +54,7 @@ const studentProfileSchema = new mongoose.Schema(
     },
     security: {
       passwordMasked: { type: String, required: true, default: "************" },
-      lastUpdatedLabel: { type: String, required: true, default: "Last updated 24 days ago" },
+      lastUpdatedLabel: { type: String, default: "" },
     },
     billingHistory: {
       type: [invoiceSchema],

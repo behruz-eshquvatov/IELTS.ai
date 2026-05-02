@@ -9,7 +9,8 @@ const WritingTask2Analysis = require("../models/writingTask2AnalysisModel");
 
 const READING_TESTS_COLLECTION = "reading_tests";
 const READING_PASSAGES_COLLECTION = "reading_passages";
-const DEFAULT_LISTENING_BLOCKS_COLLECTION = ListeningBlock.collection.name || "listening_blocks";
+const DEFAULT_LISTENING_BLOCKS_COLLECTION =
+  ListeningBlock.collection.name || "listening_blocks";
 const LEGACY_LISTENING_BLOCKS_COLLECTION = "listeninig_blocks";
 
 const RESULT_CATEGORIES = {
@@ -39,8 +40,6 @@ const RESULTS_CENTER_FILTER_LABELS = {
   [RESULT_CATEGORIES.READING_FULL_TEST]: "READING FULL TESTS",
   [RESULT_CATEGORIES.LISTENING_FULL_TEST]: "LISTENING FULL TESTS",
   question_type_task: "QUESTION TYPE TASKS",
-  [RESULT_CATEGORIES.READING_QUESTION_TASK]: "READING QUESTION TASKS",
-  [RESULT_CATEGORIES.LISTENING_QUESTION_TASK]: "LISTENING QUESTION TASKS",
 };
 
 const FILTER_ALIASES = {
@@ -58,13 +57,24 @@ const FILTER_ALIASES = {
 };
 
 function normalizeText(value, fallback = "", maxLength = 320) {
-  const normalized = String(value || "").trim().slice(0, maxLength);
-  return normalized || String(fallback || "").trim().slice(0, maxLength);
+  const normalized = String(value || "")
+    .trim()
+    .slice(0, maxLength);
+  return (
+    normalized ||
+    String(fallback || "")
+      .trim()
+      .slice(0, maxLength)
+  );
 }
 
 function normalizeTaskType(value) {
   const safe = normalizeText(value, "", 60).toLowerCase();
-  return ["reading", "listening", "writing_task1", "writing_task2"].includes(safe) ? safe : "";
+  return ["reading", "listening", "writing_task1", "writing_task2"].includes(
+    safe,
+  )
+    ? safe
+    : "";
 }
 
 function normalizeSourceType(value) {
@@ -102,8 +112,8 @@ function doesCategoryMatchFilter(taskCategory, filterKey) {
 
   if (safeFilter === "question_type_task") {
     return (
-      safeCategory === RESULT_CATEGORIES.READING_QUESTION_TASK
-      || safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
+      safeCategory === RESULT_CATEGORIES.READING_QUESTION_TASK ||
+      safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
     );
   }
 
@@ -136,19 +146,27 @@ function summarizeScore(score = {}) {
   const safe = score && typeof score === "object" ? score : {};
   return {
     band: Number.isFinite(Number(safe?.band)) ? Number(safe.band) : null,
-    percentage: Number.isFinite(Number(safe?.percentage)) ? Number(safe.percentage) : null,
-    correctCount: Number.isFinite(Number(safe?.correctCount)) ? Number(safe.correctCount) : null,
-    incorrectCount: Number.isFinite(Number(safe?.incorrectCount)) ? Number(safe.incorrectCount) : null,
-    totalQuestions: Number.isFinite(Number(safe?.totalQuestions)) ? Number(safe.totalQuestions) : null,
+    percentage: Number.isFinite(Number(safe?.percentage))
+      ? Number(safe.percentage)
+      : null,
+    correctCount: Number.isFinite(Number(safe?.correctCount))
+      ? Number(safe.correctCount)
+      : null,
+    incorrectCount: Number.isFinite(Number(safe?.incorrectCount))
+      ? Number(safe.incorrectCount)
+      : null,
+    totalQuestions: Number.isFinite(Number(safe?.totalQuestions))
+      ? Number(safe.totalQuestions)
+      : null,
   };
 }
 
 function buildScoreLabel(score = {}) {
   const safeScore = summarizeScore(score);
   if (
-    Number.isFinite(Number(safeScore.correctCount))
-    && Number.isFinite(Number(safeScore.totalQuestions))
-    && Number(safeScore.totalQuestions) > 0
+    Number.isFinite(Number(safeScore.correctCount)) &&
+    Number.isFinite(Number(safeScore.totalQuestions)) &&
+    Number(safeScore.totalQuestions) > 0
   ) {
     if (Number.isFinite(Number(safeScore.band))) {
       return `${safeScore.correctCount}/${safeScore.totalQuestions} - band ${Number(safeScore.band).toFixed(1)}`;
@@ -191,7 +209,8 @@ function parseListeningPartTaskRefId(taskRefId) {
   const partNumber = Number.parseInt(String(match[2] || ""), 10);
   return {
     testId: normalizeTaskRefId(match[1]),
-    partNumber: Number.isFinite(partNumber) && partNumber > 0 ? partNumber : null,
+    partNumber:
+      Number.isFinite(partNumber) && partNumber > 0 ? partNumber : null,
   };
 }
 
@@ -209,7 +228,10 @@ function resolveAttemptTaskCategory(taskType, sourceType, taskRefId = "") {
   }
 
   if (safeTaskType === "reading") {
-    if (safeSourceType === "reading_passage" || safeSourceType === "reading_question_family") {
+    if (
+      safeSourceType === "reading_passage" ||
+      safeSourceType === "reading_question_family"
+    ) {
       return RESULT_CATEGORIES.READING_QUESTION_TASK;
     }
     return RESULT_CATEGORIES.READING_FULL_TEST;
@@ -217,10 +239,10 @@ function resolveAttemptTaskCategory(taskType, sourceType, taskRefId = "") {
 
   if (safeTaskType === "listening") {
     if (
-      safeSourceType === "listening_block"
-      || safeSourceType === "listening_question_family"
-      || safeSourceType === "listening_part"
-      || safeTaskRefId.includes("::part:")
+      safeSourceType === "listening_block" ||
+      safeSourceType === "listening_question_family" ||
+      safeSourceType === "listening_part" ||
+      safeTaskRefId.includes("::part:")
     ) {
       return RESULT_CATEGORIES.LISTENING_QUESTION_TASK;
     }
@@ -255,15 +277,15 @@ function resolveGroupSourceType(taskCategory, sourceType) {
 function resolveTaskTypeFromCategory(taskCategory) {
   const safeCategory = normalizeText(taskCategory, "", 80).toLowerCase();
   if (
-    safeCategory === RESULT_CATEGORIES.READING_FULL_TEST
-    || safeCategory === RESULT_CATEGORIES.READING_QUESTION_TASK
+    safeCategory === RESULT_CATEGORIES.READING_FULL_TEST ||
+    safeCategory === RESULT_CATEGORIES.READING_QUESTION_TASK
   ) {
     return "reading";
   }
 
   if (
-    safeCategory === RESULT_CATEGORIES.LISTENING_FULL_TEST
-    || safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
+    safeCategory === RESULT_CATEGORIES.LISTENING_FULL_TEST ||
+    safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
   ) {
     return "listening";
   }
@@ -281,13 +303,16 @@ function resolveTaskTypeFromCategory(taskCategory) {
 
 function resolveTaskMode(taskCategory) {
   const safeCategory = normalizeText(taskCategory, "", 80).toLowerCase();
-  if (safeCategory === RESULT_CATEGORIES.READING_FULL_TEST || safeCategory === RESULT_CATEGORIES.LISTENING_FULL_TEST) {
+  if (
+    safeCategory === RESULT_CATEGORIES.READING_FULL_TEST ||
+    safeCategory === RESULT_CATEGORIES.LISTENING_FULL_TEST
+  ) {
     return "full";
   }
 
   if (
-    safeCategory === RESULT_CATEGORIES.READING_QUESTION_TASK
-    || safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
+    safeCategory === RESULT_CATEGORIES.READING_QUESTION_TASK ||
+    safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
   ) {
     return "question";
   }
@@ -358,30 +383,46 @@ function sanitizeIncorrectItems(items = []) {
     blockType: normalizeSourceType(item?.blockType),
     blockId: normalizeTaskRefId(item?.blockId),
     blockTitle: normalizeText(item?.blockTitle, "", 180),
-    questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
+    questionNumber: Number.isFinite(Number(item?.questionNumber))
+      ? Number(item.questionNumber)
+      : null,
     studentAnswer: normalizeText(item?.studentAnswer, "", 240),
     acceptedAnswers: Array.isArray(item?.acceptedAnswers)
-      ? item.acceptedAnswers.map((entry) => normalizeText(entry, "", 120)).filter(Boolean).slice(0, 8)
+      ? item.acceptedAnswers
+          .map((entry) => normalizeText(entry, "", 120))
+          .filter(Boolean)
+          .slice(0, 8)
       : [],
+    isCorrect: Boolean(item?.isCorrect),
   }));
 }
 
 function sanitizeEvaluation(value = {}) {
   const safe = value && typeof value === "object" ? value : {};
-  const totalQuestions = Number.isFinite(Number(safe?.totalQuestions)) ? Number(safe.totalQuestions) : 0;
-  const correctCount = Number.isFinite(Number(safe?.correctCount)) ? Number(safe.correctCount) : 0;
+  const totalQuestions = Number.isFinite(Number(safe?.totalQuestions))
+    ? Number(safe.totalQuestions)
+    : 0;
+  const correctCount = Number.isFinite(Number(safe?.correctCount))
+    ? Number(safe.correctCount)
+    : 0;
   const incorrectCount = Number.isFinite(Number(safe?.incorrectCount))
     ? Number(safe.incorrectCount)
     : Math.max(0, totalQuestions - correctCount);
   const percentage = Number.isFinite(Number(safe?.percentage))
     ? Number(safe.percentage)
-    : (totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0);
+    : totalQuestions > 0
+      ? Math.round((correctCount / totalQuestions) * 100)
+      : 0;
 
   return {
     totalQuestions: Math.max(0, Math.round(totalQuestions)),
     correctCount: Math.max(0, Math.round(correctCount)),
     incorrectCount: Math.max(0, Math.round(incorrectCount)),
     percentage: Math.max(0, Math.min(100, Math.round(percentage))),
+    band: Number.isFinite(Number(safe?.band))
+      ? Math.max(0, Math.min(9, Number(safe.band)))
+      : null,
+    answerItems: sanitizeIncorrectItems(safe?.answerItems),
     incorrectItems: sanitizeIncorrectItems(safe?.incorrectItems),
   };
 }
@@ -396,9 +437,15 @@ function sanitizePassageTiming(items = []) {
       passageNumber: Number.isFinite(Number(item?.passageNumber))
         ? Number(item.passageNumber)
         : index + 1,
-      timeSpentSeconds: Math.max(0, Math.round(Number(item?.timeSpentSeconds) || 0)),
+      timeSpentSeconds: Math.max(
+        0,
+        Math.round(Number(item?.timeSpentSeconds) || 0),
+      ),
     }))
-    .filter((entry) => Number.isFinite(entry.passageNumber) && entry.passageNumber > 0);
+    .filter(
+      (entry) =>
+        Number.isFinite(entry.passageNumber) && entry.passageNumber > 0,
+    );
 }
 
 function sanitizeBlockResults(items = []) {
@@ -406,40 +453,51 @@ function sanitizeBlockResults(items = []) {
     return [];
   }
 
-  return items.slice(0, 40).map((item) => ({
-    blockId: normalizeTaskRefId(item?.blockId),
-    section: normalizeSourceType(item?.section),
-    questionFamily: normalizeSourceType(item?.questionFamily),
-    blockType: normalizeSourceType(item?.blockType),
-    blockTitle: normalizeText(item?.blockTitle, "", 180),
-    correctCount: Math.max(0, Math.round(Number(item?.correctCount) || 0)),
-    totalQuestions: Math.max(0, Math.round(Number(item?.totalQuestions) || 0)),
-    percentage: Math.max(0, Math.round(Number(item?.percentage) || 0)),
-    incorrectItems: sanitizeIncorrectItems(item?.incorrectItems),
-  })).filter((entry) => entry.blockId);
+  return items
+    .slice(0, 40)
+    .map((item) => ({
+      blockId: normalizeTaskRefId(item?.blockId),
+      section: normalizeSourceType(item?.section),
+      questionFamily: normalizeSourceType(item?.questionFamily),
+      blockType: normalizeSourceType(item?.blockType),
+      blockTitle: normalizeText(item?.blockTitle, "", 180),
+      correctCount: Math.max(0, Math.round(Number(item?.correctCount) || 0)),
+      totalQuestions: Math.max(
+        0,
+        Math.round(Number(item?.totalQuestions) || 0),
+      ),
+      percentage: Math.max(0, Math.round(Number(item?.percentage) || 0)),
+      answerItems: sanitizeIncorrectItems(item?.answerItems),
+      incorrectItems: sanitizeIncorrectItems(item?.incorrectItems),
+    }))
+    .filter((entry) => entry.blockId);
 }
 
 function extractWritingAnalysisId(rawAttempt = {}) {
-  const sourceRefs = rawAttempt?.sourceRefs && typeof rawAttempt.sourceRefs === "object"
-    ? rawAttempt.sourceRefs
-    : {};
-  const payload = rawAttempt?.payload && typeof rawAttempt.payload === "object"
-    ? rawAttempt.payload
-    : {};
+  const sourceRefs =
+    rawAttempt?.sourceRefs && typeof rawAttempt.sourceRefs === "object"
+      ? rawAttempt.sourceRefs
+      : {};
+  const payload =
+    rawAttempt?.payload && typeof rawAttempt.payload === "object"
+      ? rawAttempt.payload
+      : {};
   const taskType = normalizeTaskType(rawAttempt?.taskType);
 
   if (taskType === "writing_task1") {
     return normalizeTaskRefId(
-      sourceRefs?.writingTask1AnalysisId || payload?.analysis?.id || payload?.analysisId,
+      sourceRefs?.writingTask1AnalysisId ||
+        payload?.analysis?.id ||
+        payload?.analysisId,
     );
   }
 
   if (taskType === "writing_task2") {
     return normalizeTaskRefId(
-      sourceRefs?.writingTask2AnalysisId
-      || payload?.analysis?.id
-      || payload?.submission?.analysisId
-      || payload?.analysisId,
+      sourceRefs?.writingTask2AnalysisId ||
+        payload?.analysis?.id ||
+        payload?.submission?.analysisId ||
+        payload?.analysisId,
     );
   }
 
@@ -447,13 +505,24 @@ function extractWritingAnalysisId(rawAttempt = {}) {
 }
 
 function extractAttemptPayloadSummary(rawAttempt = {}) {
-  const payload = rawAttempt?.payload && typeof rawAttempt.payload === "object" ? rawAttempt.payload : {};
-  const submission = payload?.submission && typeof payload.submission === "object" ? payload.submission : {};
-  const analysis = payload?.analysis && typeof payload.analysis === "object" ? payload.analysis : {};
+  const payload =
+    rawAttempt?.payload && typeof rawAttempt.payload === "object"
+      ? rawAttempt.payload
+      : {};
+  const submission =
+    payload?.submission && typeof payload.submission === "object"
+      ? payload.submission
+      : {};
+  const analysis =
+    payload?.analysis && typeof payload.analysis === "object"
+      ? payload.analysis
+      : {};
 
   return {
     route: normalizeText(payload?.route || payload?.navigation?.to, "", 520),
-    practiceKey: normalizeSourceType(payload?.practiceKey || submission?.practiceKey),
+    practiceKey: normalizeSourceType(
+      payload?.practiceKey || submission?.practiceKey,
+    ),
     partNumber: Number.isFinite(Number(submission?.partNumber))
       ? Number(submission.partNumber)
       : null,
@@ -462,11 +531,20 @@ function extractAttemptPayloadSummary(rawAttempt = {}) {
       : Number.isFinite(Number(rawAttempt?.score?.totalWords))
         ? Number(rawAttempt.score.totalWords)
         : null,
-    evaluation: sanitizeEvaluation(payload?.evaluation || submission?.evaluation || {}),
-    passageTiming: sanitizePassageTiming(payload?.passageTiming || submission?.passageTiming || []),
-    blockResults: sanitizeBlockResults(payload?.blockResults || submission?.blockResults || []),
+    evaluation: sanitizeEvaluation(
+      payload?.evaluation || submission?.evaluation || {},
+    ),
+    passageTiming: sanitizePassageTiming(
+      payload?.passageTiming || submission?.passageTiming || [],
+    ),
+    blockResults: sanitizeBlockResults(
+      payload?.blockResults || submission?.blockResults || [],
+    ),
     analysisSummary: normalizeText(analysis?.summary, "", 400),
-    diagnosis: analysis?.diagnosis && typeof analysis.diagnosis === "object" ? analysis.diagnosis : {},
+    diagnosis:
+      analysis?.diagnosis && typeof analysis.diagnosis === "object"
+        ? analysis.diagnosis
+        : {},
     analysisStatus: normalizeText(analysis?.status, "", 40).toLowerCase(),
   };
 }
@@ -474,20 +552,34 @@ function extractAttemptPayloadSummary(rawAttempt = {}) {
 async function resolveListeningBlocksCollectionName() {
   const db = mongoose.connection.db;
   const hasDefaultCollection = Boolean(
-    await db.listCollections({ name: DEFAULT_LISTENING_BLOCKS_COLLECTION }, { nameOnly: true }).next(),
+    await db
+      .listCollections(
+        { name: DEFAULT_LISTENING_BLOCKS_COLLECTION },
+        { nameOnly: true },
+      )
+      .next(),
   );
   if (hasDefaultCollection) {
-    const count = await db.collection(DEFAULT_LISTENING_BLOCKS_COLLECTION).estimatedDocumentCount();
+    const count = await db
+      .collection(DEFAULT_LISTENING_BLOCKS_COLLECTION)
+      .estimatedDocumentCount();
     if (count > 0) {
       return DEFAULT_LISTENING_BLOCKS_COLLECTION;
     }
   }
 
   const hasLegacyCollection = Boolean(
-    await db.listCollections({ name: LEGACY_LISTENING_BLOCKS_COLLECTION }, { nameOnly: true }).next(),
+    await db
+      .listCollections(
+        { name: LEGACY_LISTENING_BLOCKS_COLLECTION },
+        { nameOnly: true },
+      )
+      .next(),
   );
   if (hasLegacyCollection) {
-    const count = await db.collection(LEGACY_LISTENING_BLOCKS_COLLECTION).estimatedDocumentCount();
+    const count = await db
+      .collection(LEGACY_LISTENING_BLOCKS_COLLECTION)
+      .estimatedDocumentCount();
     if (count > 0) {
       return LEGACY_LISTENING_BLOCKS_COLLECTION;
     }
@@ -508,7 +600,11 @@ async function buildTaskMetadataLookups(rawAttempts = []) {
     const taskType = normalizeTaskType(attempt?.taskType);
     const sourceType = normalizeSourceType(attempt?.sourceType);
     const taskRefId = normalizeTaskRefId(attempt?.taskRefId);
-    const taskCategory = resolveAttemptTaskCategory(taskType, sourceType, taskRefId);
+    const taskCategory = resolveAttemptTaskCategory(
+      taskType,
+      sourceType,
+      taskRefId,
+    );
     if (!taskType || !taskRefId) {
       return;
     }
@@ -551,7 +647,8 @@ async function buildTaskMetadataLookups(rawAttempts = []) {
   });
 
   const db = mongoose.connection.db;
-  const listeningBlocksCollectionName = await resolveListeningBlocksCollectionName();
+  const listeningBlocksCollectionName =
+    await resolveListeningBlocksCollectionName();
 
   const [
     writingTask1Docs,
@@ -563,45 +660,65 @@ async function buildTaskMetadataLookups(rawAttempts = []) {
   ] = await Promise.all([
     writingTask1Ids.size > 0
       ? WritingTask1Item.find(
-        { _id: { $in: Array.from(writingTask1Ids) } },
-        { _id: 1, questionTopic: 1, title: 1, visualType: 1 },
-      ).lean()
+          { _id: { $in: Array.from(writingTask1Ids) } },
+          { _id: 1, questionTopic: 1, title: 1, visualType: 1 },
+        ).lean()
       : Promise.resolve([]),
     writingTask2Ids.size > 0
       ? WritingTask2Item.find(
-        { _id: { $in: Array.from(writingTask2Ids) } },
-        { _id: 1, questionTopic: 1, title: 1, essayType: 1 },
-      ).lean()
+          { _id: { $in: Array.from(writingTask2Ids) } },
+          { _id: 1, questionTopic: 1, title: 1, essayType: 1 },
+        ).lean()
       : Promise.resolve([]),
     readingTestIds.size > 0
-      ? db.collection(READING_TESTS_COLLECTION).find(
-        { _id: { $in: Array.from(readingTestIds) } },
-        { projection: { _id: 1, title: 1, module: 1, book: 1, test: 1 } },
-      ).toArray()
+      ? db
+          .collection(READING_TESTS_COLLECTION)
+          .find(
+            { _id: { $in: Array.from(readingTestIds) } },
+            { projection: { _id: 1, title: 1, module: 1, book: 1, test: 1 } },
+          )
+          .toArray()
       : Promise.resolve([]),
     readingPassageIds.size > 0
-      ? db.collection(READING_PASSAGES_COLLECTION).find(
-        { _id: { $in: Array.from(readingPassageIds) } },
-        { projection: { _id: 1, title: 1, passageTitle: 1, heading: 1 } },
-      ).toArray()
+      ? db
+          .collection(READING_PASSAGES_COLLECTION)
+          .find(
+            { _id: { $in: Array.from(readingPassageIds) } },
+            { projection: { _id: 1, title: 1, passageTitle: 1, heading: 1 } },
+          )
+          .toArray()
       : Promise.resolve([]),
     listeningTestIds.size > 0
       ? ListeningTest.find(
-        { _id: { $in: Array.from(listeningTestIds) } },
-        { _id: 1, title: 1, section: 1, module: 1 },
-      ).lean()
+          { _id: { $in: Array.from(listeningTestIds) } },
+          { _id: 1, title: 1, section: 1, module: 1 },
+        ).lean()
       : Promise.resolve([]),
     listeningBlockIds.size > 0
-      ? db.collection(listeningBlocksCollectionName).find(
-        { _id: { $in: Array.from(listeningBlockIds) } },
-        { projection: { _id: 1, blockType: 1, questionFamily: 1, display: 1 } },
-      ).toArray()
+      ? db
+          .collection(listeningBlocksCollectionName)
+          .find(
+            { _id: { $in: Array.from(listeningBlockIds) } },
+            {
+              projection: {
+                _id: 1,
+                blockType: 1,
+                questionFamily: 1,
+                display: 1,
+              },
+            },
+          )
+          .toArray()
       : Promise.resolve([]),
   ]);
 
-  const toMapById = (items = []) => new Map(
-    (Array.isArray(items) ? items : []).map((item) => [normalizeTaskRefId(item?._id), item]),
-  );
+  const toMapById = (items = []) =>
+    new Map(
+      (Array.isArray(items) ? items : []).map((item) => [
+        normalizeTaskRefId(item?._id),
+        item,
+      ]),
+    );
 
   return {
     writingTask1ById: toMapById(writingTask1Docs),
@@ -617,46 +734,74 @@ function buildReadableTaskTitle(rawAttempt = {}, lookups = {}) {
   const taskType = normalizeTaskType(rawAttempt?.taskType);
   const taskRefId = normalizeTaskRefId(rawAttempt?.taskRefId);
   const sourceType = normalizeSourceType(rawAttempt?.sourceType);
-  const taskCategory = resolveAttemptTaskCategory(taskType, sourceType, taskRefId);
+  const taskCategory = resolveAttemptTaskCategory(
+    taskType,
+    sourceType,
+    taskRefId,
+  );
   const taskLabel = normalizeText(rawAttempt?.taskLabel, "", 300);
   const payloadSummary = extractAttemptPayloadSummary(rawAttempt);
 
   if (taskCategory === RESULT_CATEGORIES.WRITING_TASK1) {
     const itemDoc = lookups?.writingTask1ById?.get(taskRefId) || null;
-    const topic = normalizeText(itemDoc?.questionTopic || itemDoc?.title || taskLabel || taskRefId, "", 280);
+    const topic = normalizeText(
+      itemDoc?.questionTopic || itemDoc?.title || taskLabel || taskRefId,
+      "",
+      280,
+    );
     return `Writing Task 1 - ${topic}`;
   }
 
   if (taskCategory === RESULT_CATEGORIES.WRITING_TASK2) {
     const itemDoc = lookups?.writingTask2ById?.get(taskRefId) || null;
-    const topic = normalizeText(itemDoc?.questionTopic || itemDoc?.title || taskLabel || taskRefId, "", 280);
+    const topic = normalizeText(
+      itemDoc?.questionTopic || itemDoc?.title || taskLabel || taskRefId,
+      "",
+      280,
+    );
     return `Writing Task 2 - ${topic}`;
   }
 
   if (taskCategory === RESULT_CATEGORIES.READING_FULL_TEST) {
     const testDoc = lookups?.readingTestsById?.get(taskRefId) || null;
-    const fromNumbers = Number.isFinite(Number(testDoc?.book)) && Number.isFinite(Number(testDoc?.test))
-      ? `Cambridge ${Number(testDoc.book)} Test ${Number(testDoc.test)}`
-      : "";
-    const title = normalizeText(testDoc?.title || fromNumbers || taskLabel || taskRefId, "", 240);
+    const fromNumbers =
+      Number.isFinite(Number(testDoc?.book)) &&
+      Number.isFinite(Number(testDoc?.test))
+        ? `Cambridge ${Number(testDoc.book)} Test ${Number(testDoc.test)}`
+        : "";
+    const title = normalizeText(
+      testDoc?.title || fromNumbers || taskLabel || taskRefId,
+      "",
+      240,
+    );
     return `Reading Full Test - ${title}`;
   }
 
   if (taskCategory === RESULT_CATEGORIES.LISTENING_FULL_TEST) {
     const testDoc = lookups?.listeningTestsById?.get(taskRefId) || null;
-    const title = normalizeText(testDoc?.title || taskLabel || taskRefId, "", 240);
+    const title = normalizeText(
+      testDoc?.title || taskLabel || taskRefId,
+      "",
+      240,
+    );
     return `Listening Full Test - ${title}`;
   }
 
   if (taskCategory === RESULT_CATEGORIES.READING_QUESTION_TASK) {
     const passageDoc = lookups?.readingPassagesById?.get(taskRefId) || null;
     const passageTitle = normalizeText(
-      passageDoc?.title || passageDoc?.passageTitle || passageDoc?.heading || taskLabel || taskRefId,
+      passageDoc?.title ||
+        passageDoc?.passageTitle ||
+        passageDoc?.heading ||
+        taskLabel ||
+        taskRefId,
       "",
       220,
     );
     if (sourceType === "reading_question_family") {
-      const familyLabel = toReadableLabel(payloadSummary?.practiceKey || "question family");
+      const familyLabel = toReadableLabel(
+        payloadSummary?.practiceKey || "question family",
+      );
       return `Reading Question Task - ${familyLabel} - ${passageTitle}`;
     }
     return `Reading Question Task - ${passageTitle}`;
@@ -666,14 +811,30 @@ function buildReadableTaskTitle(rawAttempt = {}, lookups = {}) {
     if (sourceType === "listening_part" || taskRefId.includes("::part:")) {
       const partMeta = parseListeningPartTaskRefId(taskRefId);
       const testDoc = lookups?.listeningTestsById?.get(partMeta.testId) || null;
-      const testTitle = normalizeText(testDoc?.title || partMeta.testId || taskLabel || taskRefId, "", 220);
-      const partLabel = Number.isFinite(partMeta.partNumber) ? `Part ${partMeta.partNumber}` : "Part";
+      const testTitle = normalizeText(
+        testDoc?.title || partMeta.testId || taskLabel || taskRefId,
+        "",
+        220,
+      );
+      const partLabel = Number.isFinite(partMeta.partNumber)
+        ? `Part ${partMeta.partNumber}`
+        : "Part";
       return `Listening Question Task - ${partLabel} - ${testTitle}`;
     }
 
     const blockDoc = lookups?.listeningBlocksById?.get(taskRefId) || null;
-    const blockTitle = normalizeText(blockDoc?.display?.title || taskLabel || taskRefId, "", 220);
-    const family = normalizeText(blockDoc?.questionFamily || payloadSummary?.practiceKey || "question type", "", 120);
+    const blockTitle = normalizeText(
+      blockDoc?.display?.title || taskLabel || taskRefId,
+      "",
+      220,
+    );
+    const family = normalizeText(
+      blockDoc?.questionFamily ||
+        payloadSummary?.practiceKey ||
+        "question type",
+      "",
+      120,
+    );
     return `Listening Question Task - ${toReadableLabel(family)} - ${blockTitle}`;
   }
 
@@ -684,7 +845,11 @@ function buildTaskMetadata(rawAttempt = {}, lookups = {}) {
   const taskType = normalizeTaskType(rawAttempt?.taskType);
   const taskRefId = normalizeTaskRefId(rawAttempt?.taskRefId);
   const sourceType = normalizeSourceType(rawAttempt?.sourceType);
-  const taskCategory = resolveAttemptTaskCategory(taskType, sourceType, taskRefId);
+  const taskCategory = resolveAttemptTaskCategory(
+    taskType,
+    sourceType,
+    taskRefId,
+  );
   const payloadSummary = extractAttemptPayloadSummary(rawAttempt);
 
   if (taskCategory === RESULT_CATEGORIES.READING_FULL_TEST) {
@@ -709,7 +874,11 @@ function buildTaskMetadata(rawAttempt = {}, lookups = {}) {
   if (taskCategory === RESULT_CATEGORIES.READING_QUESTION_TASK) {
     const doc = lookups?.readingPassagesById?.get(taskRefId) || {};
     return {
-      passageTitle: normalizeText(doc?.title || doc?.passageTitle || doc?.heading, "", 220),
+      passageTitle: normalizeText(
+        doc?.title || doc?.passageTitle || doc?.heading,
+        "",
+        220,
+      ),
       questionFamily: toReadableLabel(payloadSummary?.practiceKey || ""),
     };
   }
@@ -729,7 +898,9 @@ function buildTaskMetadata(rawAttempt = {}, lookups = {}) {
     return {
       blockTitle: normalizeText(doc?.display?.title, "", 220),
       blockType: normalizeSourceType(doc?.blockType),
-      questionFamily: normalizeSourceType(doc?.questionFamily || payloadSummary?.practiceKey),
+      questionFamily: normalizeSourceType(
+        doc?.questionFamily || payloadSummary?.practiceKey,
+      ),
     };
   }
 
@@ -753,11 +924,17 @@ function buildTaskMetadata(rawAttempt = {}, lookups = {}) {
 }
 
 function buildAttemptNavigation(attempt) {
-  const taskCategory = normalizeText(attempt?.taskCategory, "", 80).toLowerCase();
+  const taskCategory = normalizeText(
+    attempt?.taskCategory,
+    "",
+    80,
+  ).toLowerCase();
   const taskRefId = normalizeTaskRefId(attempt?.taskRefId);
   const safeTaskRefId = encodeURIComponent(taskRefId || "");
   const analysisId = normalizeTaskRefId(attempt?.analysisId);
-  const analysisQuery = analysisId ? `&analysisId=${encodeURIComponent(analysisId)}` : "";
+  const analysisQuery = analysisId
+    ? `&analysisId=${encodeURIComponent(analysisId)}`
+    : "";
 
   if (taskCategory === RESULT_CATEGORIES.WRITING_TASK1) {
     return {
@@ -778,11 +955,17 @@ function buildAttemptNavigation(attempt) {
   const taskType = normalizeTaskType(attempt?.taskType);
   const domain = taskType === "reading" ? "reading" : "listening";
   const taskMode = resolveTaskMode(taskCategory);
-  const groupAttemptNumber = Number.isFinite(Number(attempt?.groupAttemptNumber))
+  const groupAttemptNumber = Number.isFinite(
+    Number(attempt?.groupAttemptNumber),
+  )
     ? Number(attempt.groupAttemptNumber)
     : 1;
-  const sourceType = encodeURIComponent(normalizeText(attempt?.sourceType, "", 120));
-  const taskGroupId = encodeURIComponent(normalizeText(attempt?.taskGroupId, "", 420));
+  const sourceType = encodeURIComponent(
+    normalizeText(attempt?.sourceType, "", 120),
+  );
+  const taskGroupId = encodeURIComponent(
+    normalizeText(attempt?.taskGroupId, "", 420),
+  );
   return {
     type: "results_history",
     route: `/student/results/${domain}/${taskMode}/${safeTaskRefId}/attempt-${groupAttemptNumber}?sourceType=${sourceType}&taskGroupId=${taskGroupId}`,
@@ -794,7 +977,11 @@ function summarizeAttemptFromDoc(rawAttempt = {}, lookups = {}) {
   const taskType = normalizeTaskType(rawAttempt?.taskType);
   const taskRefId = normalizeTaskRefId(rawAttempt?.taskRefId);
   const sourceType = normalizeSourceType(rawAttempt?.sourceType);
-  const taskCategory = resolveAttemptTaskCategory(taskType, sourceType, taskRefId);
+  const taskCategory = resolveAttemptTaskCategory(
+    taskType,
+    sourceType,
+    taskRefId,
+  );
   const groupSourceType = resolveGroupSourceType(taskCategory, sourceType);
   const taskGroupId = buildTaskGroupId({
     taskCategory,
@@ -809,7 +996,9 @@ function summarizeAttemptFromDoc(rawAttempt = {}, lookups = {}) {
     attemptId: normalizeTaskRefId(rawAttempt?._id),
     taskGroupId,
     taskCategory,
-    taskCategoryLabel: RESULTS_CENTER_FILTER_LABELS[taskCategory] || toReadableLabel(taskCategory),
+    taskCategoryLabel:
+      RESULTS_CENTER_FILTER_LABELS[taskCategory] ||
+      toReadableLabel(taskCategory),
     taskType,
     taskRefId,
     sourceType: groupSourceType,
@@ -819,20 +1008,28 @@ function summarizeAttemptFromDoc(rawAttempt = {}, lookups = {}) {
     taskMeta: buildTaskMetadata(rawAttempt, lookups),
     attemptCategory: normalizeAttemptCategory(rawAttempt?.attemptCategory),
     status: normalizeText(rawAttempt?.status, "completed", 40),
-    attemptNumber: Number.isFinite(Number(rawAttempt?.attemptNumber)) ? Number(rawAttempt.attemptNumber) : 1,
+    attemptNumber: Number.isFinite(Number(rawAttempt?.attemptNumber))
+      ? Number(rawAttempt.attemptNumber)
+      : 1,
     submitReason: normalizeText(rawAttempt?.submitReason, "manual", 80),
     forceReason: normalizeText(rawAttempt?.forceReason, "", 240),
     isAutoSubmitted: Boolean(rawAttempt?.isAutoSubmitted),
-    submittedAt: toSafeIsoDate(rawAttempt?.submittedAt || rawAttempt?.createdAt),
-    totalTimeSpentSeconds: Math.max(0, Math.round(Number(rawAttempt?.totalTimeSpentSeconds) || 0)),
+    submittedAt: toSafeIsoDate(
+      rawAttempt?.submittedAt || rawAttempt?.createdAt,
+    ),
+    totalTimeSpentSeconds: Math.max(
+      0,
+      Math.round(Number(rawAttempt?.totalTimeSpentSeconds) || 0),
+    ),
     totalTimeSpentLabel: formatDurationLabel(rawAttempt?.totalTimeSpentSeconds),
     score,
     scoreLabel: buildScoreLabel(score),
     payloadSummary,
     analysisId,
-    sourceRefs: rawAttempt?.sourceRefs && typeof rawAttempt.sourceRefs === "object"
-      ? rawAttempt.sourceRefs
-      : {},
+    sourceRefs:
+      rawAttempt?.sourceRefs && typeof rawAttempt.sourceRefs === "object"
+        ? rawAttempt.sourceRefs
+        : {},
   };
 }
 
@@ -845,7 +1042,9 @@ function assignStableGroupAttemptNumbers(attempts = []) {
       return leftTime - rightTime;
     }
 
-    return String(left?.attemptId || "").localeCompare(String(right?.attemptId || ""));
+    return String(left?.attemptId || "").localeCompare(
+      String(right?.attemptId || ""),
+    );
   });
 
   chronological.forEach((attempt, index) => {
@@ -860,7 +1059,9 @@ function assignStableGroupAttemptNumbers(attempts = []) {
       if (rightTime !== leftTime) {
         return rightTime - leftTime;
       }
-      return String(right?.attemptId || "").localeCompare(String(left?.attemptId || ""));
+      return String(right?.attemptId || "").localeCompare(
+        String(left?.attemptId || ""),
+      );
     })
     .map((attempt) => ({
       ...attempt,
@@ -887,7 +1088,9 @@ function buildGroupSummary(group) {
   return {
     taskGroupId: group.taskGroupId,
     taskCategory: group.taskCategory,
-    taskCategoryLabel: RESULTS_CENTER_FILTER_LABELS[group.taskCategory] || toReadableLabel(group.taskCategory),
+    taskCategoryLabel:
+      RESULTS_CENTER_FILTER_LABELS[group.taskCategory] ||
+      toReadableLabel(group.taskCategory),
     taskType: group.taskType,
     taskRefId: group.taskRefId,
     sourceType: group.sourceType,
@@ -901,7 +1104,10 @@ function buildGroupSummary(group) {
     latestScoreLabel: latestAttempt?.scoreLabel || "Completed",
     latestTimeSpentSeconds: Number(latestAttempt?.totalTimeSpentSeconds || 0),
     latestSubmittedAt: latestAttempt?.submittedAt || null,
-    navigation: latestAttempt?.navigation || { route: "/student/results", type: "results_history" },
+    navigation: latestAttempt?.navigation || {
+      route: "/student/results",
+      type: "results_history",
+    },
     attempts,
   };
 }
@@ -955,8 +1161,10 @@ async function buildGroupedResults(studentUserId) {
 
   const groupedResults = Array.from(groupMap.values())
     .map((group) => buildGroupSummary(group))
-    .sort((left, right) =>
-      new Date(right?.latestSubmittedAt || 0).valueOf() - new Date(left?.latestSubmittedAt || 0).valueOf(),
+    .sort(
+      (left, right) =>
+        new Date(right?.latestSubmittedAt || 0).valueOf() -
+        new Date(left?.latestSubmittedAt || 0).valueOf(),
     );
 
   return {
@@ -977,8 +1185,8 @@ function buildFilterSummaries(groupedResults = []) {
       counts[category] += 1;
     }
     if (
-      category === RESULT_CATEGORIES.READING_QUESTION_TASK
-      || category === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
+      category === RESULT_CATEGORIES.READING_QUESTION_TASK ||
+      category === RESULT_CATEGORIES.LISTENING_QUESTION_TASK
     ) {
       counts.question_type_task += 1;
     }
@@ -996,7 +1204,9 @@ async function listResultsCenterGroups(studentUserId, options = {}) {
   const activeFilter = normalizeResultsCenterFilter(options?.category);
   const { groupedResults } = await buildGroupedResults(studentUserId);
   const filters = buildFilterSummaries(groupedResults);
-  const groups = groupedResults.filter((group) => doesCategoryMatchFilter(group?.taskCategory, activeFilter));
+  const groups = groupedResults.filter((group) =>
+    doesCategoryMatchFilter(group?.taskCategory, activeFilter),
+  );
 
   return {
     activeFilter,
@@ -1025,7 +1235,9 @@ async function listResultGroupAttempts(studentUserId, options = {}) {
     .lean();
 
   if (!Array.isArray(rawAttempts) || rawAttempts.length === 0) {
-    const error = new Error("No completed attempts were found for this task group.");
+    const error = new Error(
+      "No completed attempts were found for this task group.",
+    );
     error.httpStatus = 404;
     throw error;
   }
@@ -1033,31 +1245,39 @@ async function listResultGroupAttempts(studentUserId, options = {}) {
   const lookups = await buildTaskMetadataLookups(rawAttempts);
   const attempts = rawAttempts
     .map((rawAttempt) => summarizeAttemptFromDoc(rawAttempt, lookups))
-    .filter((attempt) =>
-      attempt.taskCategory === parsedGroup.taskCategory
-      && attempt.sourceType === parsedGroup.sourceType,
+    .filter(
+      (attempt) =>
+        attempt.taskCategory === parsedGroup.taskCategory &&
+        attempt.sourceType === parsedGroup.sourceType,
     );
 
   if (attempts.length === 0) {
-    const error = new Error("No completed attempts were found for this specific task source.");
+    const error = new Error(
+      "No completed attempts were found for this specific task source.",
+    );
     error.httpStatus = 404;
     throw error;
   }
 
   const groupSummary = buildGroupSummary({
     ...parsedGroup,
-    readableTitle: attempts[0]?.readableTitle || `${toReadableLabel(parsedGroup.taskType)} - ${parsedGroup.taskRefId}`,
+    readableTitle:
+      attempts[0]?.readableTitle ||
+      `${toReadableLabel(parsedGroup.taskType)} - ${parsedGroup.taskRefId}`,
     taskType: parsedGroup.taskType,
     attempts,
     taskMeta: attempts[0]?.taskMeta || {},
   });
 
   const sort = normalizeText(options?.sort, "desc", 12).toLowerCase();
-  const orderedAttempts = sort === "asc"
-    ? [...groupSummary.attempts].sort((left, right) =>
-      Number(left?.groupAttemptNumber || 0) - Number(right?.groupAttemptNumber || 0),
-    )
-    : groupSummary.attempts;
+  const orderedAttempts =
+    sort === "asc"
+      ? [...groupSummary.attempts].sort(
+          (left, right) =>
+            Number(left?.groupAttemptNumber || 0) -
+            Number(right?.groupAttemptNumber || 0),
+        )
+      : groupSummary.attempts;
 
   return {
     taskGroupId: groupSummary.taskGroupId,
@@ -1092,7 +1312,11 @@ function parseAttemptReference(attemptRefInput) {
   }
 
   const parsedDirect = Number.parseInt(safe, 10);
-  if (Number.isFinite(parsedDirect) && String(parsedDirect) === safe && parsedDirect > 0) {
+  if (
+    Number.isFinite(parsedDirect) &&
+    String(parsedDirect) === safe &&
+    parsedDirect > 0
+  ) {
     return {
       attemptNumber: parsedDirect,
       attemptId: "",
@@ -1108,14 +1332,23 @@ function parseAttemptReference(attemptRefInput) {
 function buildWeakAreasFromIncorrectItems(incorrectItems = []) {
   const buckets = new Map();
   (Array.isArray(incorrectItems) ? incorrectItems : []).forEach((item) => {
-    const key = normalizeText(item?.blockTitle, "Unknown section", 120);
+    const key = toReadableLabel(
+      normalizeText(
+        item?.questionFamily || item?.blockType || item?.blockTitle,
+        "Unknown question type",
+        120,
+      ),
+    );
     const previous = buckets.get(key) || 0;
     buckets.set(key, previous + 1);
   });
 
   return Array.from(buckets.entries())
     .map(([label, incorrectCount]) => ({ label, incorrectCount }))
-    .sort((left, right) => Number(right.incorrectCount || 0) - Number(left.incorrectCount || 0))
+    .sort(
+      (left, right) =>
+        Number(right.incorrectCount || 0) - Number(left.incorrectCount || 0),
+    )
     .slice(0, 8);
 }
 
@@ -1125,14 +1358,25 @@ async function enrichWritingAttemptDetail(attempt, studentUserId) {
     return null;
   }
 
-  const taskCategory = normalizeText(attempt?.taskCategory, "", 80).toLowerCase();
-  if (taskCategory !== RESULT_CATEGORIES.WRITING_TASK1 && taskCategory !== RESULT_CATEGORIES.WRITING_TASK2) {
+  const taskCategory = normalizeText(
+    attempt?.taskCategory,
+    "",
+    80,
+  ).toLowerCase();
+  if (
+    taskCategory !== RESULT_CATEGORIES.WRITING_TASK1 &&
+    taskCategory !== RESULT_CATEGORIES.WRITING_TASK2
+  ) {
     return null;
   }
 
   const query = { _id: analysisId };
-  const model = taskCategory === RESULT_CATEGORIES.WRITING_TASK1 ? WritingTask1Analysis : WritingTask2Analysis;
-  const analysis = await model.findOne(query)
+  const model =
+    taskCategory === RESULT_CATEGORIES.WRITING_TASK1
+      ? WritingTask1Analysis
+      : WritingTask2Analysis;
+  const analysis = await model
+    .findOne(query)
     .select({
       _id: 1,
       studentUserId: 1,
@@ -1160,14 +1404,24 @@ async function enrichWritingAttemptDetail(attempt, studentUserId) {
   return {
     id: normalizeTaskRefId(analysis?._id),
     status: normalizeText(analysis?.status, "", 40).toLowerCase(),
-    overallBand: Number.isFinite(Number(analysis?.overallBand)) ? Number(analysis.overallBand) : null,
+    overallBand: Number.isFinite(Number(analysis?.overallBand))
+      ? Number(analysis.overallBand)
+      : null,
     summary: normalizeText(analysis?.summary, "", 400),
-    diagnosis: analysis?.diagnosis && typeof analysis.diagnosis === "object" ? analysis.diagnosis : {},
-    criteriaScores: analysis?.criteriaScores && typeof analysis.criteriaScores === "object"
-      ? analysis.criteriaScores
-      : {},
-    wordsCount: Number.isFinite(Number(analysis?.wordsCount)) ? Number(analysis.wordsCount) : null,
-    timeSpentSeconds: Number.isFinite(Number(analysis?.timeSpentSeconds)) ? Number(analysis.timeSpentSeconds) : null,
+    diagnosis:
+      analysis?.diagnosis && typeof analysis.diagnosis === "object"
+        ? analysis.diagnosis
+        : {},
+    criteriaScores:
+      analysis?.criteriaScores && typeof analysis.criteriaScores === "object"
+        ? analysis.criteriaScores
+        : {},
+    wordsCount: Number.isFinite(Number(analysis?.wordsCount))
+      ? Number(analysis.wordsCount)
+      : null,
+    timeSpentSeconds: Number.isFinite(Number(analysis?.timeSpentSeconds))
+      ? Number(analysis.timeSpentSeconds)
+      : null,
     submittedAt: toSafeIsoDate(analysis?.submittedAt),
     failureReason: normalizeText(analysis?.failureReason, "", 240),
   };
@@ -1182,17 +1436,24 @@ async function getResultGroupAttemptDetail(studentUserId, options = {}) {
   const { attemptNumber, attemptId } = parseAttemptReference(
     options?.attemptRef || options?.attemptNumber || options?.attemptId,
   );
-  const attempts = Array.isArray(attemptsPayload?.attempts) ? attemptsPayload.attempts : [];
+  const attempts = Array.isArray(attemptsPayload?.attempts)
+    ? attemptsPayload.attempts
+    : [];
   const latestAttempt = attempts[0] || null;
 
   let activeAttempt = latestAttempt;
   if (attemptId) {
-    activeAttempt = attempts.find((attempt) => String(attempt?.attemptId || "") === attemptId) || activeAttempt;
+    activeAttempt =
+      attempts.find(
+        (attempt) => String(attempt?.attemptId || "") === attemptId,
+      ) || activeAttempt;
   } else if (Number.isFinite(attemptNumber) && attemptNumber > 0) {
-    activeAttempt = attempts.find((attempt) =>
-      Number(attempt?.groupAttemptNumber) === Number(attemptNumber)
-      || Number(attempt?.attemptNumber) === Number(attemptNumber),
-    ) || activeAttempt;
+    activeAttempt =
+      attempts.find(
+        (attempt) =>
+          Number(attempt?.groupAttemptNumber) === Number(attemptNumber) ||
+          Number(attempt?.attemptNumber) === Number(attemptNumber),
+      ) || activeAttempt;
   }
 
   if (!activeAttempt) {
@@ -1202,9 +1463,14 @@ async function getResultGroupAttemptDetail(studentUserId, options = {}) {
   }
 
   const evaluation = activeAttempt?.payloadSummary?.evaluation || {};
-  const incorrectItems = Array.isArray(evaluation?.incorrectItems) ? evaluation.incorrectItems : [];
+  const incorrectItems = Array.isArray(evaluation?.incorrectItems)
+    ? evaluation.incorrectItems
+    : [];
   const weakAreas = buildWeakAreasFromIncorrectItems(incorrectItems);
-  const writingAnalysis = await enrichWritingAttemptDetail(activeAttempt, studentUserId);
+  const writingAnalysis = await enrichWritingAttemptDetail(
+    activeAttempt,
+    studentUserId,
+  );
 
   return {
     ...attemptsPayload,
@@ -1232,9 +1498,18 @@ async function getResultGroupAttemptDetail(studentUserId, options = {}) {
 
 async function getWritingResultRedirectMeta(studentUserId, options = {}) {
   const detail = await getResultGroupAttemptDetail(studentUserId, options);
-  const taskCategory = normalizeText(detail?.taskCategory, "", 80).toLowerCase();
-  if (taskCategory !== RESULT_CATEGORIES.WRITING_TASK1 && taskCategory !== RESULT_CATEGORIES.WRITING_TASK2) {
-    const error = new Error("Writing redirect is only available for writing task groups.");
+  const taskCategory = normalizeText(
+    detail?.taskCategory,
+    "",
+    80,
+  ).toLowerCase();
+  if (
+    taskCategory !== RESULT_CATEGORIES.WRITING_TASK1 &&
+    taskCategory !== RESULT_CATEGORIES.WRITING_TASK2
+  ) {
+    const error = new Error(
+      "Writing redirect is only available for writing task groups.",
+    );
     error.httpStatus = 400;
     throw error;
   }
@@ -1243,10 +1518,13 @@ async function getWritingResultRedirectMeta(studentUserId, options = {}) {
   const analysisId = normalizeTaskRefId(activeAttempt?.analysisId);
   const taskRefId = normalizeTaskRefId(detail?.taskRefId);
   const safeTaskRefId = encodeURIComponent(taskRefId || "");
-  const analysisQuery = analysisId ? `&analysisId=${encodeURIComponent(analysisId)}` : "";
-  const route = taskCategory === RESULT_CATEGORIES.WRITING_TASK1
-    ? `/student/tests/writingTask1/result?set=${safeTaskRefId}${analysisQuery}`
-    : `/student/tests/writingTask2/result?set=${safeTaskRefId}${analysisQuery}`;
+  const analysisQuery = analysisId
+    ? `&analysisId=${encodeURIComponent(analysisId)}`
+    : "";
+  const route =
+    taskCategory === RESULT_CATEGORIES.WRITING_TASK1
+      ? `/student/tests/writingTask1/result?set=${safeTaskRefId}${analysisQuery}`
+      : `/student/tests/writingTask2/result?set=${safeTaskRefId}${analysisQuery}`;
 
   return {
     taskGroupId: detail.taskGroupId,

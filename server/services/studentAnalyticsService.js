@@ -1,9 +1,10 @@
 const StudentTaskAttempt = require("../models/studentTaskAttemptModel");
 const User = require("../models/userModel");
+const { DailyTaskUnit } = require("../models/dailyTaskUnitModel");
 const { normalizeStudyHeatmapEntries } = require("../utils/studyHeatmap");
 
 const PERIODS = ["week", "month", "lifetime"];
-const SECTION_KEYS = ["all", "listening", "reading", "writing"];
+const SECTION_KEYS = ["all", "reading", "listening", "writing_task1", "writing_task2"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function normalizePeriod(value) {
@@ -52,13 +53,14 @@ function toSection(taskType) {
   const safe = String(taskType || "").toLowerCase();
   if (safe.includes("listening")) return "listening";
   if (safe.includes("reading")) return "reading";
-  if (safe.includes("writing")) return "writing";
+  if (safe.includes("writing_task1")) return "writing_task1";
+  if (safe.includes("writing_task2")) return "writing_task2";
   return "all";
 }
 
 function normalizeSection(value, fallback = "all") {
   const safe = String(value || "").trim().toLowerCase();
-  if (safe === "listening" || safe === "reading" || safe === "writing") {
+  if (SECTION_KEYS.includes(safe)) {
     return safe;
   }
   return SECTION_KEYS.includes(fallback) ? fallback : "all";
@@ -66,6 +68,8 @@ function normalizeSection(value, fallback = "all") {
 
 function formatSectionLabel(section) {
   const safe = normalizeSection(section);
+  if (safe === "writing_task1") return "Writing T1";
+  if (safe === "writing_task2") return "Writing T2";
   return safe === "all" ? "" : safe.charAt(0).toUpperCase() + safe.slice(1);
 }
 
@@ -311,7 +315,7 @@ function extractWeakAreas(attempts = []) {
     ].forEach(([key, label]) => {
       const items = Array.isArray(diagnosis?.[key]) ? diagnosis[key] : [];
       if (items.length > 0) {
-        addWeakArea(map, "writing", label, items.length);
+        addWeakArea(map, section, label, items.length);
       }
     });
 
@@ -321,7 +325,7 @@ function extractWeakAreas(attempts = []) {
     Object.entries(criteriaScores).forEach(([criterion, value]) => {
       const numeric = Number(value);
       if (Number.isFinite(numeric) && numeric > 0 && numeric < 6) {
-        addWeakArea(map, "writing", criterion, 1);
+        addWeakArea(map, section, criterion, 1);
       }
     });
   });
@@ -364,6 +368,81 @@ function extractWeakAreas(attempts = []) {
   });
 
   return bySection;
+}
+
+function normalizeUnitLabel(unit = {}, fallbackIndex = 0) {
+  const title = String(unit?.title || "").trim();
+  if (title) {
+    return title;
+  }
+
+  const order = Number(unit?.order);
+  return `Unit ${Number.isFinite(order) && order > 0 ? order : fallbackIndex + 1}`;
+}
+
+async function buildDailyUnitScores(studentUserId, attempts = []) {
+  const publishedUnits = await DailyTaskUnit.find(
+    { status: "published" },
+    { _id: 1, title: 1, order: 1, tasks: 1 },
+  )
+    .sort({ order: 1, createdAt: 1, _id: 1 })
+    .lean();
+
+  const dailyAttempts = (Array.isArray(attempts) ? attempts : [])
+    .filter((attempt) => String(attempt?.attemptCategory || "").trim() === "daily")
+    .sort((left, right) => {
+      const leftDate = new Date(left?.submittedAt || left?.createdAt || 0).valueOf();
+      const rightDate = new Date(right?.submittedAt || right?.createdAt || 0).valueOf();
+      if (leftDate !== rightDate) return leftDate - rightDate;
+      return Number(left?.attemptNumber || 0) - Number(right?.attemptNumber || 0);
+    });
+
+  const latestAttemptByUnitTask = new Map();
+  dailyAttempts.forEach((attempt) => {
+    const unitId = String(attempt?.unitId || "").trim();
+    const taskType = String(attempt?.taskType || "").trim();
+    const taskRefId = String(attempt?.taskRefId || "").trim();
+    if (!unitId || !taskType || !taskRefId) {
+      return;
+    }
+
+    latestAttemptByUnitTask.set(`${unitId}::${taskType}::${taskRefId}`, attempt);
+  });
+
+  return publishedUnits.flatMap((unit, unitIndex) => {
+    const unitId = String(unit?._id || "").trim();
+    const unitLabel = normalizeUnitLabel(unit, unitIndex);
+    const unitOrder = Number(unit?.order) || unitIndex + 1;
+    const tasks = Array.isArray(unit?.tasks) ? unit.tasks : [];
+
+    return tasks.map((task) => {
+      const taskType = String(task?.taskType || "").trim();
+      const taskRefId = String(task?.taskRefId || "").trim();
+      const section = toSection(taskType);
+      const attempt = latestAttemptByUnitTask.get(`${unitId}::${taskType}::${taskRefId}`) || null;
+      const score = attempt?.score || {};
+      const band = toBand(score);
+      const correctCount = Number(score?.correctCount);
+      const totalQuestions = Number(score?.totalQuestions);
+
+      return {
+        unitId,
+        unitLabel,
+        unitOrder,
+        taskType,
+        section,
+        sectionLabel: formatSectionLabel(section),
+        taskRefId,
+        score: band === null ? null : Number(band.toFixed(1)),
+        band: band === null ? null : Number(band.toFixed(1)),
+        correctCount: Number.isFinite(correctCount) ? correctCount : null,
+        totalQuestions: Number.isFinite(totalQuestions) ? totalQuestions : null,
+        attemptNumber: Number.isFinite(Number(attempt?.attemptNumber)) ? Number(attempt.attemptNumber) : null,
+        submittedAt: attempt?.submittedAt || null,
+        hasAttempt: Boolean(attempt),
+      };
+    });
+  }).filter((row) => row.section !== "all");
 }
 
 function currentStreak(entries = [], now = new Date()) {
@@ -483,6 +562,7 @@ async function getDynamicStudentAnalytics(studentUserId, periodInput = "week") {
   const accuracies = attempts.map((attempt) => toAccuracy(attempt?.score)).filter((value) => value !== null);
   const totalStudyMinutes = periodEntries.reduce((sum, entry) => sum + Number(entry.minutesSpent || 0), 0);
   const weakSections = extractWeakAreas(attempts);
+  const dailyUnitScores = await buildDailyUnitScores(studentUserId, attempts);
   const summary = {
     totalStudyMinutes: Math.round(totalStudyMinutes),
     tasksCompleted: attempts.length,
@@ -497,13 +577,14 @@ async function getDynamicStudentAnalytics(studentUserId, periodInput = "week") {
     aiInsight: generateInsight({ period, summary, weakSections }),
     bandByDay,
     timeSpent,
+    dailyUnitScores,
     practiceConsistency: periodEntries,
     weakSections,
     sectionFilters: [
-      { value: "all", label: "All" },
       { value: "reading", label: "Reading" },
       { value: "listening", label: "Listening" },
-      { value: "writing", label: "Writing" },
+      { value: "writing_task1", label: "Writing T1" },
+      { value: "writing_task2", label: "Writing T2" },
     ],
   };
 }

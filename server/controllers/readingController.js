@@ -102,19 +102,24 @@ function sanitizePassageTiming(passageTiming, fallbackPassages = []) {
 
 function sanitizeEvaluationPayload(value) {
   const safe = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sanitizeAnswerItem = (item) => ({
+    section: "reading",
+    questionFamily: normalizeValue(item?.questionFamily),
+    blockType: normalizeValue(item?.blockType),
+    blockId: normalizeValue(item?.blockId),
+    blockTitle: normalizeValue(item?.blockTitle),
+    questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
+    studentAnswer: normalizeValue(item?.studentAnswer),
+    acceptedAnswers: Array.isArray(item?.acceptedAnswers)
+      ? item.acceptedAnswers.map((answer) => normalizeValue(answer)).filter(Boolean)
+      : [],
+    isCorrect: Boolean(item?.isCorrect),
+  });
   const incorrectItems = Array.isArray(safe?.incorrectItems)
-    ? safe.incorrectItems.map((item) => ({
-      section: "reading",
-      questionFamily: normalizeValue(item?.questionFamily),
-      blockType: normalizeValue(item?.blockType),
-      blockId: normalizeValue(item?.blockId),
-      blockTitle: normalizeValue(item?.blockTitle),
-      questionNumber: Number.isFinite(Number(item?.questionNumber)) ? Number(item.questionNumber) : null,
-      studentAnswer: normalizeValue(item?.studentAnswer),
-      acceptedAnswers: Array.isArray(item?.acceptedAnswers)
-        ? item.acceptedAnswers.map((answer) => normalizeValue(answer)).filter(Boolean)
-        : [],
-    }))
+    ? safe.incorrectItems.map((item) => sanitizeAnswerItem({ ...item, isCorrect: false }))
+    : [];
+  const answerItems = Array.isArray(safe?.answerItems)
+    ? safe.answerItems.map((item) => sanitizeAnswerItem(item))
     : [];
 
   return {
@@ -122,8 +127,12 @@ function sanitizeEvaluationPayload(value) {
     correctCount: Math.max(0, Math.round(Number(safe?.correctCount) || 0)),
     incorrectCount: Math.max(0, Math.round(Number(safe?.incorrectCount) || 0)),
     percentage: Math.max(0, Math.round(Number(safe?.percentage) || 0)),
+    band: Number.isFinite(Number(safe?.band))
+      ? Math.max(0, Math.min(9, Number(safe.band)))
+      : null,
     submitReason: normalizeValue(safe?.submitReason) || "manual",
     forceReason: normalizeValue(safe?.forceReason),
+    answerItems,
     incorrectItems,
   };
 }
@@ -760,12 +769,15 @@ async function submitFullReadingTestAttempt(req, res) {
     submittedAt: new Date(),
   });
 
+  let trackedAttempt = null;
   try {
-    const totalTimeSpentSeconds = passageTiming.reduce(
+    const passageTimeSpentSeconds = passageTiming.reduce(
       (sum, entry) => sum + Math.max(0, Math.round(Number(entry?.timeSpentSeconds) || 0)),
       0,
     );
-    await recordStudentTaskAttempt({
+    const submittedTimeSpentSeconds = Math.max(0, Math.round(Number(req.body?.totalTimeSpentSeconds) || 0));
+    const totalTimeSpentSeconds = Math.max(passageTimeSpentSeconds, submittedTimeSpentSeconds);
+    trackedAttempt = await recordStudentTaskAttempt({
       studentUserId: studentId,
       studentEmail: String(req.auth?.email || "").trim().toLowerCase(),
       attemptCategory: resolvedAttemptCategory,
@@ -779,6 +791,7 @@ async function submitFullReadingTestAttempt(req, res) {
       submittedAt: savedAttempt?.submittedAt || new Date(),
       totalTimeSpentSeconds,
       score: {
+        band: evaluation.band,
         percentage: evaluation.percentage,
         correctCount: evaluation.correctCount,
         incorrectCount: evaluation.incorrectCount,
@@ -798,7 +811,10 @@ async function submitFullReadingTestAttempt(req, res) {
 
   return res.status(201).json({
     message: "Full reading test submitted successfully.",
-    attempt: summarizeReadingFullTestAttempt(savedAttempt),
+    attempt: {
+      ...summarizeReadingFullTestAttempt(savedAttempt),
+      resultAttemptNumber: Number(trackedAttempt?.attemptNumber || savedAttempt?.attemptNumber || 1),
+    },
     previousAttempt: summarizeReadingFullTestAttempt(previousAttempt),
   });
 }

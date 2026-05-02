@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
 import { TestPageSkeleton } from "../../components/ui/Skeleton";
+import { buildResultsAttemptRoute } from "../../components/student/results/resultsUtils";
 
 function decodeValue(value) {
   try {
@@ -90,8 +91,12 @@ function StudentReadingPassageTaskPage() {
         (sum, item) => sum + Math.max(0, Number(item?.timeSpentSeconds) || 0),
         0,
       );
+      const resolvedTimeSpentSeconds = Math.max(
+        Math.round(totalTimeSpentSeconds),
+        Math.max(0, Math.round(Number(attemptPayload?.totalTimeSpentSeconds) || 0)),
+      );
 
-      await apiRequest("/students/me/daily-tasks/attempts", {
+      const response = await apiRequest("/students/me/daily-tasks/attempts", {
         method: "POST",
         body: {
           taskType: "reading",
@@ -103,8 +108,9 @@ function StudentReadingPassageTaskPage() {
           forceReason: String(attemptPayload?.forceReason || ""),
           isAutoSubmitted: String(attemptPayload?.submitReason || "manual") !== "manual",
           submittedAt: new Date().toISOString(),
-          totalTimeSpentSeconds: Math.round(totalTimeSpentSeconds),
+          totalTimeSpentSeconds: resolvedTimeSpentSeconds,
           score: {
+            band: Number(attemptPayload?.evaluation?.band || 0),
             percentage: Number(attemptPayload?.evaluation?.percentage || 0),
             correctCount: Number(attemptPayload?.evaluation?.correctCount || 0),
             incorrectCount: Number(attemptPayload?.evaluation?.incorrectCount || 0),
@@ -120,6 +126,17 @@ function StudentReadingPassageTaskPage() {
           },
         },
       });
+
+      return {
+        reviewRoute: buildResultsAttemptRoute({
+          taskType: "reading",
+          taskMode: "question",
+          taskRefId: passageId,
+          sourceType: "reading_passage",
+          taskGroupId: `reading_question_task::reading_passage::${passageId}`,
+          attemptNumber: Number(response?.attempt?.attemptNumber || 1),
+        }),
+      };
     },
     [group?.passage?.title, group?.passageId, passageId],
   );

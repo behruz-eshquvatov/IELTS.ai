@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   BookOpenText,
-  ChevronRight,
+  ChevronDown,
   Clock3,
   Headphones,
   LockKeyhole,
@@ -490,6 +490,26 @@ function SummaryChip({ icon: Icon, label, value, tone = "slate" }) {
   );
 }
 
+function RollingHeaderAction({ icon, label, onClick }) {
+  const renderedIcon = icon ? icon({ className: "h-4 w-4 shrink-0" }) : null;
+
+  return (
+    <button
+      className="group inline-flex items-center gap-2 bg-transparent px-1 py-3 text-sm font-semibold text-slate-200/90 transition-colors duration-200 hover:text-white"
+      onClick={onClick}
+      type="button"
+    >
+      {renderedIcon}
+      <span className="relative block h-[1.15rem] overflow-hidden">
+        <span className="flex flex-col transition-transform duration-300 ease-out group-hover:-translate-y-1/2">
+          <span className="h-[1.15rem]">{label}</span>
+          <span className="h-[1.15rem] text-white">{label}</span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function HeaderPanel({
   classroom,
   onOpenEditModal,
@@ -514,30 +534,21 @@ function HeaderPanel({
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <button
-                className="inline-flex items-center gap-2 bg-transparent px-1 py-3 text-sm font-semibold text-slate-200/90 transition-colors duration-200 hover:text-white"
+              <RollingHeaderAction
+                icon={ArrowUpRight}
+                label="Analyses"
                 onClick={onOpenAnalysisModal}
-                type="button"
-              >
-                <ArrowUpRight className="h-4 w-4" />
-                Analyses
-              </button>
-              <button
-                className="inline-flex items-center gap-2 bg-transparent px-1 py-3 text-sm font-semibold text-slate-200/90 transition-colors duration-200 hover:text-white"
+              />
+              <RollingHeaderAction
+                icon={Send}
+                label="Message"
                 onClick={onOpenMessageModal}
-                type="button"
-              >
-                <Send className="h-4 w-4" />
-                Message
-              </button>
-              <button
-                className="inline-flex items-center gap-2 px-1 py-3 text-sm font-semibold text-slate-100 transition-colors duration-200 "
+              />
+              <RollingHeaderAction
+                icon={PenSquare}
+                label="Edit class"
                 onClick={onOpenEditModal}
-                type="button"
-              >
-                <PenSquare className="h-4 w-4" />
-                Edit class
-              </button>
+              />
               <button
                 className="emerald-gradient-fill ml-3 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 px-4 py-3 text-sm font-semibold text-white"
                 onClick={onOpenInviteModal}
@@ -569,7 +580,7 @@ function EditClassModal({ form, isOpen, onChange, onClose, onSubmit }) {
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <div className="flex min-h-11 items-center">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
@@ -661,7 +672,7 @@ function InviteStudentModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-5xl overflow-visible rounded-3xl bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-5xl overflow-visible bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="-mx-px flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
@@ -807,7 +818,7 @@ function MessageClassModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-2xl overflow-hidden bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
               Message to class
@@ -881,7 +892,7 @@ function AddStudentModal({
   return createPortal(
     <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
       <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+        <div className="w-full max-w-3xl overflow-hidden border border-slate-200 bg-[#f8fafc] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
           <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -986,7 +997,9 @@ function UnitHomeworkPanel({
   const [sortBy, setSortBy] = useState("status");
   const [sortDirection, setSortDirection] = useState("asc");
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+  const [isUnitMenuOpen, setIsUnitMenuOpen] = useState(false);
   const columnMenuRef = useRef(null);
+  const unitMenuRef = useRef(null);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
       const raw = window.localStorage.getItem("teacher:unit-homework:visible-columns");
@@ -998,7 +1011,6 @@ function UnitHomeworkPanel({
         reading: true,
         writingTask1: true,
         writingTask2: true,
-        risk: true,
       };
     } catch {
       return {
@@ -1009,7 +1021,6 @@ function UnitHomeworkPanel({
         reading: true,
         writingTask1: true,
         writingTask2: true,
-        risk: true,
       };
     }
   });
@@ -1023,7 +1034,7 @@ function UnitHomeworkPanel({
     } catch {
       // ignore
     }
-    return ["attempts", "timeSpent", "overallScore", "listening", "reading", "writingTask1", "writingTask2", "risk"];
+    return ["attempts", "timeSpent", "overallScore", "listening", "reading", "writingTask1", "writingTask2"];
   });
 
   useEffect(() => {
@@ -1039,11 +1050,15 @@ function UnitHomeworkPanel({
       if (!columnMenuRef.current?.contains(event.target)) {
         setIsColumnMenuOpen(false);
       }
+      if (!unitMenuRef.current?.contains(event.target)) {
+        setIsUnitMenuOpen(false);
+      }
     }
 
     function handleEscape(event) {
       if (event.key === "Escape") {
         setIsColumnMenuOpen(false);
+        setIsUnitMenuOpen(false);
       }
     }
 
@@ -1089,7 +1104,6 @@ function UnitHomeworkPanel({
 
   const activeUnitIndex = payload.units.findIndex((unit) => unit.unitId === payload.selectedUnitId);
   const selectedUnit = activeUnitIndex >= 0 ? payload.units[activeUnitIndex] : null;
-  const totalUnits = payload.units.length;
 
   const handleUnitSelect = async (unitId) => {
     if (!unitId || unitId === payload.selectedUnitId) {
@@ -1132,7 +1146,6 @@ function UnitHomeworkPanel({
 
   const sortedRows = useMemo(() => {
     const rows = [...filteredRows];
-    const riskRank = { clean: 0, low: 1, medium: 2, high: 3 };
     rows.sort((left, right) => {
       let cmp = 0;
       if (sortBy === "studentName") {
@@ -1147,8 +1160,6 @@ function UnitHomeworkPanel({
         cmp = Number(left.timeSpentSeconds || 0) - Number(right.timeSpentSeconds || 0);
       } else if (sortBy === "overallScore") {
         cmp = Number(left.overallScore ?? -1) - Number(right.overallScore ?? -1);
-      } else if (sortBy === "risk") {
-        cmp = (riskRank[left?.risk?.level] ?? -1) - (riskRank[right?.risk?.level] ?? -1);
       }
       return sortDirection === "asc" ? cmp : -cmp;
     });
@@ -1163,7 +1174,6 @@ function UnitHomeworkPanel({
     { key: "reading", label: "READING", sortable: false },
     { key: "writingTask1", label: "WRITING TASK 1", sortable: false },
     { key: "writingTask2", label: "WRITING TASK 2", sortable: false },
-    { key: "risk", label: "RISK", sortable: true },
   ];
   const optionalColumnKeys = optionalColumns.map((column) => column.key);
   const normalizedColumnOrder = [
@@ -1176,9 +1186,6 @@ function UnitHomeworkPanel({
   const visibleOrderedColumns = orderedColumns.filter((column) => visibleColumns[column.key]);
   const getColumnMinWidth = (column) => {
     const baseFromLabel = Math.max(String(column?.label || "").length * 10 + 42, 120);
-    if (column?.key === "risk") {
-      return Math.max(baseFromLabel, 165);
-    }
     if (column?.key === "overallScore") {
       return Math.max(baseFromLabel, 150);
     }
@@ -1187,51 +1194,6 @@ function UnitHomeworkPanel({
   const tableMinWidth = visibleOrderedColumns.reduce(
     (totalWidth, column) => totalWidth + getColumnMinWidth(column),
     384, // STUDENT + STATUS baseline width + sticky actions column
-  );
-  const unitPager = (
-    <div className="flex w-full items-center gap-2 overflow-x-auto lg:w-auto">
-      <button
-        aria-label="Previous unit"
-        className="flex h-12 w-12 shrink-0 items-center justify-center border border-transparent bg-transparent text-slate-700 transition-colors duration-200 hover:border-slate-300 disabled:opacity-40"
-        disabled={activeUnitIndex <= 0}
-        onClick={() => handleUnitSelect(payload.units[activeUnitIndex - 1]?.unitId)}
-        type="button"
-      >
-        <ChevronRight className="h-5 w-5 rotate-180" />
-      </button>
-      {payload.units.length ? payload.units.map((unit, index) => {
-        const isActive = unit.unitId === payload.selectedUnitId;
-        return (
-          <button
-            className={`min-h-10 shrink-0 rounded-none border bg-transparent px-4 py-2 text-left transition-colors duration-200 ${
-              isActive
-                ? "border-slate-950 text-slate-950"
-                : "border-transparent text-slate-700 hover:border-slate-300"
-            }`}
-            key={unit.unitId}
-            onClick={() => handleUnitSelect(unit.unitId)}
-            type="button"
-          >
-            <span className="block text-sm font-semibold">
-              {unit.title || `Unit ${index + 1}`}
-            </span>
-          </button>
-        );
-      }) : (
-        <div className="min-h-12 min-w-[120px] shrink-0 rounded-none border border-slate-200 bg-transparent px-4 py-3 text-sm font-semibold text-slate-500">
-          No units
-        </div>
-      )}
-      <button
-        aria-label="Next unit"
-        className="flex h-12 w-12 shrink-0 items-center justify-center border border-transparent bg-transparent text-slate-700 transition-colors duration-200 hover:border-slate-300 disabled:opacity-40"
-        disabled={activeUnitIndex < 0 || activeUnitIndex >= payload.units.length - 1}
-        onClick={() => handleUnitSelect(payload.units[activeUnitIndex + 1]?.unitId)}
-        type="button"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
-    </div>
   );
 
   return (
@@ -1256,7 +1218,7 @@ function UnitHomeworkPanel({
             <button
               aria-expanded={isColumnMenuOpen}
               aria-haspopup="menu"
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-200"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-200 hover:text-emerald-700"
               onClick={() => setIsColumnMenuOpen((current) => !current)}
               type="button"
             >
@@ -1275,12 +1237,12 @@ function UnitHomeworkPanel({
                 <div className="max-h-80 space-y-1 overflow-y-auto p-2">
                   {optionalColumns.map((column) => (
                     <label
-                      className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm text-slate-700 transition-colors duration-150 hover:bg-slate-50"
+                      className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm text-slate-700 transition-colors duration-150 hover:bg-emerald-50 hover:text-emerald-800"
                       key={column.key}
                     >
                       <span className="font-medium text-slate-700">{column.label}</span>
                       <input
-                        className="h-4 w-4 border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-300"
+                        className="h-4 w-4 border-slate-300 accent-emerald-600 focus:ring-2 focus:ring-emerald-300"
                         checked={Boolean(visibleColumns[column.key])}
                         onChange={(event) => setVisibleColumns((current) => ({
                           ...current,
@@ -1291,6 +1253,65 @@ function UnitHomeworkPanel({
                     </label>
                   ))}
                 </div>
+            </div>
+          </div>
+          <div
+            className="relative"
+            ref={unitMenuRef}
+            onMouseEnter={() => setIsUnitMenuOpen(true)}
+            onMouseLeave={(event) => {
+              if (!unitMenuRef.current?.contains(event.relatedTarget)) {
+                setIsUnitMenuOpen(false);
+              }
+            }}
+          >
+            <button
+              aria-expanded={isUnitMenuOpen}
+              aria-haspopup="menu"
+              className="inline-flex min-w-[130px] items-center justify-between gap-3 border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-emerald-300 hover:text-emerald-700"
+              onClick={() => setIsUnitMenuOpen((current) => !current)}
+              type="button"
+            >
+              <span className="truncate">
+                {selectedUnit?.title || (payload.units.length ? `Unit ${activeUnitIndex + 1}` : "No units")}
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isUnitMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            <div
+              className={`absolute right-0 top-full z-20 mt-0 w-56 origin-top-right overflow-hidden border border-slate-200 bg-white shadow-[0_24px_48px_-30px_rgba(15,23,42,0.45)] transition ${
+                isUnitMenuOpen
+                  ? "scale-100 opacity-100"
+                  : "pointer-events-none scale-95 opacity-0"
+              }`}
+              role="menu"
+            >
+              <span className="absolute -top-2 left-0 h-2 w-full bg-transparent" />
+              <div className="max-h-80 overflow-y-auto p-2">
+                {payload.units.length ? payload.units.map((unit, index) => {
+                  const isActive = unit.unitId === payload.selectedUnitId;
+                  return (
+                    <button
+                      className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-semibold transition-colors duration-150 ${
+                        isActive
+                          ? "emerald-gradient-fill text-white"
+                          : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
+                      }`}
+                      key={unit.unitId}
+                      onClick={() => {
+                        setIsUnitMenuOpen(false);
+                        void handleUnitSelect(unit.unitId);
+                      }}
+                      type="button"
+                    >
+                      <span className="truncate">{unit.title || `Unit ${index + 1}`}</span>
+                    </button>
+                  );
+                }) : (
+                  <div className="px-3 py-2 text-sm font-semibold text-slate-500">
+                    No units
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <label className="flex min-w-72 items-center gap-3 border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
@@ -1424,35 +1445,6 @@ function UnitHomeworkPanel({
                     if (column.key === "writingTask2") {
                       return <td className="px-4 py-4 text-sm text-slate-800" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }}>{formatBand(row.sectionScores?.writingTask2)}</td>;
                     }
-                    if (column.key === "risk") {
-                      const isIncomplete = String(row?.status || "").toLowerCase() !== "complete";
-                      const level = String(row?.risk?.level || "clean");
-                      if (isIncomplete) {
-                        return (
-                          <td className="px-4 py-4" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }} title="Risk is undefined until the task is completed.">
-                            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                              UNDEFINED
-                            </span>
-                          </td>
-                        );
-                      }
-                      const isDanger = level !== "clean";
-                      const riskLabel = isDanger ? "DANGER" : "CLEAN";
-                      const riskText = Array.isArray(row?.risk?.reasons) && row.risk.reasons.length
-                        ? row.risk.reasons.join("\n")
-                        : "No risk signals detected.";
-                      return (
-                        <td className="px-4 py-4" key={column.key} style={{ minWidth: `${getColumnMinWidth(column)}px` }} title={riskText}>
-                          <span
-                            className={`text-xs font-semibold uppercase tracking-[0.14em] ${
-                              isDanger ? "text-rose-600" : "text-emerald-700"
-                            }`}
-                          >
-                            {riskLabel}
-                          </span>
-                        </td>
-                      );
-                    }
                     return null;
                   })}
                   <td className="sticky right-0 z-10 relative w-16 min-w-[72px] bg-white px-4 py-4 text-right">
@@ -1480,10 +1472,6 @@ function UnitHomeworkPanel({
           </table>
         </div>
       </PanelShell>
-
-      <div className="flex justify-center pt-1 lg:justify-end">
-        {unitPager}
-      </div>
     </div>
   );
 }
@@ -1882,8 +1870,14 @@ function TeacherClassOverviewPage() {
           id: student.studentId,
           name: student.fullName,
           email: student.email,
-          classId: student.inClass ? classId : null,
-          className: student.inClass ? classDetails.name : "Unassigned",
+          classId: student.inClass ? classId : student.assignedElsewhere ? student.assignedClassId : null,
+          className: student.inClass
+            ? classDetails.name
+            : student.assignedElsewhere
+              ? (student.assignedClassName || "Another group")
+              : "Unassigned",
+          assignedElsewhere: Boolean(student.assignedElsewhere),
+          canInvite: student.canInvite !== false,
           targetBand: "TBD",
           currentBand: "TBD",
           status: student.pendingRequestStatus === "pending" ? "Invited" : "On track",
@@ -1939,7 +1933,9 @@ function TeacherClassOverviewPage() {
   const registeredStudents = useMemo(
     () =>
       teacherStudentCatalog
-        .filter((student) => !rosterStudents.some((rosterStudent) => rosterStudent.id === student.id))
+        .filter((student) =>
+          student.canInvite !== false &&
+          !rosterStudents.some((rosterStudent) => rosterStudent.id === student.id))
         .map((student) => ({
           ...student,
           email: buildInferredEmail(student),
@@ -2298,7 +2294,7 @@ function TeacherClassOverviewPage() {
       {isAnalysisModalOpen ? createPortal(
         <div className="fixed inset-0 z-[9999] min-h-screen bg-slate-950/42 backdrop-blur-[3px]">
           <div className="flex min-h-screen items-center justify-center p-4 sm:p-6">
-            <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
+            <div className="w-full max-w-4xl overflow-hidden bg-white shadow-[0_28px_90px_-42px_rgba(15,23,42,0.38)]">
               <div className="flex items-center justify-between border-b border-slate-950 bg-slate-950 px-6 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white">
                   Analyses

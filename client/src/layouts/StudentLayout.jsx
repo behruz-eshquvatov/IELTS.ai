@@ -14,11 +14,11 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { memo, useEffect, useRef, useState } from "react";
 import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
+import AppBreadcrumbHeader from "../components/layout/AppBreadcrumbHeader";
 import { authApi } from "../lib/apiClient";
 import { clearAuthSession } from "../lib/authSession";
 import useStudyHeatmapTracker from "../hooks/useStudyHeatmapTracker";
 import {
-  getMyClassMemberships,
   getMyHeatmap,
   getMyNotifications,
   respondToMyClassJoinRequest,
@@ -63,8 +63,7 @@ function getDateKey(dateInput = new Date()) {
 
 function formatMinutes(minutesSpent) {
   const numeric = Number(minutesSpent);
-  const rounded = Number.isFinite(numeric) ? Number(numeric.toFixed(1)) : 0;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return String(Number.isFinite(numeric) ? Math.floor(Math.max(numeric, 0)) : 0);
 }
 
 function readTrackerMinutes(todayKey) {
@@ -88,6 +87,44 @@ function readTrackerMinutes(todayKey) {
   } catch {
     return 0;
   }
+}
+
+function isStudyTrackingRoute(pathname = "") {
+  const segments = String(pathname || "")
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (segments[0] !== "student" || segments[1] !== "tests") {
+    return false;
+  }
+
+  const section = segments[2];
+  const mode = segments[3];
+  const itemId = segments[4];
+
+  if (section === "listening") {
+    return (
+      (mode === "full" && Boolean(itemId))
+      || (mode === "by-part" && Boolean(itemId) && Boolean(segments[5]))
+      || (mode === "block" && Boolean(itemId))
+      || (Boolean(mode) && Boolean(itemId) && !["full", "by-part", "block"].includes(mode))
+    );
+  }
+
+  if (section === "reading") {
+    return (
+      (mode === "full" && Boolean(itemId))
+      || (mode === "by-passage" && Boolean(itemId))
+      || (Boolean(mode) && Boolean(itemId) && !["full", "by-passage"].includes(mode))
+    );
+  }
+
+  if (section === "writingTask1" || section === "writingTask2") {
+    return Boolean(mode) && !["type", "result"].includes(mode);
+  }
+
+  return Boolean(section) && mode === "start";
 }
 
 function StudentTodayStudyTime() {
@@ -128,6 +165,17 @@ function StudentTodayStudyTime() {
       Today you studied <span className="text-slate-700">{formatMinutes(minutesSpent)} min</span>
     </p>
   );
+}
+
+function getStudentRouteTitle(pathname) {
+  return navGroups
+    .flatMap((group) => group.items)
+    .find((item) => item.to === pathname)?.label
+    ?? (pathname.startsWith("/student/results")
+      ? "Results"
+      : pathname.startsWith("/student/analytics/assistant")
+        ? "AI Analysis"
+        : "Student Portal");
 }
 
 function StudentSidebar() {
@@ -257,7 +305,6 @@ const StudentMainContent = memo(function StudentMainContent() {
   const location = useLocation();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [classMemberships, setClassMemberships] = useState([]);
   const [isNotificationActionLoading, setIsNotificationActionLoading] = useState("");
   const notificationsRef = useRef(null);
   const mainRef = useRef(null);
@@ -297,15 +344,10 @@ const StudentMainContent = memo(function StudentMainContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [notificationsResponse, membershipsResponse] = await Promise.all([
-          getMyNotifications(),
-          getMyClassMemberships(),
-        ]);
+        const notificationsResponse = await getMyNotifications();
         setNotifications(Array.isArray(notificationsResponse?.notifications) ? notificationsResponse.notifications : []);
-        setClassMemberships(Array.isArray(membershipsResponse?.memberships) ? membershipsResponse.memberships : []);
       } catch {
         setNotifications([]);
-        setClassMemberships([]);
       }
     };
 
@@ -313,23 +355,14 @@ const StudentMainContent = memo(function StudentMainContent() {
   }, [location.pathname]);
 
   const classJoinNotifications = notifications.filter((item) => item.type === "class_join_request" && !item.read);
+  const routeTitle = getStudentRouteTitle(location.pathname);
 
   return (
     <main className="flex-1 flex flex-col min-w-0" ref={mainRef}>
       <div ref={topAnchorRef} />
       <header className="relative flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] px-6 lg:px-10 z-40 sticky top-0">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">
-            {navGroups
-              .flatMap((group) => group.items)
-              .find((item) => item.to === location.pathname)?.label ??
-              (location.pathname.startsWith("/student/results")
-                ? "Results"
-                :
-              (location.pathname.startsWith("/student/analytics/assistant")
-                ? "AI Analysis"
-                : "Student Portal"))}
-          </h1>
+        <div className="min-w-0 pr-4">
+          <AppBreadcrumbHeader segments={["Student", routeTitle]} />
         </div>
         <div className="absolute left-1/2 -translate-x-1/2">
           <StudentTodayStudyTime />
@@ -372,11 +405,6 @@ const StudentMainContent = memo(function StudentMainContent() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Notifications
               </p>
-              {classMemberships.length > 0 ? (
-                <div className="mt-2 rounded-none border border-emerald-200 bg-emerald-50/50 px-2.5 py-2 text-xs text-emerald-700">
-                  Joined: {classMemberships.map((item) => item.className).filter(Boolean).join(", ")}
-                </div>
-              ) : null}
               <div className="mt-2 space-y-2">
                 {classJoinNotifications.length === 0 ? (
                   <p className="text-sm text-slate-600">No notifications yet.</p>
@@ -397,8 +425,6 @@ const StudentMainContent = memo(function StudentMainContent() {
                           try {
                             await respondToMyClassJoinRequest(requestId, "accept");
                             setNotifications((current) => current.map((row) => (row._id === item._id ? { ...row, read: true } : row)));
-                            const membershipsResponse = await getMyClassMemberships();
-                            setClassMemberships(Array.isArray(membershipsResponse?.memberships) ? membershipsResponse.memberships : []);
                           } finally {
                             setIsNotificationActionLoading("");
                           }
@@ -446,7 +472,8 @@ const StudentMainContent = memo(function StudentMainContent() {
 });
 
 function StudentLayout() {
-  useStudyHeatmapTracker();
+  const location = useLocation();
+  useStudyHeatmapTracker(isStudyTrackingRoute(location.pathname));
 
   return (
     <div className="min-h-screen bg-[#f7f4ef] text-slate-900 font-sans flex flex-col lg:flex-row">

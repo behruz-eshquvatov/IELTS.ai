@@ -27,6 +27,35 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function normalizeInstructionDisplayText(value, minimumWords = FALLBACK_MINIMUM_WORDS) {
+  const safe = normalizeText(value).replace(/\s+/g, " ");
+  if (!safe) {
+    return `Write around ${minimumWords} words.`;
+  }
+
+  if (/write\s+at\s+least\s+\d+\s+words?\.?/i.test(safe)) {
+    return safe.replace(/write\s+at\s+least\s+(\d+)\s+words?\.?/i, "Write around $1 words.");
+  }
+
+  return safe;
+}
+
+function getSubmissionReasonLabel(source) {
+  const safeSource = normalizeText(source).toLowerCase();
+  const labels = {
+    auto: "Timer finished. Task auto-submitted.",
+    "focus-lost": "You switched tabs or browser/window. Task auto-submitted.",
+    "tab-hidden": "You switched tabs. Task auto-submitted.",
+    "browser-blur": "You switched browser/window. Task auto-submitted.",
+    "page-hide": "You refreshed or left the page. Task auto-submitted.",
+    "before-unload": "You refreshed or left the page. Task auto-submitted.",
+    "leave-page": "You chose to leave the page. Task auto-submitted.",
+    manual: "Submitted manually.",
+  };
+
+  return labels[safeSource] || "Task submitted.";
+}
+
 function parseDurationSecondsFromItem(item) {
   const explicitMinutesCandidates = [
     item?.durationMinutes,
@@ -309,7 +338,7 @@ function StudentWritingTask2TaskPage() {
   const wordsGuideText =
     wordsCount >= minimumWords
       ? "Minimum reached. Keep improving argument quality."
-      : `Target at least ${minimumWords} words.`;
+      : `Write around ${minimumWords} words.`;
   const isStartGateModalOpen =
     !isSubmitted && !isAttemptStarted && isSubmissionHydrated && !isLoading && !error && item;
 
@@ -319,8 +348,7 @@ function StudentWritingTask2TaskPage() {
     (source) => {
       const submittedAt = new Date().toISOString();
       const question = normalizeText(item?.questionTopic) || "Question not available.";
-      const instructionText =
-        normalizeText(item?.instruction?.text) || `Write at least ${minimumWords} words.`;
+      const instructionText = normalizeInstructionDisplayText(item?.instruction?.text, minimumWords);
 
       return {
         setId: safeItemId,
@@ -335,7 +363,7 @@ function StudentWritingTask2TaskPage() {
         questionTopic: question,
         questionMeta: [
           instructionText,
-          `Minimum words: ${minimumWords}`,
+          `Target length: around ${minimumWords} words`,
           `Essay type: ${toReadableLabel(item?.essayType || "unknown")}`,
         ],
         durationSeconds,
@@ -368,12 +396,6 @@ function StudentWritingTask2TaskPage() {
     }
 
     const source = normalizeText(submissionPayload?.source).toLowerCase() || "manual";
-    const autoSubmitReasonBySource = {
-      auto: "Timer finished. Task auto-submitted.",
-      "focus-lost": "You switched tab or browser. Task auto-submitted.",
-      "page-hide": "You refreshed or left the page. Task auto-submitted.",
-      "leave-page": "You chose to leave the page. Task auto-submitted.",
-    };
     const resolvedBand = Number(analysisPayload?.overallBand);
 
     void apiRequest("/students/me/daily-tasks/attempts", {
@@ -385,7 +407,7 @@ function StudentWritingTask2TaskPage() {
         sourceType,
         taskLabel: normalizeText(item?.questionTopic) || safeItemId,
         submitReason: source || "manual",
-        forceReason: autoSubmitReasonBySource[source] || "",
+        forceReason: source === "manual" ? "" : getSubmissionReasonLabel(source),
         isAutoSubmitted: source !== "manual",
         submittedAt: submissionPayload?.submittedAt || new Date().toISOString(),
         totalTimeSpentSeconds: Math.max(0, Number(submissionPayload?.timeSpentSeconds) || 0),
@@ -577,7 +599,7 @@ function StudentWritingTask2TaskPage() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        handleSubmitAttempt("focus-lost");
+        handleSubmitAttempt("tab-hidden");
       }
     };
 
@@ -585,11 +607,17 @@ function StudentWritingTask2TaskPage() {
       handleSubmitAttempt("page-hide");
     };
 
+    const handleWindowBlur = () => {
+      handleSubmitAttempt("browser-blur");
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("pagehide", handlePageHide);
     };
   }, [handleSubmitAttempt, isAttemptStarted, isSubmitted]);
@@ -643,6 +671,32 @@ function StudentWritingTask2TaskPage() {
     handleOpenFeedback();
   }, [handleOpenFeedback, leaveProtection, shouldProceedAfterResult]);
 
+  const handleWriteAgain = useCallback(() => {
+    clearCountdownInterval();
+    setIsCountdownRunning(false);
+    setCountdownValue(null);
+    localStorage.removeItem(submitStorageKey);
+    localStorage.removeItem(analysisStorageKey);
+    localStorage.removeItem(attemptStartStorageKey);
+    localStorage.removeItem(draftStorageKey);
+    setEssayText("");
+    setSubmissionMeta(null);
+    setResultPayload(null);
+    setIsSubmitted(false);
+    setIsAttemptStarted(false);
+    setRemainingSeconds(durationSeconds);
+    setIsResultModalOpen(false);
+    setShouldProceedAfterResult(false);
+    setIsRouteLeaveSubmitting(false);
+  }, [
+    analysisStorageKey,
+    attemptStartStorageKey,
+    clearCountdownInterval,
+    draftStorageKey,
+    durationSeconds,
+    submitStorageKey,
+  ]);
+
   return (
     <div className="relative space-y-6 select-none">
       <header className="space-y-3">
@@ -669,7 +723,7 @@ function StudentWritingTask2TaskPage() {
                     {normalizeText(item?.questionTopic) || "Question not available."}
                   </p>
                   <p className="mt-5 text-sm leading-7 text-slate-300">
-                    {normalizeText(item?.instruction?.text) || `Write at least ${minimumWords} words.`}
+                    {normalizeInstructionDisplayText(item?.instruction?.text, minimumWords)}
                   </p>
                   <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-400">
                     Essay type: {toReadableLabel(item?.essayType || "unknown")}
@@ -690,7 +744,7 @@ function StudentWritingTask2TaskPage() {
             </div>
             <textarea
               className="h-[54vh] min-h-[380px] w-full resize-none border border-slate-200 bg-white px-4 py-4 text-base leading-7 text-slate-900 outline-none transition focus:border-emerald-300 select-text"
-              disabled={!isAttemptStarted || isTimeOver || isSubmitted}
+              disabled={!isAttemptStarted || isTimeOver || isSubmitted || isCheckingEssay}
               onChange={(event) => setEssayText(event.target.value)}
               placeholder="Write your full response here..."
               spellCheck={false}
@@ -725,11 +779,11 @@ function StudentWritingTask2TaskPage() {
               </p>
               <p className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                Time continues even if you refresh or leave the page.
+                If you refresh or leave this page, your essay is submitted automatically and the timer stops.
               </p>
               <p className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                Check when ready. If timer reaches 00:00, auto-check starts.
+                Submit when ready. If the timer reaches 00:00, your essay is submitted automatically.
               </p>
             </div>
           </section>
@@ -742,11 +796,11 @@ function StudentWritingTask2TaskPage() {
               !isAttemptStarted || isSubmitted || isCheckingEssay || isLoading || Boolean(error) || !item
             }
           >
-            {isCheckingEssay ? "Checking..." : isSubmitted ? "Checked" : "Check My Essay"}
+            {isCheckingEssay ? "Submitting..." : isSubmitted ? "Submitted" : "Submit My Essay"}
           </button>
           {submissionMeta ? (
             <p className="text-xs text-slate-600">
-              Checked {submissionMeta.source === "auto" ? "automatically" : "manually"} at{" "}
+              Submitted {submissionMeta.source === "auto" ? "automatically" : "manually"} at{" "}
               {new Date(submissionMeta.submittedAt).toLocaleTimeString()}.
             </p>
           ) : null}
@@ -773,7 +827,7 @@ function StudentWritingTask2TaskPage() {
           Words: {resultPayload?.submission?.wordsCount || 0}
         </p>
         <p className="text-sm text-slate-600">
-          Source: {toReadableLabel(resultPayload?.submission?.source || "manual")}
+          Reason: {getSubmissionReasonLabel(resultPayload?.submission?.source || "manual")}
         </p>
         {resultPayload?.analysisError ? (
           <p className="mx-auto mt-4 max-w-md rounded-none border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -785,10 +839,10 @@ function StudentWritingTask2TaskPage() {
           {shouldProceedAfterResult ? null : (
             <button
               className="inline-flex items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50"
-              onClick={() => setIsResultModalOpen(false)}
+              onClick={handleWriteAgain}
               type="button"
             >
-              Stay Here
+              Write Again
             </button>
           )}
           <button
@@ -828,7 +882,7 @@ function StudentWritingTask2TaskPage() {
             <div className="mx-auto mt-4 max-w-2xl space-y-2 text-base font-medium leading-8 text-slate-700">
               <p>
                 You have <span className="text-yellow-500">{Math.max(1, Math.round(durationSeconds / 60))} minutes</span> for this writing task.
-                If you <span className="text-yellow-500">switch</span> tabs, <span className="text-yellow-500">change</span> browser, or <span className="text-yellow-500">refresh</span>, this task is <span className="text-yellow-500">auto-submitted</span>.
+                If you <span className="text-yellow-500">switch</span> tabs, <span className="text-yellow-500">change</span> browser, or <span className="text-yellow-500">refresh it</span>, this task is <span className="text-yellow-500">auto-submitted</span>.
               </p>
             </div>
             <button

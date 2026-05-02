@@ -17,6 +17,57 @@ import {
 
 const WRITING_CATEGORIES = new Set(["writing_task1", "writing_task2"]);
 
+function formatBandScore(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "0";
+  }
+
+  return numeric.toFixed(1);
+}
+
+function resolveAnswerText(value) {
+  const safe = String(value || "").trim();
+  return safe || "-";
+}
+
+function resolveAcceptedAnswerText(item) {
+  return Array.isArray(item?.acceptedAnswers) && item.acceptedAnswers.length > 0
+    ? item.acceptedAnswers.join(", ")
+    : "-";
+}
+
+function resolveReadingPassageNumber(questionNumber) {
+  const safeNumber = Number(questionNumber);
+  if (!Number.isFinite(safeNumber) || safeNumber <= 0) {
+    return 1;
+  }
+
+  if (safeNumber <= 13) {
+    return 1;
+  }
+
+  if (safeNumber <= 26) {
+    return 2;
+  }
+
+  return 3;
+}
+
+function formatWeakAreaLabel(value) {
+  const safe = String(value || "Unknown question type")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+\d+\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!safe) {
+    return "Unknown question type";
+  }
+
+  return safe.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function StudentTaskResultHistoryPage() {
   const navigate = useNavigate();
   const {
@@ -179,14 +230,44 @@ function StudentTaskResultHistoryPage() {
     ? Number(evaluation.totalQuestions)
     : Number(activeAttempt?.score?.totalQuestions || 0);
   const incorrectItems = Array.isArray(evaluation?.incorrectItems) ? evaluation.incorrectItems : [];
+  const answerItems = Array.isArray(evaluation?.answerItems) ? evaluation.answerItems : [];
   const weakAreas = Array.isArray(detailSummary?.weakAreas) ? detailSummary.weakAreas : [];
-  const passageTiming = Array.isArray(detailSummary?.passageTiming) ? detailSummary.passageTiming : [];
   const blockResults = Array.isArray(detailSummary?.blockResults) ? detailSummary.blockResults : [];
 
   const activeCategory = String(taskGroup?.taskCategory || "").toLowerCase();
   const isReadingFull = activeCategory === "reading_full_test";
   const isListeningFull = activeCategory === "listening_full_test";
   const isQuestionTask = activeCategory === "reading_question_task" || activeCategory === "listening_question_task";
+  const displayedAnswerItems = isReadingFull && answerItems.length > 0
+    ? answerItems
+    : isReadingFull
+      ? incorrectItems
+      : incorrectItems.slice(0, 12);
+  const scoreBand = Number.isFinite(Number(activeAttempt?.score?.band ?? evaluation?.band))
+    ? Number(activeAttempt?.score?.band ?? evaluation?.band)
+    : null;
+  const readingAnswerGroups = useMemo(() => {
+    if (!isReadingFull) {
+      return [];
+    }
+
+    const grouped = new Map();
+    displayedAnswerItems
+      .slice()
+      .sort((left, right) => Number(left?.questionNumber || 0) - Number(right?.questionNumber || 0))
+      .forEach((item) => {
+        const passageNumber = resolveReadingPassageNumber(item?.questionNumber);
+        if (!grouped.has(passageNumber)) {
+          grouped.set(passageNumber, []);
+        }
+        grouped.get(passageNumber).push(item);
+      });
+
+    return Array.from(grouped.entries()).map(([passageNumber, items]) => ({
+      passageNumber,
+      items,
+    }));
+  }, [displayedAnswerItems, isReadingFull]);
 
   function handleSelectAttempt(attempt) {
     const attemptNumber = Number(attempt?.groupAttemptNumber || attempt?.attemptNumber || 1);
@@ -211,9 +292,6 @@ function StudentTaskResultHistoryPage() {
           <ArrowLeft className="h-4 w-4" />
           Results center
         </Link>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          {taskGroup?.taskCategoryLabel || "Task History"}
-        </p>
         <h1 className="text-3xl font-semibold text-slate-900">
           {taskGroup?.readableTitle || "Task attempt history"}
         </h1>
@@ -252,29 +330,14 @@ function StudentTaskResultHistoryPage() {
               </article>
               <article className="border border-slate-200 bg-slate-50 px-3 py-2.5">
                 <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Accuracy
+                  Score
                 </p>
                 <p className="mt-1 text-base font-semibold text-slate-900">
-                  {Number(activeAttempt?.score?.percentage || evaluation?.percentage || 0)}%
+                  {formatBandScore(scoreBand)}
                 </p>
               </article>
             </div>
           </section>
-
-          {isReadingFull ? (
-            <BreakdownTable
-              columns={[
-                { key: "passageNumber", label: "Passage" },
-                {
-                  key: "timeSpentSeconds",
-                  label: "Time Spent",
-                  render: (row) => formatSeconds(row?.timeSpentSeconds),
-                },
-              ]}
-              rows={passageTiming}
-              title="Passage Timing Breakdown"
-            />
-          ) : null}
 
           {isListeningFull ? (
             <BreakdownTable
@@ -315,43 +378,85 @@ function StudentTaskResultHistoryPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Areas With Most Errors
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {weakAreas.map((area) => (
-                  <article className="border border-slate-200 bg-slate-50 px-3 py-2" key={String(area?.label || "")}>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {String(area?.label || "Unknown section")}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      Incorrect: {Number(area?.incorrectCount || 0)}
-                    </p>
-                  </article>
-                ))}
+              <div className="overflow-x-auto border border-slate-200">
+                <table className="min-w-full border-collapse text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-[0.14em] text-slate-500">
+                    <tr>
+                      <th className="border-b border-r border-slate-200 px-3 py-3 font-semibold">Question Type</th>
+                      <th className="border-b border-slate-200 px-3 py-3 text-center font-semibold">Questions Missed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weakAreas.map((area) => (
+                      <tr
+                        className="border-b border-slate-200 transition-colors last:border-b-0 hover:bg-emerald-50/60"
+                        key={String(area?.label || "")}
+                      >
+                        <td className="border-r border-slate-200 px-3 py-3 font-semibold text-slate-900">
+                          {formatWeakAreaLabel(area?.label)}
+                        </td>
+                        <td className="px-3 py-3 text-center text-slate-700">
+                          {Number(area?.incorrectCount || 0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           ) : null}
 
-          {incorrectItems.length > 0 ? (
+          {displayedAnswerItems.length > 0 ? (
             <section className="space-y-2 rounded-none border border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Incorrect Answers
+                {isReadingFull && answerItems.length > 0 ? "Answers" : "Incorrect Answers"}
               </p>
-              <div className="space-y-2">
-                {incorrectItems.slice(0, 12).map((item, index) => (
-                  <article className="border border-slate-200 bg-slate-50 px-3 py-2" key={`incorrect-${index}`}>
-                    <p className="text-sm font-semibold text-slate-900">
-                      Q{Number(item?.questionNumber || "?")} {item?.blockTitle ? `- ${item.blockTitle}` : ""}
-                    </p>
-                    {item?.studentAnswer ? (
-                      <p className="mt-1 text-xs text-slate-600">Your answer: {item.studentAnswer}</p>
-                    ) : null}
-                    {Array.isArray(item?.acceptedAnswers) && item.acceptedAnswers.length > 0 ? (
-                      <p className="mt-1 text-xs text-slate-600">
-                        Expected: {item.acceptedAnswers.join(", ")}
+              {isReadingFull ? (
+                <div className="space-y-3 grid grid-cols-3 gap-3">
+                  {readingAnswerGroups.map((group) => (
+                    <article key={`passage-${group.passageNumber}`}>
+                      <p className="mt-3 mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Passage {group.passageNumber}
                       </p>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
+                      <div className="grid gap-2 grid-cols-1">
+                        {group.items.map((item) => (
+                          <div
+                            className={`bg-white px-2.5 py-2 text-sm font-semibold ${
+                              item?.isCorrect
+                                ? "text-emerald-700"
+                                : "text-rose-700"
+                            }`}
+                            key={`answer-${group.passageNumber}-${item?.questionNumber}`}
+                          >
+                            {Number(item?.questionNumber || "?")}: {resolveAnswerText(item?.studentAnswer)}
+                            <span className="font-normal text-slate-600">
+                              {" "}({resolveAcceptedAnswerText(item)})
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {displayedAnswerItems.map((item, index) => (
+                    <article className="border border-slate-200 bg-slate-50 px-3 py-2" key={`incorrect-${index}`}>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Q{Number(item?.questionNumber || "?")}
+                      </p>
+                      {item?.studentAnswer ? (
+                        <p className="mt-1 text-xs text-slate-600">Your answer: {item.studentAnswer}</p>
+                      ) : null}
+                      {Array.isArray(item?.acceptedAnswers) && item.acceptedAnswers.length > 0 ? (
+                        <p className="mt-1 text-xs text-slate-600">
+                          Expected: {item.acceptedAnswers.join(", ")}
+                        </p>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
           ) : null}
 

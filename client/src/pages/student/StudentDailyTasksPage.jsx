@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import StudentTodayTasks from "../../components/student/StudentTodayTasks";
 import { getDailyTasks } from "../../services/studentService";
 
-const filters = ["All", "Today", "Completed", "Locked"];
+const filters = ["All", "Completed"];
 
 function RollingLabel({ label, active }) {
   return (

@@ -68,7 +68,7 @@ function buildDefaultStudentProfile(userDoc) {
     },
     security: {
       passwordMasked: "************",
-      lastUpdatedLabel: "Recently updated",
+      lastUpdatedLabel: "",
     },
     billingHistory: [],
   };

@@ -64,7 +64,7 @@ function SuperAdminWritingTask2Page() {
 
   const [questionTopic, setQuestionTopic] = useState("");
   const [essayType, setEssayType] = useState("opinion");
-  const [instructionText, setInstructionText] = useState("Write at least 250 words.");
+  const [instructionText, setInstructionText] = useState("Write at around 250 words.");
   const [instructionMinWords, setInstructionMinWords] = useState("250");
   const [status, setStatus] = useState("draft");
   const [source, setSource] = useState("");
@@ -105,7 +105,7 @@ function SuperAdminWritingTask2Page() {
 
     setQuestionTopic(normalizeText(item.questionTopic));
     setEssayType(normalizeEnum(item.essayType) || "unknown");
-    setInstructionText(normalizeText(item?.instruction?.text) || "Write at least 250 words.");
+    setInstructionText(normalizeText(item?.instruction?.text) || "Write at around 250 words.");
     setInstructionMinWords(String(toNumber(item?.instruction?.minWords, 250)));
     setStatus(normalizeEnum(item.status) || "draft");
     setSource(normalizeText(item.source));
@@ -160,7 +160,7 @@ function SuperAdminWritingTask2Page() {
     setSelectedItemId("");
     setQuestionTopic("");
     setEssayType("opinion");
-    setInstructionText("Write at least 250 words.");
+    setInstructionText("Write at around 250 words.");
     setInstructionMinWords("250");
     setStatus("draft");
     setSource("");
@@ -531,7 +531,7 @@ function SuperAdminWritingTask2Page() {
                 <input
                   className="w-full border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-700"
                   onChange={(event) => setInstructionText(event.target.value)}
-                  placeholder="Write at least 250 words."
+                  placeholder="Write at around 250 words."
                   value={instructionText}
                 />
               </label>

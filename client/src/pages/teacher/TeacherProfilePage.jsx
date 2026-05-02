@@ -1,30 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Mail, ShieldCheck, UserCircle } from "lucide-react";
 import ExamPopup from "../../components/student/exam/ExamPopup";
+import MagneticButton from "../../components/ui/MagneticButton";
 import { getStoredUser, saveAuthSession } from "../../lib/authSession";
 import { getTeacherProfile, updateTeacherPassword, updateTeacherProfile } from "../../services/teacherService";
 
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function getInitials(name, email) {
-  const nameParts = String(name || "").trim().split(/\s+/).filter(Boolean);
-  if (nameParts.length) {
-    return nameParts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
-  }
-  return String(email || "TH").slice(0, 2).toUpperCase();
-}
-
-function AccountOverviewCard({ fullName, email, initials }) {
+function AccountOverviewCard({ fullName, email }) {
   return (
     <section className="relative grid overflow-hidden rounded-none border border-dashed border-slate-700/90 bg-gradient-to-br from-[#062316] via-[#050505] to-[#061421] lg:grid-cols-2">
       <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:linear-gradient(to_right,rgba(148,163,184,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.16)_1px,transparent_1px)] [background-size:28px_28px]" />
 
       <article className="relative p-7 lg:border-r lg:border-dashed lg:border-white/10">
-        <span className="inline-flex h-14 w-14 items-center justify-center border border-white/10 bg-white/[0.08] text-lg font-semibold text-white">
-          {initials}
-        </span>
-        <p className="mt-5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-white/45">
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-white/45">
           Account Overview
         </p>
         <p className="mt-2 text-2xl font-semibold text-white">{fullName}</p>
@@ -54,18 +44,19 @@ function ActionButton({ children, onClick, disabled = false, tone = "emerald" })
     : "emerald-gradient-fill border-emerald-300/20 text-white shadow-[0_14px_36px_-28px_rgba(16,185,129,0.8)]";
 
   return (
-    <button
-      className={`inline-flex w-[106px] items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:opacity-60 ${toneClass}`}
+    <MagneticButton
+      className="rounded-full"
+      innerClassName={`inline-flex w-[106px] items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition disabled:cursor-not-allowed disabled:opacity-60 ${toneClass}`}
       disabled={disabled}
       onClick={onClick}
       type="button"
     >
       {children}
-    </button>
+    </MagneticButton>
   );
 }
 
-function SettingsDisplayCard({ icon, title, value, subtitle, actionLabel, onAction }) {
+function SettingsDisplayCard({ icon, title, value, actionLabel, onAction }) {
   const Icon = icon;
 
   return (
@@ -80,7 +71,6 @@ function SettingsDisplayCard({ icon, title, value, subtitle, actionLabel, onActi
             <p className="mt-2 whitespace-pre-wrap break-words text-base font-semibold text-slate-900">
               {value}
             </p>
-            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
           </div>
         </div>
         {actionLabel ? <ActionButton onClick={onAction}>{actionLabel}</ActionButton> : null}
@@ -131,8 +121,6 @@ function TeacherProfilePage() {
   const [modalError, setModalError] = useState("");
   const [savingField, setSavingField] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-
-  const initials = useMemo(() => getInitials(profile.fullName, profile.email), [profile.email, profile.fullName]);
 
   const syncStoredUser = useCallback((nextProfile) => {
     const currentStoredUser = getStoredUser();
@@ -307,7 +295,7 @@ function TeacherProfilePage() {
       {isLoading ? <p className="text-sm text-slate-500">Loading profile...</p> : null}
       {errorMessage ? <p className="text-sm text-rose-600">{errorMessage}</p> : null}
 
-      <AccountOverviewCard email={profile.email} fullName={profile.fullName} initials={initials} />
+      <AccountOverviewCard email={profile.email} fullName={profile.fullName} />
 
       <section className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -317,7 +305,6 @@ function TeacherProfilePage() {
           <SettingsDisplayCard
             actionLabel="Change"
             icon={UserCircle}
-            subtitle="Displayed in your teacher account"
             title="Name"
             value={profile.fullName}
             onAction={() => openModal("fullName")}
@@ -325,7 +312,6 @@ function TeacherProfilePage() {
           <SettingsDisplayCard
             actionLabel="Change"
             icon={Mail}
-            subtitle="Used for login and notifications"
             title="Email"
             value={profile.email}
             onAction={() => openModal("email")}
@@ -341,7 +327,6 @@ function TeacherProfilePage() {
           <SettingsDisplayCard
             actionLabel="Change"
             icon={KeyRound}
-            subtitle="Use your current password to set a new one"
             title="Password"
             value={profile.passwordMasked}
             onAction={() => openModal("password")}

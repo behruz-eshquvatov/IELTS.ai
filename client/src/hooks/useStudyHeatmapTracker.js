@@ -86,12 +86,12 @@ async function postHeatmapDay(date, minutesSpent) {
   return upsertHeatmapDay(date, normalizeMinutes(minutesSpent, 0));
 }
 
-export function useStudyHeatmapTracker() {
+export function useStudyHeatmapTracker(isTrackingActive = false) {
   const stateRef = useRef(createDefaultTrackerState());
   const lastVisibleAtRef = useRef(0);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !isTrackingActive) {
       return undefined;
     }
 
@@ -226,7 +226,7 @@ export function useStudyHeatmapTracker() {
       const state = stateRef.current;
       sendHeatmapDayKeepalive(state.date, state.minutesSpent);
     };
-  }, []);
+  }, [isTrackingActive]);
 }
 
 export default useStudyHeatmapTracker;

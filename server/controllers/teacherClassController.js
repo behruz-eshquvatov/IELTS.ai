@@ -81,6 +81,38 @@ async function isTeacherClassStudentActiveMember({ teacherId, classId, studentId
   return Boolean(membership);
 }
 
+async function findActiveStudentClass(studentId) {
+  const memberships = await ClassMembership.find({
+    studentId: String(studentId || "").trim(),
+    status: "active",
+  })
+    .sort({ joinedAt: -1, createdAt: -1 })
+    .lean();
+  if (!memberships.length) {
+    return { membership: null, classDoc: null };
+  }
+
+  const classIds = Array.from(new Set(memberships.map((item) => String(item.classId || "")).filter(Boolean)));
+  const classes = await TeacherClass.find(
+    { _id: { $in: classIds }, status: "active" },
+    { name: 1, teacherId: 1 },
+  ).lean();
+  const classById = new Map(classes.map((item) => [String(item._id), item]));
+  const membership = memberships.find((item) => classById.has(String(item.classId || "")));
+  if (!membership) {
+    return { membership: null, classDoc: null };
+  }
+
+  return { membership, classDoc: classById.get(String(membership.classId || "")) || null };
+}
+
+function buildAlreadyAssignedMessage(classDoc) {
+  const className = normalizeText(classDoc?.name, 120);
+  return className
+    ? `This student is already in ${className}. A student can only be in one group.`
+    : "This student is already in another group. A student can only be in one group.";
+}
+
 async function listTeacherClasses(req, res) {
   const teacherId = String(req.auth?.userId || "");
   const classes = await TeacherClass.find({ teacherId })
@@ -282,10 +314,36 @@ async function searchStudentsForTeacherClass(req, res) {
     .sort({ fullName: 1 })
     .limit(40)
     .lean();
+  const userIds = users.map((user) => String(user._id));
+  const activeMemberships = userIds.length
+    ? await ClassMembership.find({ studentId: { $in: userIds }, status: "active" }).lean()
+    : [];
+  const activeClassIds = Array.from(new Set(activeMemberships.map((item) => String(item.classId || "")).filter(Boolean)));
+  const activeClasses = activeClassIds.length
+    ? await TeacherClass.find({ _id: { $in: activeClassIds }, status: "active" }, { name: 1 }).lean()
+    : [];
+  const activeClassById = new Map(activeClasses.map((item) => [String(item._id), item]));
+  const activeMembershipByStudentId = new Map();
+  activeMemberships.forEach((membership) => {
+    if (!activeClassById.has(String(membership.classId || ""))) {
+      return;
+    }
+    const studentId = String(membership.studentId || "");
+    const existing = activeMembershipByStudentId.get(studentId);
+    const isCurrentClass = String(membership.classId || "") === String(classDoc._id);
+    if (!existing || isCurrentClass) {
+      activeMembershipByStudentId.set(studentId, membership);
+    }
+  });
 
   const rows = users.map((user) => {
     const studentId = String(user._id);
     const membership = membershipByStudentId.get(studentId);
+    const activeMembership = activeMembershipByStudentId.get(studentId);
+    const activeClass = activeMembership ? activeClassById.get(String(activeMembership.classId || "")) : null;
+    const isAssignedToAnotherClass = Boolean(
+      activeMembership && String(activeMembership.classId || "") !== String(classDoc._id),
+    );
     const pending = pendingByStudentId.get(studentId);
     return {
       studentId,
@@ -293,9 +351,12 @@ async function searchStudentsForTeacherClass(req, res) {
       email: String(user.email || ""),
       inClass: Boolean(membership),
       classMembershipStatus: membership ? "active" : null,
+      assignedClassId: activeMembership ? String(activeMembership.classId || "") : "",
+      assignedClassName: activeClass ? String(activeClass.name || "") : "",
+      assignedElsewhere: isAssignedToAnotherClass,
       pendingRequestId: pending ? String(pending._id) : "",
       pendingRequestStatus: pending ? "pending" : null,
-      canInvite: !membership && !pending,
+      canInvite: !membership && !pending && !isAssignedToAnotherClass,
     };
   });
 
@@ -322,7 +383,8 @@ async function inviteStudentToTeacherClass(req, res) {
     return res.status(404).json({ message: "Student not found." });
   }
 
-  const [activeMembership, pendingRequest] = await Promise.all([
+  const [{ membership: assignedMembership, classDoc: assignedClass }, activeMembership, pendingRequest] = await Promise.all([
+    findActiveStudentClass(studentId),
     ClassMembership.findOne({
       classId: classDoc._id,
       teacherId,
@@ -337,6 +399,9 @@ async function inviteStudentToTeacherClass(req, res) {
     }).lean(),
   ]);
 
+  if (assignedMembership && String(assignedMembership.classId || "") !== String(classDoc._id)) {
+    return res.status(409).json({ message: buildAlreadyAssignedMessage(assignedClass) });
+  }
   if (activeMembership) {
     return res.status(409).json({ message: "Student is already an active class member." });
   }
@@ -602,6 +667,19 @@ async function respondToClassJoinRequest(req, res) {
     return res.json({ message: "Join request rejected." });
   }
 
+  const { membership: assignedMembership, classDoc: assignedClass } = await findActiveStudentClass(studentId);
+  if (assignedMembership && String(assignedMembership.classId || "") !== String(requestDoc.classId || "")) {
+    await ClassJoinRequest.updateOne(
+      { _id: requestDoc._id },
+      { $set: { status: "expired", respondedAt: now } },
+    );
+    await Notification.updateMany(
+      { recipientId: studentId, "data.requestId": String(requestDoc._id) },
+      { $set: { read: true, handledAt: now } },
+    );
+    return res.status(409).json({ message: buildAlreadyAssignedMessage(assignedClass) });
+  }
+
   await ClassMembership.findOneAndUpdate(
     { classId: requestDoc.classId, teacherId: requestDoc.teacherId, studentId },
     {
@@ -614,6 +692,21 @@ async function respondToClassJoinRequest(req, res) {
     { _id: requestDoc._id },
     { $set: { status: "accepted", respondedAt: now } },
   );
+  const otherPendingRequests = await ClassJoinRequest.find(
+    { _id: { $ne: requestDoc._id }, studentId, status: "pending" },
+    { _id: 1 },
+  ).lean();
+  const otherPendingRequestIds = otherPendingRequests.map((item) => String(item._id));
+  if (otherPendingRequestIds.length) {
+    await ClassJoinRequest.updateMany(
+      { _id: { $in: otherPendingRequestIds } },
+      { $set: { status: "expired", respondedAt: now } },
+    );
+    await Notification.updateMany(
+      { recipientId: studentId, "data.requestId": { $in: otherPendingRequestIds } },
+      { $set: { read: true, handledAt: now } },
+    );
+  }
   await Notification.updateMany(
     { recipientId: studentId, "data.requestId": String(requestDoc._id) },
     { $set: { read: true, handledAt: now } },

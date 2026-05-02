@@ -42,6 +42,43 @@ function toFiniteNumber(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function toListeningBand(correctCount, totalQuestions) {
+  const safeTotal = Math.max(0, Number(totalQuestions) || 0);
+  if (safeTotal <= 0) {
+    return 0;
+  }
+
+  const safeCorrect = Math.max(0, Math.min(safeTotal, Number(correctCount) || 0));
+  const scaledCorrect = safeTotal === 40
+    ? Math.round(safeCorrect)
+    : Math.round((safeCorrect / safeTotal) * 40);
+
+  if (scaledCorrect >= 39) return 9;
+  if (scaledCorrect >= 37) return 8.5;
+  if (scaledCorrect >= 35) return 8;
+  if (scaledCorrect >= 32) return 7.5;
+  if (scaledCorrect >= 30) return 7;
+  if (scaledCorrect >= 26) return 6.5;
+  if (scaledCorrect >= 23) return 6;
+  if (scaledCorrect >= 18) return 5.5;
+  if (scaledCorrect >= 16) return 5;
+  if (scaledCorrect >= 13) return 4.5;
+  if (scaledCorrect >= 11) return 4;
+  if (scaledCorrect >= 8) return 3.5;
+  if (scaledCorrect >= 6) return 3;
+  if (scaledCorrect >= 4) return 2.5;
+  return 0;
+}
+
+function formatBandScore(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "0";
+  }
+
+  return numeric.toFixed(1);
+}
+
 function parseBlockQuestionRange(blockId) {
   const safeBlockId = String(blockId || "").trim();
   if (!safeBlockId) {
@@ -1500,6 +1537,7 @@ function StudentListeningFullTestDetailPage() {
       const totalCorrect = allBlockResults.reduce((sum, result) => sum + Number(result.correctCount || 0), 0);
       const totalQuestions = allBlockResults.reduce((sum, result) => sum + Number(result.totalQuestions || 0), 0);
       const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+      const band = toListeningBand(totalCorrect, totalQuestions);
       const incorrectItems = allBlockResults.flatMap((result) =>
         Array.isArray(result.incorrectItems) ? result.incorrectItems : [],
       );
@@ -1532,6 +1570,7 @@ function StudentListeningFullTestDetailPage() {
                 correctCount: totalCorrect,
                 incorrectCount: Math.max(0, totalQuestions - totalCorrect),
                 percentage,
+                band,
                 incorrectItems,
               },
               blockResults: blockResultsPayload,
@@ -1558,6 +1597,7 @@ function StudentListeningFullTestDetailPage() {
               submittedAt: new Date().toISOString(),
               totalTimeSpentSeconds,
               score: {
+                band,
                 percentage,
                 correctCount: totalCorrect,
                 incorrectCount: Math.max(0, totalQuestions - totalCorrect),
@@ -1573,6 +1613,7 @@ function StudentListeningFullTestDetailPage() {
                     correctCount: totalCorrect,
                     incorrectCount: Math.max(0, totalQuestions - totalCorrect),
                     percentage,
+                    band,
                     incorrectItems,
                   },
                   blockResults: blockResultsPayload,
@@ -1594,6 +1635,7 @@ function StudentListeningFullTestDetailPage() {
         totalCorrect,
         totalQuestions,
         percentage,
+        band,
         incorrectItems,
         forceReason: finalForceReason,
       });
@@ -2020,6 +2062,9 @@ function StudentListeningFullTestDetailPage() {
     ? Math.round((cappedDisplayCorrectCount / displayTotalQuestions) * 100)
     : 0;
   const isGoodFinalScore = resultPercentage >= GOOD_SCORE_THRESHOLD_PERCENT;
+  const finalBandLabel = formatBandScore(
+    finalResult?.band ?? toListeningBand(cappedDisplayCorrectCount, displayTotalQuestions),
+  );
 
   return (
     <div className="space-y-8 pt-2 sm:pt-4">
@@ -2223,7 +2268,7 @@ function StudentListeningFullTestDetailPage() {
             </p>
 
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">
-              Score: {resultPercentage}%
+              Score: {finalBandLabel}
             </p>
 
             <p className="mt-4 text-sm text-slate-600">
@@ -2283,7 +2328,7 @@ function StudentListeningFullTestDetailPage() {
                   onClick={handleFinalModalPrimaryAction}
                   type="button"
                 >
-                  Leave Page
+                  Review
                 </button>
               ) : (
                 <Link

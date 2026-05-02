@@ -112,7 +112,7 @@ function buildWritingTask2ExtractionPrompt() {
     "- Normalize whitespace only.",
     "- Do not add markdown or explanations.",
     "- Do not add keys outside this schema.",
-    "- `instruction.text` should usually be 'Write at least 250 words.' when visible or implied.",
+    "- `instruction.text` should usually be 'Write at around 250 words.' when visible or implied.",
     "- `instruction.minWords` should be numeric and usually 250.",
     "",
     "Essay type guidance:",

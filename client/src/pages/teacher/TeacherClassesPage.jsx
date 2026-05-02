@@ -155,6 +155,10 @@ function StudentDirectoryModal({
                           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">In class</span>
                         ) : student.pendingRequestStatus === "pending" ? (
                           <span className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-600">Pending</span>
+                        ) : student.assignedElsewhere || student.canInvite === false ? (
+                          <span className="text-right text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            {student.assignedClassName ? `In ${student.assignedClassName}` : "In another group"}
+                          </span>
                         ) : (
                           <button
                             className="emerald-gradient-fill inline-flex items-center gap-2 border border-emerald-300/20 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition-opacity duration-200 disabled:opacity-50"

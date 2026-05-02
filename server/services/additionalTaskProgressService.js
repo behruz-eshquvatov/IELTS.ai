@@ -10,6 +10,7 @@ const READING_PASSAGES_COLLECTION = "reading_passages";
 const READING_BLOCKS_COLLECTION = "reading_blocks";
 const DEFAULT_LISTENING_BLOCKS_COLLECTION = ListeningBlock.collection.name || "listening_blocks";
 const LEGACY_LISTENING_BLOCKS_COLLECTION = "listeninig_blocks";
+const WRITING_ADDITIONAL_UNLOCK_MIN_BAND = 5.0;
 
 const READING_PRACTICE_FAMILY_MAP = {
   multiple_choice: ["multiple_choice"],
@@ -199,6 +200,16 @@ function buildSequentialStatusMap(orderedTaskRefs = [], completionMap = new Map(
   });
 
   return statusMap;
+}
+
+function isProgressQualifyingAttempt(attempt = {}) {
+  const taskType = normalizeTaskType(attempt?.taskType);
+  if (taskType !== "writing_task1" && taskType !== "writing_task2") {
+    return true;
+  }
+
+  const band = toFiniteNumber(attempt?.score?.band, Number.NaN);
+  return Number.isFinite(band) && band >= WRITING_ADDITIONAL_UNLOCK_MIN_BAND;
 }
 
 async function resolveListeningBlocksCollectionName() {
@@ -398,6 +409,10 @@ async function buildAdditionalProgressMap(options = {}) {
     }
 
     if (practiceKey && extractPracticeKeyFromAttempt(attempt) !== practiceKey) {
+      return;
+    }
+
+    if (!isProgressQualifyingAttempt(attempt)) {
       return;
     }
 

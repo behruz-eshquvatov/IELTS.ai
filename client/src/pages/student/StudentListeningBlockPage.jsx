@@ -1274,7 +1274,7 @@ function StudentListeningBlockPage() {
     };
 
     const handleWindowBlur = () => {
-      autoCompleteAttempt("You switched focus away from this page. This task was auto-completed.", "window-blur");
+      autoCompleteAttempt("You did not follow the rule. This task was auto-completed.", "window-blur");
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -1410,7 +1410,7 @@ function StudentListeningBlockPage() {
 
   const handleChoiceSelect = useCallback((questionId, value, selectionLimit = 1) => {
     const safeQuestionId = String(questionId || "").trim();
-    if (!safeQuestionId || isAutoCompleted || !hasAttemptStarted) {
+    if (!safeQuestionId || isAutoCompleted || !hasAttemptStarted || isSubmittingAttempt) {
       return;
     }
 
@@ -1434,12 +1434,13 @@ function StudentListeningBlockPage() {
   }, [
     hasAttemptStarted,
     isAutoCompleted,
+    isSubmittingAttempt,
     isMultipleChoiceMultiBlock,
     sharedMultiChoiceQuestionIdSet,
     sharedMultiChoiceQuestionIds,
   ]);
 
-  const isInputDisabled = isAutoCompleted || !hasAttemptStarted;
+  const isInputDisabled = isAutoCompleted || !hasAttemptStarted || isSubmittingAttempt;
   const showAudioPlayingEffect =
     Boolean(audio?.exists) && hasAttemptStarted && !isAutoCompleted && isAudioPlaying;
   const submissionPercentage = Number(submissionResult?.percentage || 0);
@@ -1730,7 +1731,7 @@ function StudentListeningBlockPage() {
                   onClick={handleResultPrimaryAction}
                   type="button"
                 >
-                  Leave Page
+                  Review
                 </button>
               ) : (
                 <Link

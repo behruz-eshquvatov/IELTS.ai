@@ -45,10 +45,7 @@ function AccountOverviewCard({ fullName, email, memberSince, subscription }) {
 
       <article className="relative p-7 lg:border-r lg:border-dashed lg:border-white/10">
         <div className="relative z-10">
-          <span className="inline-flex h-12 w-12 items-center justify-center border border-white/10 bg-white/[0.08] text-white">
-            <UserCircle className="h-5 w-5" />
-          </span>
-          <p className="mt-5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-white/45">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-white/45">
             Account Overview
           </p>
           <p className="mt-2 text-2xl font-semibold text-white">{fullName}</p>
@@ -95,7 +92,6 @@ function SettingsDisplayCard({
   icon,
   title,
   value,
-  subtitle,
   actionLabel,
   onAction,
   isActionDisabled = false,
@@ -114,7 +110,6 @@ function SettingsDisplayCard({
             <p className="mt-2 whitespace-pre-wrap break-words text-base font-semibold text-slate-900">
               {value}
             </p>
-            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
           </div>
         </div>
         <ActionButton label={actionLabel} onClick={onAction} disabled={isActionDisabled} />
@@ -451,7 +446,6 @@ function StudentProfilePage() {
           <SettingsDisplayCard
             actionLabel="Change"
             icon={UserCircle}
-            subtitle="Displayed in your account profile"
             title="Name"
             value={profile.fullName || "Student"}
             onAction={() => openModal("fullName")}
@@ -461,7 +455,6 @@ function StudentProfilePage() {
           <SettingsDisplayCard
             actionLabel="Change"
             icon={Mail}
-            subtitle="Used for login and notifications"
             title="Email"
             value={profile.email || "student@example.com"}
             onAction={() => openModal("email")}
@@ -479,7 +472,6 @@ function StudentProfilePage() {
           <SettingsDisplayCard
             actionLabel="Change"
             icon={KeyRound}
-            subtitle={profile.security?.lastUpdatedLabel || "Not updated recently"}
             title="Password"
             value={profile.security?.passwordMasked || "************"}
             onAction={() => openModal("password")}

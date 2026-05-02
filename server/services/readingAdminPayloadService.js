@@ -46,10 +46,6 @@ const EXAMPLE_READING_PASSAGE = {
   passageNumber: 1,
   contentBlocks: [
     {
-      type: "intro",
-      text: "You should spend about 20 minutes on Questions 1-13, which are based on Reading Passage 1 below.",
-    },
-    {
       type: "title",
       text: "The headline of the passage",
     },
@@ -93,6 +89,16 @@ const EXAMPLE_READING_BLOCK = {
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function isReadingTimingInstruction(value) {
+  const safe = normalizeText(value).toLowerCase();
+  return (
+    safe.includes("you should spend about 20 minutes") &&
+    safe.includes("questions") &&
+    safe.includes("reading passage") &&
+    safe.includes("below")
+  );
 }
 
 function normalizeEnum(value) {
@@ -249,7 +255,9 @@ function normalizeReadingPassagePayload(rawPassage = {}) {
     test: normalizeNumericValue(source.test),
     passageNumber: normalizeNumericValue(source.passageNumber),
     contentBlocks: Array.isArray(source.contentBlocks)
-      ? source.contentBlocks.map((item) => normalizeReadingPassageContentBlock(item))
+      ? source.contentBlocks
+        .map((item) => normalizeReadingPassageContentBlock(item))
+        .filter((item) => !isReadingTimingInstruction(item?.text))
       : [],
     status: normalizeEnum(source.status) || "draft",
   };
@@ -760,6 +768,7 @@ function buildReadingPassageExtractionPrompt() {
     "- Do not paraphrase.",
     "- Do not shorten.",
     "- Only normalize spacing.",
+    "- Omit timing/instruction headers such as 'You should spend about 20 minutes on Questions ... Reading Passage ... below.'",
     "",
     "Structure rules:",
     "- Each paragraph must be a separate contentBlock.",

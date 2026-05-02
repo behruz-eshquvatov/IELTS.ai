@@ -124,7 +124,6 @@ function StudentReadingPracticePage() {
       <PracticeTipsCarousel tips={tips} />
 
       <section className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Task Group</p>
         <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-900">
           {practiceConfig?.title || "Reading Practice"}
         </h1>

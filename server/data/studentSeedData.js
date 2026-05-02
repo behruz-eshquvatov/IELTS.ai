@@ -321,7 +321,7 @@ const studentProfileSeed = {
   },
   security: {
     passwordMasked: "************",
-    lastUpdatedLabel: "Last updated 24 days ago",
+    lastUpdatedLabel: "",
   },
   billingHistory: [
     { invoiceId: "INV-2482", date: "Mar 28, 2026", amount: "$19.00", status: "Paid" },

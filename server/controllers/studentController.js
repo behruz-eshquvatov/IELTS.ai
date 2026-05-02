@@ -66,8 +66,6 @@ const RESULTS_CATEGORY_LABELS = {
   writing_task2: "WRITING T2",
   reading_full: "READING FULL TESTS",
   listening_full: "LISTENING FULL TESTS",
-  reading_question: "READING QUESTION TASKS",
-  listening_question: "LISTENING QUESTION TASKS",
 };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
@@ -98,12 +96,8 @@ function normalizeText(value, fallback = "", maxLength = 320) {
   return normalized || String(fallback || "").trim().slice(0, maxLength);
 }
 
-function formatSecurityUpdatedLabel(date = new Date()) {
-  return `Updated ${date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })}`;
+function formatSecurityUpdatedLabel() {
+  return "";
 }
 
 function normalizePositiveOrder(value, fallback = 1) {

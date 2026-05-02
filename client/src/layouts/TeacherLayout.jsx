@@ -3,7 +3,6 @@ import {
   GraduationCap,
   LogOut,
   Users,
-  User,
   UserCircle,
 } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -11,6 +10,8 @@ import { useEffect, useRef, useState } from "react";
 import { authApi } from "../lib/apiClient";
 import { clearAuthSession } from "../lib/authSession";
 import { getTeacherNotifications, markTeacherNotificationRead } from "../services/teacherService";
+import ConfirmLeaveModal from "../components/student/ConfirmLeaveModal";
+import AppBreadcrumbHeader from "../components/layout/AppBreadcrumbHeader";
 
 const navGroups = [
   {
@@ -47,6 +48,7 @@ function TeacherLayout() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLeaveOpen, setIsLeaveOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const notificationsRef = useRef(null);
   const location = useLocation();
@@ -176,7 +178,7 @@ function TeacherLayout() {
               className={`${linkBase} ${
                 isSidebarExpanded ? "grid-cols-[56px_1fr]" : "grid-cols-[56px_0px]"
               } w-full border border-transparent text-left text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700`}
-              onClick={handleLogout}
+              onClick={() => setIsLeaveOpen(true)}
               type="button"
             >
               <span className="flex h-9 w-[56px] items-center justify-center">
@@ -189,44 +191,69 @@ function TeacherLayout() {
                     : "max-w-0 opacity-0 overflow-hidden"
                 }`}
               >
-                Logout
+                Leave
               </span>
             </button>
           </div>
         </div>
       </aside>
 
+      <ConfirmLeaveModal
+        isOpen={isLeaveOpen}
+        onCancel={() => setIsLeaveOpen(false)}
+        onConfirm={async () => {
+          setIsLeaveOpen(false);
+          await handleLogout();
+        }}
+      />
+
       <main className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-[#fbf8f2] pl-6 pr-0 lg:pl-8">
-          <div className="pr-4">
-            <h1 className="text-lg font-semibold text-slate-900">{routeTitle}</h1>
+          <div className="min-w-0 pr-4">
+            <AppBreadcrumbHeader segments={["Teacher", routeTitle]} />
           </div>
-          <div className="flex h-full items-stretch">
-            <div className="relative flex items-center border-l border-slate-200 px-4" ref={notificationsRef}>
+          <div className="flex h-full items-center gap-3 pr-4">
+            <div
+              className="relative flex items-center"
+              ref={notificationsRef}
+              onMouseEnter={() => setIsNotificationsOpen(true)}
+              onMouseLeave={(event) => {
+                if (!notificationsRef.current?.contains(event.relatedTarget)) {
+                  setIsNotificationsOpen(false);
+                }
+              }}
+            >
               <button
                 type="button"
                 aria-label="Notifications"
+                aria-haspopup="dialog"
                 aria-expanded={isNotificationsOpen}
                 onClick={() => setIsNotificationsOpen((current) => !current)}
-                className="relative flex h-10 w-10 items-center justify-center border border-slate-200 bg-white text-slate-600"
+                className="group relative flex h-9 w-9 items-center justify-center overflow-visible rounded-none border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300/40 hover:text-white hover:shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
               >
-                <Bell className="h-5 w-5" />
+                <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 emerald-gradient-fill" />
+                <Bell className="relative h-5 w-5" />
                 {unreadNotifications.length > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                  <span className="absolute right-0 top-0 z-10 inline-flex h-[18px] min-w-[18px] translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
                     {unreadNotifications.length > 99 ? "99+" : unreadNotifications.length}
                   </span>
                 ) : null}
               </button>
               <div
-                className={`absolute right-0 top-12 z-30 w-96 border border-slate-200 bg-white p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"}`}
+                role="dialog"
+                aria-label="Notifications"
+                className={`absolute right-0 top-12 z-30 min-h-[6.5rem] w-80 origin-top-right rounded-none border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition ${isNotificationsOpen ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"}`}
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Notifications</p>
-                <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                <span className="absolute -top-3 left-0 h-3 w-full" />
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Notifications
+                </p>
+                <div className="mt-2 max-h-80 space-y-2 overflow-y-auto">
                   {notifications.length === 0 ? (
                     <p className="text-sm text-slate-600">No notifications yet.</p>
                   ) : notifications.map((item) => (
                     <button
-                      className={`w-full border p-2.5 text-left ${item.read ? "border-slate-200 bg-white" : "border-emerald-200 bg-emerald-50/40"}`}
+                      className={`w-full rounded-none border p-2.5 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40 ${item.read ? "border-slate-100 bg-white" : "border-emerald-200 bg-emerald-50/40"}`}
                       key={item._id}
                       onClick={async () => {
                         if (item.read) {

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Lock, LockOpen, PenLine } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, PenLine } from "lucide-react";
 import { apiRequest } from "../../lib/apiClient";
 import PracticeTipsCarousel from "../../components/student/PracticeTipsCarousel";
 import { LibraryListSkeleton } from "../../components/ui/Skeleton";
@@ -75,6 +75,28 @@ function toReadableLabel(value) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getProgressStatus(item) {
+  return String(item?.progressStatus || item?.progression?.status || "available")
+    .trim()
+    .toLowerCase();
+}
+
+function sortUnlockedFirst(first, second) {
+  const firstLocked = getProgressStatus(first) === "locked";
+  const secondLocked = getProgressStatus(second) === "locked";
+
+  if (firstLocked === secondLocked) {
+    return 0;
+  }
+
+  return firstLocked ? 1 : -1;
+}
+
+function getTaskTitle(item) {
+  const question = normalizeText(item?.questionTopic || item?.question || item?.prompt);
+  return `Writing Task 1${question ? `: ${question}` : ""}`;
+}
+
 function buildVisiblePageItems(currentPage, totalPages) {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -110,6 +132,11 @@ function StudentWritingTask1TypePage() {
       "Use precise comparison language and keep your structure clear.",
     ],
   };
+
+  const orderedItems = useMemo(
+    () => [...items].sort(sortUnlockedFirst),
+    [items],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -188,7 +215,6 @@ function StudentWritingTask1TypePage() {
       <PracticeTipsCarousel tips={sectionMeta.tips} />
 
       <section className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Task Group</p>
         <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-900">{sectionMeta.title}</h1>
       </section>
 
@@ -197,31 +223,28 @@ function StudentWritingTask1TypePage() {
 
       {!isLoading && !error ? (
         <section className="space-y-3">
-          {items.map((item) => {
-            const progressStatus = String(item?.progressStatus || item?.progression?.status || "available")
-              .trim()
-              .toLowerCase();
+          {orderedItems.map((item) => {
+            const progressStatus = getProgressStatus(item);
             const isLocked = progressStatus === "locked";
 
             if (isLocked) {
               return (
                 <div
                   key={item._id}
-                  className="flex min-h-[104px] cursor-not-allowed items-center gap-4 rounded-none border border-l-4 border-l-slate-300 border-slate-300/80 bg-slate-50/90 px-5 py-5"
+                  className="flex min-h-[104px] cursor-not-allowed items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 opacity-80"
                 >
-                  <span className="flex h-12 w-12 items-center justify-center bg-slate-200/80 text-slate-500 shadow-sm">
+                  <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-500 shadow-sm">
                     <PenLine className="h-4 w-4" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-semibold text-slate-700">
-                      {normalizeText(item?.title) || `Writing Task 1 ${item?._id}`}
+                      {getTaskTitle(item)}
                     </p>
                     <p className="mt-1 truncate text-xs text-slate-500">
                       {toReadableLabel(item?.visualType)} | {toReadableLabel(item?.status)}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{normalizeText(item?.questionTopic)}</p>
                   </div>
-                  <span className="inline-flex min-w-[7.5rem] items-center justify-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-center text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                  <span className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     <Lock className="h-3.5 w-3.5" />
                     Locked
                   </span>
@@ -233,23 +256,24 @@ function StudentWritingTask1TypePage() {
               <Link
                 key={item._id}
                 to={`/student/tests/writingTask1/${encodeURIComponent(item._id)}`}
-                className="group flex min-h-[104px] items-center gap-4 rounded-none border border-l-4 border-l-emerald-500 border-emerald-300/70 bg-emerald-50/40 px-5 py-5 transition hover:border-emerald-400 hover:bg-white"
+                className="group flex min-h-[104px] items-center gap-4 rounded-none border border-slate-200/80 bg-white/90 px-5 py-5 transition hover:border-emerald-200/80 hover:bg-white"
               >
-                <span className="flex h-12 w-12 items-center justify-center bg-emerald-100/80 text-emerald-700 shadow-sm transition group-hover:bg-emerald-100 group-hover:text-emerald-700">
+                <span className="flex h-12 w-12 items-center justify-center bg-slate-50 text-slate-600 shadow-sm transition group-hover:text-emerald-600">
                   <PenLine className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-semibold text-slate-900">
-                    {normalizeText(item?.title) || `Writing Task 1 ${item?._id}`}
+                    {getTaskTitle(item)}
                   </p>
                   <p className="mt-1 truncate text-xs text-slate-500">
                     {toReadableLabel(item?.visualType)} | {toReadableLabel(item?.status)}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-slate-500">{normalizeText(item?.questionTopic)}</p>
                 </div>
-                <span className="inline-flex min-w-[7.5rem] items-center justify-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1 text-center text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                  <LockOpen className="h-3.5 w-3.5" />
-                  Open
+                <span className="relative h-[1.1rem] min-w-[6.5rem] overflow-hidden text-center text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
+                  <span className="flex flex-col transition-transform duration-300 ease-out group-hover:-translate-y-1/2">
+                    <span>Open</span>
+                    <span>Open</span>
+                  </span>
                 </span>
               </Link>
             );

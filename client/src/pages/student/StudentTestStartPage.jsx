@@ -39,6 +39,21 @@ function countWords(value) {
   return trimmed.split(/\s+/).length;
 }
 
+function getSubmissionReasonLabel(source) {
+  const safeSource = String(source || "").trim().toLowerCase();
+  const labels = {
+    auto: "Timer finished. Task auto-submitted.",
+    "focus-lost": "You switched tabs or browser/window. Task auto-submitted.",
+    "tab-hidden": "You switched tabs. Task auto-submitted.",
+    "browser-blur": "You switched browser/window. Task auto-submitted.",
+    "page-hide": "You refreshed or left the page. Task auto-submitted.",
+    "before-unload": "You refreshed or left the page. Task auto-submitted.",
+    manual: "Submitted manually.",
+  };
+
+  return labels[safeSource] || "Task submitted.";
+}
+
 function readSubmissionMeta(storageKey) {
   if (typeof window === "undefined") {
     return null;
@@ -433,20 +448,28 @@ function StudentTestStartPage() {
       return undefined;
     }
 
-    const autoSubmitOnFocusLoss = () => {
-      handleSubmitAttempt("focus-lost");
-    };
-
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        autoSubmitOnFocusLoss();
+        handleSubmitAttempt("tab-hidden");
       }
     };
 
+    const handleWindowBlur = () => {
+      handleSubmitAttempt("browser-blur");
+    };
+
+    const handlePageHide = () => {
+      handleSubmitAttempt("page-hide");
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("pagehide", handlePageHide);
     };
   }, [handleSubmitAttempt, isAttemptStarted, isSubmitted, testId]);
 
@@ -492,7 +515,7 @@ function StudentTestStartPage() {
     const wordsGuideText =
       wordsCount >= MINIMUM_WORDS
         ? "Minimum reached. Keep improving argument quality."
-        : `Target at least ${MINIMUM_WORDS} words.`;
+        : `Write around ${MINIMUM_WORDS} words.`;
 
     return (
       <div className="relative space-y-6 select-none">
@@ -539,7 +562,7 @@ function StudentTestStartPage() {
               </div>
               <textarea
                 className="h-[54vh] min-h-[380px] w-full resize-none border border-slate-200 bg-white px-4 py-4 text-base leading-7 text-slate-900 outline-none transition focus:border-emerald-300 select-text"
-                disabled={!isAttemptStarted || isTimeOver || isSubmitted}
+                disabled={!isAttemptStarted || isTimeOver || isSubmitted || isCheckingEssay}
                 onChange={(event) => setEssayText(event.target.value)}
                 onCopy={(event) => event.preventDefault()}
                 onCut={(event) => event.preventDefault()}
@@ -604,7 +627,7 @@ function StudentTestStartPage() {
             </button>
             {submissionMeta ? (
               <p className="text-xs text-slate-600">
-                Checked {submissionMeta.source === "auto" ? "automatically" : "manually"} at{" "}
+                {getSubmissionReasonLabel(submissionMeta.source)} Submitted at{" "}
                 {new Date(submissionMeta.submittedAt).toLocaleTimeString()}.
               </p>
             ) : null}

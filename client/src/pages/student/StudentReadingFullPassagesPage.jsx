@@ -5,6 +5,7 @@ import { apiRequest } from "../../lib/apiClient";
 import ReadingPassageWithBlocks from "../../components/student/ReadingPassageWithBlocks";
 import { TestPageSkeleton } from "../../components/ui/Skeleton";
 import { getReadingFullTestById } from "../../services/studentService";
+import { buildResultsAttemptRoute } from "../../components/student/results/resultsUtils";
 
 const FULL_TEST_DURATION_SECONDS = 60 * 60;
 
@@ -127,7 +128,7 @@ function StudentReadingFullPassagesPage() {
         return;
       }
 
-      await apiRequest(`/reading/full-tests/${encodeURIComponent(resolvedTestId)}/submit`, {
+      const response = await apiRequest(`/reading/full-tests/${encodeURIComponent(resolvedTestId)}/submit`, {
         method: "POST",
         body: {
           attemptCategory,
@@ -136,8 +137,20 @@ function StudentReadingFullPassagesPage() {
           forceReason: String(attemptPayload?.forceReason || ""),
           evaluation: attemptPayload?.evaluation || {},
           passageTiming: Array.isArray(attemptPayload?.passageTiming) ? attemptPayload.passageTiming : [],
+          totalTimeSpentSeconds: Math.max(0, Math.round(Number(attemptPayload?.totalTimeSpentSeconds) || 0)),
         },
       });
+
+      return {
+        reviewRoute: buildResultsAttemptRoute({
+          taskType: "reading",
+          taskMode: "full",
+          taskRefId: resolvedTestId,
+          sourceType: "reading_full",
+          taskGroupId: `reading_full_test::reading_full::${resolvedTestId}`,
+          attemptNumber: Number(response?.attempt?.resultAttemptNumber || response?.attempt?.attemptNumber || 1),
+        }),
+      };
     },
     [attemptCategory, sourceType, test?._id, testId],
   );

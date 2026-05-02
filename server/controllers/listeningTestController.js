@@ -347,6 +347,9 @@ function sanitizeListeningEvaluationPayload(value) {
     correctCount,
     incorrectCount,
     percentage: Math.max(0, Math.min(percentage, 100)),
+    band: Number.isFinite(Number(safe?.band))
+      ? Math.max(0, Math.min(9, Number(safe.band)))
+      : null,
     incorrectItems: Array.isArray(safe?.incorrectItems) ? safe.incorrectItems : [],
   };
 }
@@ -772,6 +775,7 @@ async function submitListeningTestAttempt(req, res) {
       submittedAt: safeSubmittedAt,
       totalTimeSpentSeconds,
       score: {
+        band: evaluation.band,
         percentage: evaluation.percentage,
         correctCount: evaluation.correctCount,
         incorrectCount: evaluation.incorrectCount,

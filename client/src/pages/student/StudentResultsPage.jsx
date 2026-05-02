@@ -16,9 +16,12 @@ const FILTER_ORDER = [
   "reading_full_test",
   "listening_full_test",
   "question_type_task",
+];
+
+const HIDDEN_FILTER_KEYS = new Set([
   "reading_question_task",
   "listening_question_task",
-];
+]);
 
 function StudentResultsPage() {
   const [activeFilter, setActiveFilter] = useState("all");
@@ -65,14 +68,18 @@ function StudentResultsPage() {
   }, [activeFilter]);
 
   const orderedFilters = useMemo(() => {
+    const visibleFilters = (Array.isArray(filters) ? filters : []).filter(
+      (item) => !HIDDEN_FILTER_KEYS.has(String(item?.key || "")),
+    );
+
     const mapByKey = new Map(
-      (Array.isArray(filters) ? filters : []).map((item) => [String(item?.key || ""), item]),
+      visibleFilters.map((item) => [String(item?.key || ""), item]),
     );
 
     const prioritized = FILTER_ORDER.map((key) => (
       mapByKey.get(key) || { key, label: key.toUpperCase(), count: 0 }
     ));
-    const extras = (Array.isArray(filters) ? filters : []).filter(
+    const extras = visibleFilters.filter(
       (item) => !FILTER_ORDER.includes(String(item?.key || "")),
     );
     return [...prioritized, ...extras];

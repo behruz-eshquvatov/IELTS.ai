@@ -15,6 +15,20 @@ const TOMATO_COLOR = "#ff6347";
 const AUTO_COMPLETE_KEY_PREFIX = "student:reading:auto-complete:";
 const EMPTY_ARRAY = Object.freeze([]);
 
+function isReadingTimingInstruction(value) {
+  const safe = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+  return (
+    safe.includes("you should spend about 20 minutes") &&
+    safe.includes("questions") &&
+    safe.includes("reading passage") &&
+    safe.includes("below")
+  );
+}
+
 function toReadableLabel(value) {
   const safe = String(value || "").trim();
   if (!safe) {
@@ -33,6 +47,43 @@ function formatTimerLabel(totalSeconds) {
   const minutes = Math.floor(safe / 60);
   const seconds = safe % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function toReadingBand(correctCount, totalQuestions) {
+  const safeTotal = Math.max(0, Number(totalQuestions) || 0);
+  if (safeTotal <= 0) {
+    return 0;
+  }
+
+  const safeCorrect = Math.max(0, Math.min(safeTotal, Number(correctCount) || 0));
+  const scaledCorrect = safeTotal === 40
+    ? Math.round(safeCorrect)
+    : Math.round((safeCorrect / safeTotal) * 40);
+
+  if (scaledCorrect >= 39) return 9;
+  if (scaledCorrect >= 37) return 8.5;
+  if (scaledCorrect >= 35) return 8;
+  if (scaledCorrect >= 33) return 7.5;
+  if (scaledCorrect >= 30) return 7;
+  if (scaledCorrect >= 27) return 6.5;
+  if (scaledCorrect >= 23) return 6;
+  if (scaledCorrect >= 19) return 5.5;
+  if (scaledCorrect >= 15) return 5;
+  if (scaledCorrect >= 13) return 4.5;
+  if (scaledCorrect >= 10) return 4;
+  if (scaledCorrect >= 8) return 3.5;
+  if (scaledCorrect >= 6) return 3;
+  if (scaledCorrect >= 4) return 2.5;
+  return 0;
+}
+
+function formatBandScore(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "0";
+  }
+
+  return numeric.toFixed(1);
 }
 
 function normalizeAnswerText(value) {
@@ -537,11 +588,16 @@ function renderDisplayElement(element, index, keyPrefix = "element", answerConte
 function renderPassageContentBlock(contentBlock, index) {
   const type = String(contentBlock?.type || "").trim().toLowerCase();
   const key = `passage-content-${index}`;
+  const text = String(contentBlock?.text || "").trim();
+
+  if (isReadingTimingInstruction(text)) {
+    return null;
+  }
 
   if (type === "intro") {
     return (
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500" key={key}>
-        {String(contentBlock?.text || "").trim() || "-"}
+        {text || "-"}
       </p>
     );
   }
@@ -1192,6 +1248,7 @@ function ReadingPassageWithBlocks({
   const [autoCompleteReason, setAutoCompleteReason] = useState("");
   const [isRouteLeaveSubmitting, setIsRouteLeaveSubmitting] = useState(false);
   const [shouldProceedAfterResult, setShouldProceedAfterResult] = useState(false);
+  const [reviewRoute, setReviewRoute] = useState("");
 
   const passageRef = useRef(null);
   const timerIntervalRef = useRef(null);
@@ -1201,6 +1258,7 @@ function ReadingPassageWithBlocks({
   const activeTrackedPassageNumberRef = useRef(null);
   const activeTrackedStartedAtRef = useRef(null);
   const latestActivePassageNumberRef = useRef(null);
+  const lastAttemptResetSignatureRef = useRef(null);
 
   const { clearHighlights, toggleSelectionHighlight } = useTextHighlighting({
     dataAttribute: "data-reading-highlight",
@@ -1255,7 +1313,13 @@ function ReadingPassageWithBlocks({
       questions: getBlockQuestions(block, index),
     }));
   }, [blocks, evaluationBlocks]);
-  const contentResetKey = resetOnContentChange ? blocksWithQuestions.length : 0;
+  const contentResetKey = resetOnContentChange
+    ? [
+      String(passage?._id || ""),
+      ...blocksWithQuestions.map(({ block, index }) => String(block?._id || `block-${index}`)),
+    ].join("|")
+    : "continuous";
+  const hasQuestionBlocksForReset = resetOnContentChange ? blocksWithQuestions.length > 0 : true;
   const attemptResetSignature = `${autoCompleteStorageKey}|${contentResetKey}`;
 
   const clearRunningIntervals = useCallback(() => {
@@ -1472,6 +1536,17 @@ function ReadingPassageWithBlocks({
         correctCount,
         totalQuestions,
         percentage,
+        answerItems: scoreBase.map((item) => ({
+          section: "reading",
+          questionFamily,
+          blockType,
+          blockId: String(block?._id || `block-${index}`),
+          blockTitle,
+          questionNumber: item.questionNumber,
+          studentAnswer: item.studentAnswer,
+          acceptedAnswers: item.acceptedAnswers,
+          isCorrect: Boolean(item.isCorrect),
+        })),
         incorrectItems: scoreBase
           .filter((item) => !item.isCorrect)
           .map((item) => ({
@@ -1491,6 +1566,8 @@ function ReadingPassageWithBlocks({
     const correctCount = blockResults.reduce((sum, item) => sum + Number(item.correctCount || 0), 0);
     const incorrectCount = Math.max(totalQuestions - correctCount, 0);
     const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+    const band = toReadingBand(correctCount, totalQuestions);
+    const answerItems = blockResults.flatMap((item) => item.answerItems || []);
     const incorrectItems = blockResults.flatMap((item) => item.incorrectItems || []);
 
     return {
@@ -1498,6 +1575,8 @@ function ReadingPassageWithBlocks({
       correctCount,
       incorrectCount,
       percentage,
+      band,
+      answerItems,
       incorrectItems,
     };
   }, [evaluationBlocksWithQuestions, selectedAnswersById]);
@@ -1521,24 +1600,39 @@ function ReadingPassageWithBlocks({
         setIsStartModalOpen(false);
 
         const passageTiming = buildPassageTimingPayload();
+        const passageTimingSeconds = passageTiming.reduce(
+          (sum, entry) => sum + Math.max(0, Math.round(Number(entry?.timeSpentSeconds) || 0)),
+          0,
+        );
+        const elapsedAttemptSeconds = Math.max(0, normalizedAttemptDuration - remainingSeconds);
+        const totalTimeSpentSeconds = Math.max(passageTimingSeconds, elapsedAttemptSeconds);
         const nextResult = {
           ...evaluateAttempt(),
           submitReason: String(submitReason || "manual"),
           forceReason: forceReason || "",
           passageTiming,
+          totalTimeSpentSeconds,
         };
 
+        let submitResponse = null;
         if (typeof onAttemptSubmit === "function") {
           try {
-            await onAttemptSubmit({
+            submitResponse = await onAttemptSubmit({
               submitReason: String(submitReason || "manual"),
               forceReason: forceReason || "",
               evaluation: nextResult,
               passageTiming,
+              totalTimeSpentSeconds,
             });
           } catch (submitError) {
             setSubmitError(submitError?.message || "This attempt was completed locally but could not be synced.");
           }
+        }
+
+        const nextReviewRoute = String(submitResponse?.reviewRoute || "").trim();
+        if (nextReviewRoute) {
+          nextResult.reviewRoute = nextReviewRoute;
+          setReviewRoute(nextReviewRoute);
         }
 
         if (forceReason) {
@@ -1564,7 +1658,9 @@ function ReadingPassageWithBlocks({
       clearRunningIntervals,
       commitActivePassageTiming,
       evaluateAttempt,
+      normalizedAttemptDuration,
       onAttemptSubmit,
+      remainingSeconds,
     ],
   );
 
@@ -1649,6 +1745,7 @@ function ReadingPassageWithBlocks({
     setAutoCompleteReason("");
     setIsRouteLeaveSubmitting(false);
     setShouldProceedAfterResult(false);
+    setReviewRoute("");
     setIsStartModalOpen(blocksWithQuestions.length > 0);
   }, [
     autoCompleteStorageKey,
@@ -1661,7 +1758,7 @@ function ReadingPassageWithBlocks({
 
   const handleAnswerChange = useCallback((questionId, value) => {
     const safeQuestionId = String(questionId || "").trim();
-    if (!safeQuestionId || !hasAttemptStarted || isResultModalOpen) {
+    if (!safeQuestionId || !hasAttemptStarted || isResultModalOpen || isSubmittingAttempt) {
       return;
     }
 
@@ -1669,12 +1766,12 @@ function ReadingPassageWithBlocks({
       ...previousMap,
       [safeQuestionId]: String(value || ""),
     }));
-  }, [hasAttemptStarted, isResultModalOpen]);
+  }, [hasAttemptStarted, isResultModalOpen, isSubmittingAttempt]);
 
   const handleChoiceSelect = useCallback(
     (questionId, value, selectionLimit = 1) => {
       const safeQuestionId = String(questionId || "").trim();
-      if (!safeQuestionId || !hasAttemptStarted || isResultModalOpen) {
+      if (!safeQuestionId || !hasAttemptStarted || isResultModalOpen || isSubmittingAttempt) {
         return;
       }
 
@@ -1712,7 +1809,7 @@ function ReadingPassageWithBlocks({
         };
       });
     },
-    [hasAttemptStarted, isResultModalOpen],
+    [hasAttemptStarted, isResultModalOpen, isSubmittingAttempt],
   );
 
   const isExamSessionActive = hasAttemptStarted && !isResultModalOpen && !isSubmittingAttempt;
@@ -1771,13 +1868,19 @@ function ReadingPassageWithBlocks({
       return;
     }
 
+    const targetReviewRoute = String(result?.reviewRoute || reviewRoute || "").trim();
+    if (targetReviewRoute) {
+      navigate(targetReviewRoute);
+      return;
+    }
+
     if (typeof window !== "undefined" && window.history.length > 1) {
       navigate(-1);
       return;
     }
 
     navigate("/student/tests/reading");
-  }, [leaveProtection, navigate, shouldProceedAfterResult]);
+  }, [leaveProtection, navigate, result?.reviewRoute, reviewRoute, shouldProceedAfterResult]);
 
   useEffect(() => {
     const nowMs = Date.now();
@@ -1824,6 +1927,11 @@ function ReadingPassageWithBlocks({
   }, [commitActivePassageTiming]);
 
   useEffect(() => {
+    if (lastAttemptResetSignatureRef.current === attemptResetSignature) {
+      return;
+    }
+
+    lastAttemptResetSignatureRef.current = attemptResetSignature;
     clearRunningIntervals();
     clearPassageHighlights();
     initializePassageTimingState();
@@ -1840,6 +1948,7 @@ function ReadingPassageWithBlocks({
     setAutoCompleteReason("");
     setIsRouteLeaveSubmitting(false);
     setShouldProceedAfterResult(false);
+    setReviewRoute("");
 
     const persisted = readAutoCompleteState(autoCompleteStorageKey);
     if (persisted?.result) {
@@ -1853,13 +1962,13 @@ function ReadingPassageWithBlocks({
       return;
     }
 
-    setIsStartModalOpen(blocksWithQuestions.length > 0);
+    setIsStartModalOpen(hasQuestionBlocksForReset);
   }, [
     attemptResetSignature,
     autoCompleteStorageKey,
-    blocksWithQuestions.length,
     clearPassageHighlights,
     clearRunningIntervals,
+    hasQuestionBlocksForReset,
     initializePassageTimingState,
     normalizedAttemptDuration,
   ]);
@@ -1913,7 +2022,7 @@ function ReadingPassageWithBlocks({
     };
 
     const handleWindowBlur = () => {
-      autoCompleteAttempt("You switched focus away from this page. This reading task was auto-submitted.", "window-blur");
+      autoCompleteAttempt("You did not follow the rule. This reading task was auto-submitted.", "window-blur");
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -1934,9 +2043,11 @@ function ReadingPassageWithBlocks({
   const currentTimerLabel = formatTimerLabel(remainingSeconds);
   const isInputDisabled = !hasAttemptStarted || isResultModalOpen || isSubmittingAttempt;
   const resolvedPrimaryActionDisabled =
-    typeof isPrimaryActionDisabled === "boolean" ? isPrimaryActionDisabled : isInputDisabled;
+    isInputDisabled || (typeof isPrimaryActionDisabled === "boolean" ? isPrimaryActionDisabled : false);
+  const resolvedSecondaryActionDisabled = isInputDisabled || isSecondaryActionDisabled;
   const resultPercentage = Number(result?.percentage || 0);
   const isGoodResult = resultPercentage >= GOOD_SCORE_THRESHOLD_PERCENT;
+  const resultBandLabel = formatBandScore(result?.band ?? toReadingBand(result?.correctCount, result?.totalQuestions));
 
   return (
     <section className="space-y-4">
@@ -1950,8 +2061,8 @@ function ReadingPassageWithBlocks({
       <div className="grid gap-0 lg:h-[calc(100vh-12.5rem)] lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]">
         <section
           className="flex min-h-[24rem] flex-col overflow-hidden border border-slate-200/80 bg-white/95 lg:min-h-0"
-          onMouseUp={handleTextSelectionToggle}
-          onTouchEnd={handleTextSelectionToggle}
+          onMouseUp={isInputDisabled ? undefined : handleTextSelectionToggle}
+          onTouchEnd={isInputDisabled ? undefined : handleTextSelectionToggle}
           ref={passageRef}
         >
         
@@ -1978,8 +2089,14 @@ function ReadingPassageWithBlocks({
                 {isSecondaryActionVisible && typeof onSecondaryAction === "function" ? (
                   <button
                     className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isSecondaryActionDisabled}
-                    onClick={onSecondaryAction}
+                    disabled={resolvedSecondaryActionDisabled}
+                    onClick={() => {
+                      if (resolvedSecondaryActionDisabled) {
+                        return;
+                      }
+
+                      onSecondaryAction();
+                    }}
                     type="button"
                   >
                     {secondaryActionLabel || "Previous"}
@@ -1989,6 +2106,10 @@ function ReadingPassageWithBlocks({
                   className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={resolvedPrimaryActionDisabled}
                   onClick={() => {
+                    if (resolvedPrimaryActionDisabled) {
+                      return;
+                    }
+
                     if (typeof onPrimaryAction === "function") {
                       onPrimaryAction();
                       return;
@@ -2230,7 +2351,7 @@ function ReadingPassageWithBlocks({
               {result.correctCount}/{result.totalQuestions}
             </p>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">
-              Score: {result.percentage}%
+              Score: {resultBandLabel}
             </p>
 
             <div className="mt-6 grid gap-3 text-left sm:grid-cols-2">
@@ -2265,7 +2386,7 @@ function ReadingPassageWithBlocks({
                 onClick={handleResultPrimaryAction}
                 type="button"
               >
-                Leave Page
+                Review
               </button>
             </div>
           </div>

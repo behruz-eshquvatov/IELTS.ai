@@ -19,6 +19,35 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function normalizeInstructionDisplayText(value, wordTarget = MIN_WORD_TARGET) {
+  const safe = normalizeText(value).replace(/\s+/g, " ");
+  if (!safe) {
+    return `Write around ${wordTarget} words.`;
+  }
+
+  if (/write\s+at\s+least\s+\d+\s+words?\.?/i.test(safe)) {
+    return safe.replace(/write\s+at\s+least\s+(\d+)\s+words?\.?/i, "Write around $1 words.");
+  }
+
+  return safe;
+}
+
+function getSubmissionReasonLabel(source) {
+  const safeSource = normalizeText(source).toLowerCase();
+  const labels = {
+    auto: "Timer finished. Task auto-submitted.",
+    "focus-lost": "You switched tabs or browser/window. Task auto-submitted.",
+    "tab-hidden": "You switched tabs. Task auto-submitted.",
+    "browser-blur": "You switched browser/window. Task auto-submitted.",
+    "page-hide": "You refreshed or left the page. Task auto-submitted.",
+    "before-unload": "You refreshed or left the page. Task auto-submitted.",
+    "leave-page": "You chose to leave the page. Task auto-submitted.",
+    manual: "Submitted manually.",
+  };
+
+  return labels[safeSource] || "Task submitted.";
+}
+
 function resolveVisualUrl(url) {
   const safe = normalizeText(url);
   if (!safe) {
@@ -309,7 +338,7 @@ function StudentWritingTask1TaskPage() {
   const wordsGuideText =
     wordsCount >= MIN_WORD_TARGET
       ? "Target reached. Focus on overview and comparisons."
-      : `Write at least ${MIN_WORD_TARGET} words.`;
+      : `Write around ${MIN_WORD_TARGET} words.`;
   const isStartGateModalOpen = !isSubmitted && !isAttemptStarted && !isLoading && !error && item;
 
   useBodyScrollLock(isStartGateModalOpen);
@@ -317,7 +346,7 @@ function StudentWritingTask1TaskPage() {
   const buildSubmissionPayload = useCallback(
     (source) => {
       const question = normalizeText(item?.questionTopic) || "Question topic is unavailable.";
-      const instructionText = normalizeText(item?.instruction?.text);
+      const instructionText = normalizeInstructionDisplayText(item?.instruction?.text);
       const visualAsset = {
         imageId: normalizeText(item?.visualAsset?.imageId),
         url: normalizeText(item?.visualAsset?.url),
@@ -335,10 +364,10 @@ function StudentWritingTask1TaskPage() {
         question,
         questionTopic: question,
         questionMeta: [
-          instructionText || `Write at least ${MIN_WORD_TARGET} words.`,
+          instructionText,
           "Task type: writing_task1",
           `Visual type: ${normalizeText(item?.visualType) || "unknown"}`,
-          `Minimum words: ${MIN_WORD_TARGET}`,
+          `Target length: around ${MIN_WORD_TARGET} words`,
         ],
         visualAsset,
         taskLabel: question,
@@ -374,12 +403,6 @@ function StudentWritingTask1TaskPage() {
     }
 
     const source = normalizeText(submissionPayload?.source).toLowerCase() || "manual";
-    const autoSubmitReasonBySource = {
-      auto: "Timer finished. Task auto-submitted.",
-      "focus-lost": "You switched tab or browser. Task auto-submitted.",
-      "page-hide": "You refreshed or left the page. Task auto-submitted.",
-      "leave-page": "You chose to leave the page. Task auto-submitted.",
-    };
     const resolvedBand = Number(analysisPayload?.overallBand);
 
     void apiRequest("/students/me/daily-tasks/attempts", {
@@ -391,7 +414,7 @@ function StudentWritingTask1TaskPage() {
         sourceType,
         taskLabel: normalizeText(item?.questionTopic) || safeItemId,
         submitReason: source || "manual",
-        forceReason: autoSubmitReasonBySource[source] || "",
+        forceReason: source === "manual" ? "" : getSubmissionReasonLabel(source),
         isAutoSubmitted: source !== "manual",
         submittedAt: submissionPayload?.submittedAt || new Date().toISOString(),
         totalTimeSpentSeconds: Math.max(0, Number(submissionPayload?.timeSpentSeconds) || 0),
@@ -414,7 +437,7 @@ function StudentWritingTask1TaskPage() {
 
   const handleSubmitAttempt = useCallback(
     async (source = "manual") => {
-      if (!isAttemptStarted || isSubmitted || !item) {
+      if (!isAttemptStarted || isSubmitted || isCheckingEssay || !item) {
         return;
       }
 
@@ -469,6 +492,7 @@ function StudentWritingTask1TaskPage() {
       analysisStorageKey,
       attemptStartStorageKey,
       buildSubmissionPayload,
+      isCheckingEssay,
       isAttemptStarted,
       isSubmitted,
       item,
@@ -565,7 +589,7 @@ function StudentWritingTask1TaskPage() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        handleSubmitAttempt("focus-lost");
+        handleSubmitAttempt("tab-hidden");
       }
     };
 
@@ -573,10 +597,16 @@ function StudentWritingTask1TaskPage() {
       handleSubmitAttempt("page-hide");
     };
 
+    const handleWindowBlur = () => {
+      handleSubmitAttempt("browser-blur");
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("pagehide", handlePageHide);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("pagehide", handlePageHide);
     };
   }, [handleSubmitAttempt, isExamSessionActive]);
@@ -738,7 +768,7 @@ function StudentWritingTask1TaskPage() {
               </div>
               <textarea
                 className="h-[56vh] min-h-[380px] w-full resize-none border border-slate-200 bg-white px-4 py-4 text-base leading-7 text-slate-900 outline-none transition focus:border-emerald-300"
-                disabled={!isAttemptStarted || isSubmitted}
+                disabled={!isAttemptStarted || isSubmitted || isCheckingEssay}
                 onChange={(event) => setEssayText(event.target.value)}
                 placeholder="Write your Task 1 response here..."
                 spellCheck={false}
@@ -755,7 +785,11 @@ function StudentWritingTask1TaskPage() {
                 </p>
                 <p className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  Leaving this page auto-submits your current response.
+                  If you refresh or leave this page, your response is submitted automatically and the timer stops.
+                </p>
+                <p className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  Submit when ready. If the timer reaches 00:00, your response is submitted automatically.
                 </p>
               </div>
             </section>
@@ -768,7 +802,7 @@ function StudentWritingTask1TaskPage() {
               onClick={() => handleSubmitAttempt("manual")}
               type="button"
             >
-              {isCheckingEssay ? "Checking..." : isSubmitted ? "Submitted" : "Submit Task"}
+              {isCheckingEssay ? "Submitting..." : isSubmitted ? "Submitted" : "Submit Task"}
             </button>
           </aside>
         </div>
@@ -788,7 +822,7 @@ function StudentWritingTask1TaskPage() {
         </p>
         {resultPayload?.submission?.source || submissionMeta?.source ? (
           <p className="text-sm text-slate-600">
-            Source: {normalizeText(resultPayload?.submission?.source || submissionMeta?.source)}
+            Reason: {getSubmissionReasonLabel(resultPayload?.submission?.source || submissionMeta?.source)}
           </p>
         ) : null}
         {resultPayload?.analysisError ? (
@@ -843,7 +877,7 @@ function StudentWritingTask1TaskPage() {
             <div className="mx-auto mt-4 max-w-2xl space-y-2 text-base font-medium leading-8 text-slate-700">
               <p>
                 You have <span className="text-yellow-500">{Math.max(1, Math.round(durationSeconds / 60))} minutes</span> for this writing task.
-                If you <span className="text-yellow-500">switch</span> tabs, <span className="text-yellow-500">change</span> browser, or <span className="text-yellow-500">refresh</span>, this task is <span className="text-yellow-500">auto-submitted</span>.
+                If you <span className="text-yellow-500">switch</span> tabs, <span className="text-yellow-500">change</span> browser, or <span className="text-yellow-500">refresh it</span>, this task is <span className="text-yellow-500">auto-submitted</span>.
               </p>
             </div>
             <button
