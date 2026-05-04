@@ -15,6 +15,7 @@ const FILTER_ORDER = [
   "writing_task2",
   "reading_full_test",
   "listening_full_test",
+  "part_by_part",
   "question_type_task",
 ];
 

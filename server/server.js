@@ -12,10 +12,50 @@ const apiRoutes = require("./routes");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+function getAllowedOrigins() {
+  return String(process.env.CLIENT_ORIGIN || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+}
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  const normalizedOrigin = String(origin).replace(/\/+$/, "");
+  if (getAllowedOrigins().includes(normalizedOrigin)) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(normalizedOrigin);
+    const host = parsed.hostname;
+    return (
+      parsed.protocol === "http:" &&
+      parsed.port === "5173" &&
+      (host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.startsWith("192.168.") ||
+        host.startsWith("10.") ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(host))
+    );
+  } catch {
+    return false;
+  }
+}
+
 app.disable("x-powered-by");
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    origin(origin, callback) {
+      if (isAllowedCorsOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   }),
 );

@@ -1,7 +1,14 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import gsap from 'gsap';
 import useCanHover from '../../hooks/useCanHover';
+
+const MAX_SHIFT_X = 7;
+const MAX_SHIFT_Y = 5;
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
 
 const MagneticButton = ({
   href,
@@ -11,6 +18,12 @@ const MagneticButton = ({
   innerClassName = '',
   disableGlow = false,
   disableMagnetic = false,
+  disabled = false,
+  maxShiftX = MAX_SHIFT_X,
+  maxShiftY = MAX_SHIFT_Y,
+  motionDuration = 0.18,
+  resetDuration = 0.28,
+  onBlur,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -21,56 +34,109 @@ const MagneticButton = ({
   const innerRef = useRef(null);
   const glowRef = useRef(null);
   const canHover = useCanHover();
+  const isInteractive = canHover && !disableMagnetic && !disabled;
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    const glow = glowRef.current;
+
+    return () => {
+      gsap.killTweensOf([outer, inner, glow].filter(Boolean));
+    };
+  }, []);
+
+  const resetMotion = (duration = resetDuration) => {
+    gsap.killTweensOf([outerRef.current, innerRef.current, glowRef.current].filter(Boolean));
+
+    if (outerRef.current) {
+      gsap.to(outerRef.current, {
+        scale: 1,
+        duration,
+        ease: 'power3.out',
+        overwrite: true,
+      });
+    }
+
+    if (innerRef.current) {
+      gsap.to(innerRef.current, {
+        x: 0,
+        y: 0,
+        scale: 1,
+        duration,
+        ease: 'power3.out',
+        overwrite: true,
+      });
+    }
+
+    if (!disableGlow && glowRef.current) {
+      gsap.to(glowRef.current, {
+        opacity: 0,
+        duration: 0.18,
+        ease: 'power2.out',
+        overwrite: true,
+      });
+    }
+  };
 
   const handleMove = (event) => {
-    if (!canHover || disableMagnetic || !outerRef.current || !innerRef.current) return;
+    if (!isInteractive || !outerRef.current || !innerRef.current) return;
 
     const bounds = outerRef.current.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
 
     const relX = event.clientX - bounds.left;
     const relY = event.clientY - bounds.top;
+    const normalizedX = (relX / bounds.width - 0.5) * 2;
+    const normalizedY = (relY / bounds.height - 0.5) * 2;
 
-    const x = (relX - bounds.width / 2) * 0.18;
-    const y = (relY - bounds.height / 2) * 0.28;
+    const safeMaxShiftX = Math.max(0, Number(maxShiftX) || 0);
+    const safeMaxShiftY = Math.max(0, Number(maxShiftY) || 0);
+    const safeMotionDuration = Math.max(0.04, Number(motionDuration) || 0.18);
+    const x = clamp(normalizedX * safeMaxShiftX, -safeMaxShiftX, safeMaxShiftX);
+    const y = clamp(normalizedY * safeMaxShiftY, -safeMaxShiftY, safeMaxShiftY);
 
-    // magnetic motion
     gsap.to(innerRef.current, {
       x,
       y,
-      scale: 1.02,
-      duration: 0.28,
-      ease: 'power2.out',
-      overwrite: 'auto',
+      scale: 1.015,
+      duration: safeMotionDuration,
+      ease: 'power3.out',
+      overwrite: true,
     });
 
-    // glow follow
-    if (glowRef.current) {
+    if (!disableGlow && glowRef.current) {
       gsap.to(glowRef.current, {
         x: relX,
         y: relY,
-        duration: 0.2,
-        ease: 'power2.out',
+        duration: safeMotionDuration,
+        ease: 'power3.out',
+        overwrite: true,
       });
     }
   };
 
   const handleEnter = (event) => {
-    if (!canHover || disableMagnetic) {
+    if (!isInteractive) {
       onMouseEnter?.(event);
       return;
     }
 
+    const safeMotionDuration = Math.max(0.04, Number(motionDuration) || 0.18);
+
     gsap.to(outerRef.current, {
       scale: 1.01,
-      duration: 0.25,
-      ease: 'power2.out',
+      duration: safeMotionDuration,
+      ease: 'power3.out',
+      overwrite: true,
     });
 
     if (!disableGlow && glowRef.current) {
       gsap.to(glowRef.current, {
         opacity: 1,
-        duration: 0.25,
+        duration: safeMotionDuration,
         ease: 'power2.out',
+        overwrite: true,
       });
     }
 
@@ -78,50 +144,36 @@ const MagneticButton = ({
   };
 
   const handleLeave = (event) => {
-    if (!canHover || disableMagnetic) {
+    if (!isInteractive) {
       onMouseLeave?.(event);
       return;
     }
 
-    gsap.to(outerRef.current, {
-      scale: 1,
-      duration: 0.4,
-      ease: 'power3.out',
-    });
-
-    gsap.to(innerRef.current, {
-      x: 0,
-      y: 0,
-      scale: 1,
-      duration: 0.6,
-      ease: 'elastic.out(1, 0.42)',
-    });
-
-    if (!disableGlow && glowRef.current) {
-      gsap.to(glowRef.current, {
-        opacity: 0,
-        duration: 0.3,
-        ease: 'power2.out',
-      });
-    }
-
+    resetMotion(resetDuration);
     onMouseLeave?.(event);
+  };
+
+  const handleBlur = (event) => {
+    resetMotion(0.18);
+    onBlur?.(event);
   };
 
   const sharedProps = {
     ref: outerRef,
+    disabled,
     onClick,
-    onMouseMove: canHover && !disableMagnetic ? handleMove : undefined,
-    onMouseEnter: canHover ? handleEnter : onMouseEnter,
-    onMouseLeave: canHover ? handleLeave : onMouseLeave,
-    className: `relative inline-block ${className}`, // cursor visible now
+    onMouseMove: isInteractive ? handleMove : undefined,
+    onMouseEnter: isInteractive ? handleEnter : onMouseEnter,
+    onMouseLeave: isInteractive ? handleLeave : onMouseLeave,
+    onBlur: handleBlur,
+    className: `relative inline-block align-middle ${className}`,
     ...rest,
   };
 
   const content = (
     <span
       ref={innerRef}
-      className={`relative block will-change-transform overflow-hidden ${innerClassName}`}
+      className={`relative block transform-gpu will-change-transform overflow-hidden ${innerClassName}`}
     >
       {!disableGlow ? (
         <span

@@ -82,6 +82,10 @@ function ActionButton({ label, onClick, disabled = false }) {
       onClick={onClick}
       type="button"
       disabled={disabled}
+      maxShiftX={4}
+      maxShiftY={3}
+      motionDuration={0.08}
+      resetDuration={0.12}
     >
       {label}
     </MagneticButton>

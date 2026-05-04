@@ -210,7 +210,7 @@ export default function StudentAnalyticsAssistantPage() {
           <div className="mt-4 flex items-center gap-3 border-t border-slate-200 pt-4">
             <textarea
               placeholder="Ask about your week..."
-              className="max-h-36 min-h-[2.625rem] flex-1 resize-none whitespace-pre-wrap border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300"
+              className="max-h-36 min-h-[2.625rem] flex-1 resize-none whitespace-pre-wrap border-0 border-b border-slate-200 bg-transparent px-0 py-2 text-sm leading-6 text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300"
               onChange={(event) => setChatDraft(event.target.value)}
               onKeyDown={handleChatKeyDown}
               rows={chatTextareaRows}

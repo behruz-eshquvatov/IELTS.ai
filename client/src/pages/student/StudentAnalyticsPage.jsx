@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import StudentAnalyticsAdvisor from "../../components/student/StudentAnalyticsAdvisor";
 import StudentAnalyticsRangePicker from "../../components/student/StudentAnalyticsRangePicker";
@@ -18,27 +18,87 @@ const DEFAULT_SECTION_FILTERS = [
 ];
 
 function StudentAnalyticsSectionPicker({ options = DEFAULT_SECTION_FILTERS, value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef(null);
   const safeOptions = Array.isArray(options) && options.length ? options : DEFAULT_SECTION_FILTERS;
   const activeOption = safeOptions.find((item) => item.value === value) || safeOptions[0];
 
+  useEffect(() => {
+    function handleOutsideClick(event) {
+      if (!rootRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
   return (
-    <label className="relative block min-w-[180px] border border-slate-200/90 bg-[#fffaf4] px-4 py-2.5 transition focus-within:border-emerald-300/60">
-      <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-        Task section
-      </span>
-      <select
-        className="mt-0.5 block w-full appearance-none bg-transparent pr-8 text-sm font-semibold text-slate-900 outline-none"
-        onChange={(event) => onChange?.(event.target.value)}
-        value={activeOption.value}
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="group flex min-w-[180px] items-center justify-between gap-3 rounded-none border border-slate-200/90 bg-[#fffaf4] px-4 py-2.5 text-left transition hover:border-emerald-300/60"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
       >
-        {safeOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-    </label>
+        <span className="block">
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Task section
+          </span>
+          <span className="mt-0.5 block text-sm font-semibold text-slate-900">
+            {activeOption.label}
+          </span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      <div
+        className={`absolute right-0 top-[calc(100%+0.5rem)] z-30 min-w-[180px] overflow-hidden rounded-none border border-slate-200/90 bg-[#fffaf4] shadow-[0_20px_50px_-35px_rgba(15,23,42,0.45)] transition ${
+          isOpen ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 -translate-y-1"
+        }`}
+        role="listbox"
+        aria-label="Task section options"
+      >
+        {safeOptions.map((option) => {
+          const isActive = option.value === activeOption.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange?.(option.value);
+                setIsOpen(false);
+              }}
+              className={`w-full border-b border-slate-200/70 px-4 py-2.5 text-left text-sm transition last:border-b-0 ${
+                isActive
+                  ? "emerald-gradient-fill font-semibold text-white"
+                  : "text-slate-700 hover:bg-emerald-50/70 hover:text-emerald-800"
+              }`}
+              role="option"
+              aria-selected={isActive}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

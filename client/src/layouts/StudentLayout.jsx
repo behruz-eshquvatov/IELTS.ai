@@ -383,9 +383,8 @@ const StudentMainContent = memo(function StudentMainContent() {
               aria-label="Notifications"
               aria-haspopup="dialog"
               aria-expanded={isNotificationsOpen}
-              className="group relative flex h-9 w-9 items-center justify-center overflow-visible rounded-none border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300/40 hover:text-white hover:shadow-[0_14px_28px_-26px_rgba(16,185,129,0.24)]"
+              className="group relative flex h-9 w-9 items-center justify-center overflow-visible rounded-none text-slate-600 transition hover:text-emerald-700"
             >
-              <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 emerald-gradient-fill" />
               <Bell className="relative h-5 w-5" />
               {classJoinNotifications.length > 0 ? (
                 <span className="absolute right-0 top-0 z-10 inline-flex h-[18px] min-w-[18px] translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
@@ -473,7 +472,7 @@ const StudentMainContent = memo(function StudentMainContent() {
 
 function StudentLayout() {
   const location = useLocation();
-  useStudyHeatmapTracker(isStudyTrackingRoute(location.pathname));
+  useStudyHeatmapTracker(true, isStudyTrackingRoute(location.pathname));
 
   return (
     <div className="min-h-screen bg-[#f7f4ef] text-slate-900 font-sans flex flex-col lg:flex-row">

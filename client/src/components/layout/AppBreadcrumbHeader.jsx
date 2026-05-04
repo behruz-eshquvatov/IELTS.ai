@@ -1,4 +1,4 @@
-import { ChevronRight, Monitor } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 export default function AppBreadcrumbHeader({ segments = [] }) {
   const safeSegments = (Array.isArray(segments) ? segments : [])
@@ -10,9 +10,6 @@ export default function AppBreadcrumbHeader({ segments = [] }) {
       aria-label="Page breadcrumb"
       className="flex min-w-0 items-center gap-2 text-sm font-medium text-slate-600"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-slate-200 bg-white text-slate-500">
-        <Monitor className="h-4 w-4" />
-      </span>
       {safeSegments.map((segment, index) => {
         const isLast = index === safeSegments.length - 1;
 

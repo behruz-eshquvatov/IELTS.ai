@@ -28,6 +28,7 @@ const RESULTS_CENTER_FILTER_KEYS = [
   RESULT_CATEGORIES.WRITING_TASK2,
   RESULT_CATEGORIES.READING_FULL_TEST,
   RESULT_CATEGORIES.LISTENING_FULL_TEST,
+  "part_by_part",
   "question_type_task",
   RESULT_CATEGORIES.READING_QUESTION_TASK,
   RESULT_CATEGORIES.LISTENING_QUESTION_TASK,
@@ -39,6 +40,7 @@ const RESULTS_CENTER_FILTER_LABELS = {
   [RESULT_CATEGORIES.WRITING_TASK2]: "WRITING T2",
   [RESULT_CATEGORIES.READING_FULL_TEST]: "READING FULL TESTS",
   [RESULT_CATEGORIES.LISTENING_FULL_TEST]: "LISTENING FULL TESTS",
+  part_by_part: "PART BY PART",
   question_type_task: "QUESTION TYPE TASKS",
 };
 
@@ -49,6 +51,8 @@ const FILTER_ALIASES = {
   reading_full_test: RESULT_CATEGORIES.READING_FULL_TEST,
   listening_full: RESULT_CATEGORIES.LISTENING_FULL_TEST,
   listening_full_test: RESULT_CATEGORIES.LISTENING_FULL_TEST,
+  part_by_part: "part_by_part",
+  listening_part: "part_by_part",
   question_type_task: "question_type_task",
   reading_question: RESULT_CATEGORIES.READING_QUESTION_TASK,
   reading_question_task: RESULT_CATEGORIES.READING_QUESTION_TASK,
@@ -99,8 +103,15 @@ function normalizeResultsCenterFilter(value) {
   return FILTER_ALIASES[safe] || "all";
 }
 
-function isQuestionFilter(filterKey) {
-  return normalizeResultsCenterFilter(filterKey) === "question_type_task";
+function isPartByPartResult(group = {}) {
+  const safeCategory = normalizeText(group?.taskCategory, "", 80).toLowerCase();
+  const safeSourceType = normalizeSourceType(group?.sourceType);
+  const safeTaskRefId = normalizeTaskRefId(group?.taskRefId);
+
+  return (
+    safeCategory === RESULT_CATEGORIES.LISTENING_QUESTION_TASK &&
+    (safeSourceType === "listening_part" || safeTaskRefId.includes("::part:"))
+  );
 }
 
 function doesCategoryMatchFilter(taskCategory, filterKey) {
@@ -118,6 +129,15 @@ function doesCategoryMatchFilter(taskCategory, filterKey) {
   }
 
   return safeCategory === safeFilter;
+}
+
+function doesGroupMatchFilter(group, filterKey) {
+  const safeFilter = normalizeResultsCenterFilter(filterKey);
+  if (safeFilter === "part_by_part") {
+    return isPartByPartResult(group);
+  }
+
+  return doesCategoryMatchFilter(group?.taskCategory, safeFilter);
 }
 
 function toReadableLabel(value) {
@@ -1190,6 +1210,9 @@ function buildFilterSummaries(groupedResults = []) {
     ) {
       counts.question_type_task += 1;
     }
+    if (isPartByPartResult(group)) {
+      counts.part_by_part += 1;
+    }
   });
   counts.all = (Array.isArray(groupedResults) ? groupedResults : []).length;
 
@@ -1204,9 +1227,7 @@ async function listResultsCenterGroups(studentUserId, options = {}) {
   const activeFilter = normalizeResultsCenterFilter(options?.category);
   const { groupedResults } = await buildGroupedResults(studentUserId);
   const filters = buildFilterSummaries(groupedResults);
-  const groups = groupedResults.filter((group) =>
-    doesCategoryMatchFilter(group?.taskCategory, activeFilter),
-  );
+  const groups = groupedResults.filter((group) => doesGroupMatchFilter(group, activeFilter));
 
   return {
     activeFilter,

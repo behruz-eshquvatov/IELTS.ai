@@ -23,6 +23,10 @@ const MotionDiv = motion.div;
 const MotionSection = motion.section;
 const MotionSpan = motion.span;
 
+function normalizeOrganizationName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 const teacherModes = {
   login: {
     label: "Teacher log in",
@@ -181,7 +185,7 @@ function TeacherRegistrationPage() {
 
         await authApi.me();
         navigate("/teacher/classes", { replace: true });
-      } catch (error) {
+      } catch {
         clearAuthSession();
       } finally {
         if (isMounted) {
@@ -290,6 +294,9 @@ function TeacherRegistrationPage() {
     }
 
     const trimmedEmail = formData.workEmail.trim().toLowerCase();
+    let resolvedOrganizationId = formData.organizationId;
+
+    setOrganizationTouched(true);
     if (!trimmedEmail || !formData.password) {
       setStatus({
         type: "error",
@@ -315,19 +322,40 @@ function TeacherRegistrationPage() {
         return;
       }
 
-      if (!hasValidOrganizationSelection) {
-        setStatus({
-          type: "error",
-          message: "Please select a valid organization from the list.",
-        });
-        return;
-      }
-
       if (formData.password !== formData.confirmPassword) {
         setStatus({
           type: "error",
           message: "Passwords do not match.",
         });
+        return;
+      }
+
+      if (!resolvedOrganizationId) {
+        try {
+          const response = await organizationsApi.search(formData.organization);
+          const normalizedInput = normalizeOrganizationName(formData.organization);
+          const matchingOrganization = (Array.isArray(response?.organizations) ? response.organizations : [])
+            .find((organization) => normalizeOrganizationName(organization?.name) === normalizedInput);
+
+          if (matchingOrganization?._id) {
+            resolvedOrganizationId = String(matchingOrganization._id);
+            setFormData((current) => ({
+              ...current,
+              organization: String(matchingOrganization.name || current.organization),
+              organizationId: resolvedOrganizationId,
+            }));
+          }
+        } catch {
+          resolvedOrganizationId = "";
+        }
+      }
+
+      if (!resolvedOrganizationId) {
+        setStatus({
+          type: "error",
+          message: "Please select a valid organization from the list.",
+        });
+        setIsOrganizationDropdownOpen(true);
         return;
       }
     }
@@ -344,7 +372,7 @@ function TeacherRegistrationPage() {
               password: formData.password,
               confirmPassword: formData.confirmPassword,
               role: "teacher",
-              organizationId: formData.organizationId,
+              organizationId: resolvedOrganizationId,
               rememberMe: true,
             }
           : {
@@ -783,7 +811,7 @@ function TeacherRegistrationPage() {
                           <MagneticButton
                             className="rounded-full"
                             innerClassName={authPrimaryButtonClass}
-                            disabled={isSubmitting || (mode === "signup" && !hasValidOrganizationSelection)}
+                            disabled={isSubmitting}
                             type="submit"
                           >
                             <span className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-150%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(150%)]">

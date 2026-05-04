@@ -7,6 +7,10 @@ const StudentProfile = require("../models/studentProfileModel");
 const StudentAnalytics = require("../models/studentAnalyticsModel");
 const { studentAnalyticsSeed } = require("../data/studentSeedData");
 const {
+  isEmailDeliveryConfigured,
+  sendPasswordResetEmail,
+} = require("../services/emailService");
+const {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
@@ -86,8 +90,8 @@ function buildResetPath(role) {
   return role === "teacher" ? "/teachers/reset-password" : "/student/reset-password";
 }
 
-function buildResetUrl({ role, token }) {
-  const clientOrigin = (process.env.CLIENT_ORIGIN || "http://localhost:5173").replace(/\/+$/, "");
+function buildResetUrl({ role, token, origin = "" }) {
+  const clientOrigin = String(origin || process.env.CLIENT_ORIGIN || "http://localhost:5173").replace(/\/+$/, "");
   const search = new URLSearchParams({ token }).toString();
   return `${clientOrigin}${buildResetPath(role)}?${search}`;
 }
@@ -360,31 +364,53 @@ async function forgotPassword(req, res) {
   const query = role ? { email, role } : { email };
   const user = await User.findOne(query).select("+resetPasswordTokenHash +resetPasswordExpiresAt");
   if (!user || !user.isActive) {
+    const isDev = process.env.NODE_ENV !== "production";
+    const userWithOtherRole = isDev && role
+      ? await User.findOne({ email }).select("role isActive").lean()
+      : null;
+
     return res.json({
       message: "If that email exists, a password reset link has been sent.",
+      ...(isDev && userWithOtherRole?.isActive
+        ? {
+            debugMessage: `This email exists as a ${userWithOtherRole.role} account, not a ${role} account.`,
+          }
+        : {}),
     });
   }
 
   const token = crypto.randomBytes(PASSWORD_RESET_TOKEN_BYTES).toString("hex");
   const tokenHash = hashResetToken(token);
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
-  const resetUrl = buildResetUrl({ role: user.role, token });
+  const resetUrl = buildResetUrl({ role: user.role, token, origin: req.headers.origin });
 
   user.resetPasswordTokenHash = tokenHash;
   user.resetPasswordExpiresAt = expiresAt;
   await user.save();
 
-  // TODO: Replace console delivery with email provider integration.
-  console.info(`[auth] Password reset link for ${user.email}: ${resetUrl}`);
-
   const isDev = process.env.NODE_ENV !== "production";
+  const delivery = await sendPasswordResetEmail({
+    to: user.email,
+    resetUrl,
+    role: user.role,
+    expiresAt,
+  });
+
+  if (!delivery.sent) {
+    console.info(`[auth] Password reset link for ${user.email}: ${resetUrl}`);
+  }
+  const shouldExposeResetUrl = !delivery.sent;
 
   return res.json({
     message: "If that email exists, a password reset link has been sent.",
-    ...(isDev
+    ...(shouldExposeResetUrl
       ? {
           resetUrl,
           expiresAt: expiresAt.toISOString(),
+          emailDeliveryConfigured: isEmailDeliveryConfigured(),
+          emailDeliveryMessage: delivery.sent
+            ? "Reset email sent."
+            : "SMTP is not configured, so use the development reset link below.",
         }
       : {}),
   });

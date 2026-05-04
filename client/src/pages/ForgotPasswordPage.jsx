@@ -66,8 +66,12 @@ function ForgotPasswordPage() {
       setStatus({
         type: "success",
         message: response?.message || "If that email exists, a password reset link has been sent.",
-        resetUrl: response?.resetUrl || "",
+        resetUrl: response?.emailDeliveryConfigured ? "" : response?.resetUrl || "",
         expiresAt: response?.expiresAt || "",
+        debugMessage: response?.debugMessage || "",
+        emailDeliveryMessage: response?.emailDeliveryConfigured
+          ? "Reset email sent. Please check your inbox."
+          : response?.emailDeliveryMessage || "",
       });
     } catch (error) {
       setStatus({
@@ -211,6 +215,12 @@ function ForgotPasswordPage() {
                       initial={{ opacity: 0, y: 10 }}
                     >
                       <p>{status.message}</p>
+                      {status.emailDeliveryMessage ? (
+                        <p className="mt-2">{status.emailDeliveryMessage}</p>
+                      ) : null}
+                      {status.debugMessage ? (
+                        <p className="mt-2">{status.debugMessage}</p>
+                      ) : null}
                       {status.resetUrl ? (
                         <p className="mt-2 break-all">
                           Development reset link:{" "}
@@ -219,7 +229,7 @@ function ForgotPasswordPage() {
                           </a>
                         </p>
                       ) : null}
-                      {status.expiresAt ? (
+                      {status.resetUrl && status.expiresAt ? (
                         <p className="mt-1">Expires at: {new Date(status.expiresAt).toLocaleString()}</p>
                       ) : null}
                     </MotionDiv>

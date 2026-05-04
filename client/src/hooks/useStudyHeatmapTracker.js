@@ -86,12 +86,12 @@ async function postHeatmapDay(date, minutesSpent) {
   return upsertHeatmapDay(date, normalizeMinutes(minutesSpent, 0));
 }
 
-export function useStudyHeatmapTracker(isTrackingActive = false) {
+export function useStudyHeatmapTracker(shouldRecordVisit = false, shouldTrackMinutes = shouldRecordVisit) {
   const stateRef = useRef(createDefaultTrackerState());
   const lastVisibleAtRef = useRef(0);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !isTrackingActive) {
+    if (typeof window === "undefined" || !shouldRecordVisit) {
       return undefined;
     }
 
@@ -116,8 +116,10 @@ export function useStudyHeatmapTracker(isTrackingActive = false) {
         await postHeatmapDay(state.date, safeMinutes);
         state.lastSyncedMinutes = Math.max(state.lastSyncedMinutes, safeMinutes);
         writeTrackerState(state);
+        return true;
       } catch {
         // Keep local state; next flush will retry.
+        return false;
       }
     };
 
@@ -126,9 +128,11 @@ export function useStudyHeatmapTracker(isTrackingActive = false) {
         return;
       }
 
-      await syncState(state, { ...options, force: true });
-      state.visitSynced = true;
-      writeTrackerState(state);
+      const didSync = await syncState(state, { ...options, force: true });
+      if (didSync) {
+        state.visitSynced = true;
+        writeTrackerState(state);
+      }
     };
 
     const markThresholds = async (state) => {
@@ -173,7 +177,7 @@ export function useStudyHeatmapTracker(isTrackingActive = false) {
       const deltaMs = Math.min(Math.max(now - lastVisibleAtRef.current, 0), MAX_DELTA_MS);
       lastVisibleAtRef.current = now;
 
-      if (document.visibilityState !== "visible" && !allowHidden) {
+      if (!shouldTrackMinutes || (document.visibilityState !== "visible" && !allowHidden)) {
         return;
       }
 
@@ -226,7 +230,7 @@ export function useStudyHeatmapTracker(isTrackingActive = false) {
       const state = stateRef.current;
       sendHeatmapDayKeepalive(state.date, state.minutesSpent);
     };
-  }, [isTrackingActive]);
+  }, [shouldRecordVisit, shouldTrackMinutes]);
 }
 
 export default useStudyHeatmapTracker;

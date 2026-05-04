@@ -155,8 +155,8 @@ export default function StudentAnalyticsWeakSectionsTable({
       </div>
 
       <div className="rounded-none border border-slate-200/80 bg-[#fffaf4] p-5">
-        <div className="space-y-6">
-          <div className="h-[340px] w-full">
+        <div className="grid gap-6 xl:grid-cols-[minmax(280px,420px)_1fr] xl:items-center">
+          <div className="h-[280px] w-full sm:h-[340px] xl:h-[360px]">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -186,7 +186,7 @@ export default function StudentAnalyticsWeakSectionsTable({
             )}
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3 xl:self-center">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Most common mistake types in {selectedPartLabel}
             </p>
